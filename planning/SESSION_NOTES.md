@@ -141,3 +141,24 @@ Einen geschuetzten Download-Link fuer gespeicherte Revisionen bauen, damit Uploa
 ### Naechster Kleiner Schritt Nach Download
 
 Den aktuellen Web-Upload/Download-Pfad im Browser testen und danach committen.
+
+### Fortschritt Rollen
+
+- `plm/permissions.py` angelegt.
+- Rollen-Gruppen festgelegt:
+  - `admin`
+  - `editor`
+  - `reader`
+- Management-Command `setup_plm_roles` angelegt.
+- Der Command erstellt die Gruppen und weist erste Django-Modellrechte zu:
+  - `reader`: View-Rechte
+  - `editor`: View/Add/Change-Rechte, keine Delete-Rechte
+  - `admin`: alle PLM-Modellrechte
+- Upload von Revisionen ist nur fuer Superuser, `admin` und `editor` erlaubt.
+- `reader` sieht auf der Teildetail-Seite kein Upload-Formular und bekommt beim POST einen HTTP-403.
+- Die lokalen Gruppen wurden mit `manage.py setup_plm_roles` angelegt.
+- `manage.py test plm` laeuft mit 19 Tests erfolgreich.
+
+### Naechster Kleiner Schritt Nach Rollen
+
+Eine Freigabe-Aktion fuer Revisionen bauen: Entwurf zu `released`, mit Rollenpruefung und AuditEvent.

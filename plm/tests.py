@@ -1,15 +1,18 @@
-from io import BytesIO
+from io import BytesIO, StringIO
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .fcstd import validate_fcstd_upload
 from .models import AuditEvent, Part, Project, Revision
+from .permissions import ROLE_EDITOR, ROLE_READER, can_upload_revision
 from .services import create_revision_from_upload, next_revision_code
 
 
@@ -141,6 +144,7 @@ class RevisionUploadViewTests(TestCase):
         self.user = get_user_model().objects.create_user(
             username="viewer",
             password="test",
+            is_superuser=True,
         )
         self.project = Project.objects.create(code="PRJ", name="Projekt")
         self.part = Part.objects.create(
@@ -234,3 +238,56 @@ class RevisionUploadViewTests(TestCase):
             AuditEvent.objects.get().action,
             AuditEvent.Action.REVISION_DOWNLOADED,
         )
+
+
+class RolePermissionTests(TestCase):
+    def setUp(self):
+        call_command("setup_plm_roles", stdout=StringIO())
+        self.reader = get_user_model().objects.create_user(
+            username="reader",
+            password="test",
+        )
+        self.reader.groups.add(Group.objects.get(name=ROLE_READER))
+        self.editor = get_user_model().objects.create_user(
+            username="editor-role",
+            password="test",
+        )
+        self.editor.groups.add(Group.objects.get(name=ROLE_EDITOR))
+        self.project = Project.objects.create(code="PRJ", name="Projekt")
+        self.part = Part.objects.create(
+            project=self.project,
+            number="P-001",
+            name="Testteil",
+        )
+
+    def test_reader_cannot_upload_revision(self):
+        self.assertFalse(can_upload_revision(self.reader))
+
+        self.client.force_login(self.reader)
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_zip_upload()},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Revision.objects.exists())
+
+    def test_reader_does_not_see_upload_form(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertNotContains(response, "Neue Revision hochladen")
+        self.assertNotContains(response, "Revision hochladen")
+
+    def test_editor_can_upload_revision(self):
+        self.assertTrue(can_upload_revision(self.editor))
+
+        self.client.force_login(self.editor)
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_zip_upload()},
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        self.assertEqual(Revision.objects.count(), 1)

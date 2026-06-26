@@ -85,3 +85,22 @@ Grund:
 - Die Revisionshistorie bleibt aussagekraeftiger.
 
 Status: entschieden.
+
+## 2026-06-26: Einfache Rollen Fuer V1
+
+Entscheidung: V1 startet mit drei Django-Gruppen: `admin`, `editor`, `reader`.
+
+Regeln:
+
+- `reader`: ansehen und herunterladen.
+- `editor`: ansehen, herunterladen und Revisionen hochladen.
+- `admin`: volle PLM-Verwaltung innerhalb der Anwendung.
+- Superuser duerfen immer alles.
+
+Grund:
+
+- Das Modell ist einfach genug fuer ein kleines LAN-Team.
+- Django-Gruppen bleiben transparent im Admin wartbar.
+- Upload-Rechte sind fuer den ersten produktiven Pfad sofort durchsetzbar.
+
+Status: entschieden.

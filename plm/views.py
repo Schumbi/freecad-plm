@@ -2,10 +2,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import RevisionUploadForm
 from .models import AuditEvent, Part, Project, Revision
+from .permissions import can_upload_revision
 from .services import create_revision_from_upload
 
 
@@ -40,6 +42,7 @@ def part_detail(request, part_id):
             "part": part,
             "revisions": revisions,
             "form": RevisionUploadForm(),
+            "can_upload": can_upload_revision(request.user),
         },
     )
 
@@ -47,6 +50,9 @@ def part_detail(request, part_id):
 @login_required
 def upload_revision(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Hochladen von Revisionen.")
+
     if request.method != "POST":
         return redirect("plm:part_detail", part_id=part.id)
 
@@ -75,6 +81,7 @@ def upload_revision(request, part_id):
             "part": part,
             "revisions": revisions,
             "form": form,
+            "can_upload": can_upload_revision(request.user),
         },
         status=400,
     )
