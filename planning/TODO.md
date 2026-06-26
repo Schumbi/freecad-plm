@@ -6,9 +6,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Jetzt
 
-- Superuser fuer lokale Admin-Oberflaeche anlegen.
-- Admin-Oberflaeche mit ersten Projekt-/Teil-/Revision-Daten testen.
-- Upload-Formular fuer `FCStd`-Revisionen bauen.
+- Upload im Browser erneut testen: gleicher Datei-Hash muss blockiert werden.
+- Download-Link fuer gespeicherte Revisionen im Browser testen.
+- Admin-Oberflaeche mit ersten Projekt-/Teil-/Revision-Daten pruefen.
 
 ## Als Naechstes
 
@@ -42,3 +42,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Upload-Service angelegt, der validierte `FCStd`-Dateien als neue `Revision` speichert.
 - Automatische Revisionscodes `R0001`, `R0002`, ... im Upload-Service umgesetzt.
 - AuditEvent fuer hochgeladene Revisionen im Upload-Service umgesetzt.
+- Erste Weboberflaeche fuer Projektliste, Projektdetail, Teildetail und Revision-Upload angelegt.
+- Browser-Upload-Pfad mit Tests abgesichert.
+- Doppelte `FCStd`-Uploads mit gleichem SHA-256 pro Teil werden blockiert.
+- Login-geschuetzter Download-Link fuer gespeicherte Revisionen angelegt.
+- AuditEvent fuer heruntergeladene Revisionen umgesetzt.

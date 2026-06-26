@@ -1,0 +1,27 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <h1>Projekte</h1>
+  {% if projects %}
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Beschreibung</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects %}
+          <tr>
+            <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></td>
+            <td>{{ project.name }}</td>
+            <td>{{ project.description }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Noch keine Projekte vorhanden.</p>
+  {% endif %}
+{% endblock %}

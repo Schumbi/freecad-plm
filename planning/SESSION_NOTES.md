@@ -104,3 +104,40 @@ Einen Upload-Service bauen, der eine validierte Datei als neue `Revision` anlegt
 ### Naechster Kleiner Schritt Nach Upload-Service
 
 Ein Formular oder eine kleine View bauen, mit der ein angemeldeter Benutzer zu einem Teil eine `.FCStd`-Revision hochladen kann.
+
+### Fortschritt Browser-Upload
+
+- `plm/forms.py` mit `RevisionUploadForm` angelegt.
+- `plm/urls.py` angelegt und im Haupt-URLConf eingebunden.
+- Erste serverseitige Views angelegt:
+  - Projektliste
+  - Projektdetail mit Teilen/Baugruppen
+  - Teildetail mit Revisionen
+  - POST-Upload fuer neue Revisionen
+- Erste Templates unter `plm/templates/plm/` angelegt.
+- Uploads sind login-geschuetzt und nutzen den bestehenden Upload-Service.
+- Ungueltige Uploads werden im Formular angezeigt und erzeugen keine Revision.
+- Tests fuer Login-Schutz, Upload-Formular, erfolgreichen Upload und fehlerhaften Upload wurden ergaenzt.
+- `manage.py test plm` laeuft mit 12 Tests erfolgreich.
+- Lokale Demo-Daten wurden angelegt:
+  - Projekt `DEMO`
+  - Teil `DEMO-001`
+
+### Naechster Kleiner Schritt Nach Browser-Upload
+
+Einen geschuetzten Download-Link fuer gespeicherte Revisionen bauen, damit Upload und spaeterer Zugriff zusammenpassen.
+
+### Fortschritt Download Und Duplikatschutz
+
+- Der Upload-Service blockiert jetzt Uploads, wenn fuer dasselbe Teil bereits eine Revision mit gleichem SHA-256 existiert.
+- Die Teildetail-Seite zeigt fuer jede Revision einen Download-Link.
+- `download_revision` liefert die Datei als Attachment mit Originaldateiname aus.
+- Downloads sind login-geschuetzt.
+- Jeder Download erzeugt ein `AuditEvent` mit Aktion `revision_downloaded`.
+- Tests fuer Duplikatblockade, Login-Schutz beim Download und Download-Audit wurden ergaenzt.
+- `manage.py test plm` laeuft mit 16 Tests erfolgreich.
+- Lokaler Ist-Zustand: Die zwei vor der Regel hochgeladenen Demo-Revisionen sind Duplikate; neue Duplikate werden ab jetzt blockiert.
+
+### Naechster Kleiner Schritt Nach Download
+
+Den aktuellen Web-Upload/Download-Pfad im Browser testen und danach committen.

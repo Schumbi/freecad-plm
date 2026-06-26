@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .fcstd import read_uploaded_file, validate_fcstd_upload
@@ -17,6 +18,11 @@ def create_revision_from_upload(part, uploaded_file, created_by, revision_code=N
     metadata = validate_fcstd_upload(uploaded_file)
     file_data = read_uploaded_file(uploaded_file)
     code = revision_code or next_revision_code(part)
+
+    if part.revisions.filter(sha256=metadata["sha256"]).exists():
+        raise ValidationError(
+            "Diese FCStd-Datei wurde fuer dieses Teil bereits hochgeladen."
+        )
 
     revision = Revision.objects.create(
         part=part,

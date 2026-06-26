@@ -1,0 +1,51 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <p><a href="{% url 'plm:project_detail' part.project.id %}">Zurueck zu {{ part.project.code }}</a></p>
+  <h1>{{ part.number }} - {{ part.name }}</h1>
+  <p>{{ part.get_category_display }}</p>
+  {% if part.description %}<p>{{ part.description }}</p>{% endif %}
+
+  <h2>Neue Revision hochladen</h2>
+  <form method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.file.label_tag }}
+    {{ form.file }}
+    {% if form.file.errors %}
+      <div class="errors">{{ form.file.errors }}</div>
+    {% endif %}
+    <button type="submit">Revision hochladen</button>
+  </form>
+
+  <h2>Revisionen</h2>
+  {% if revisions %}
+    <table>
+      <thead>
+        <tr>
+          <th>Revision</th>
+          <th>Status</th>
+          <th>Datei</th>
+          <th>Download</th>
+          <th>Groesse</th>
+          <th>SHA-256</th>
+          <th>Erstellt von</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for revision in revisions %}
+          <tr>
+            <td>{{ revision.revision_code }}</td>
+            <td>{{ revision.get_status_display }}</td>
+            <td>{{ revision.original_filename }}</td>
+            <td><a href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a></td>
+            <td>{{ revision.size_bytes }}</td>
+            <td>{{ revision.sha256|slice:":12" }}</td>
+            <td>{{ revision.created_by }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Noch keine Revisionen vorhanden.</p>
+  {% endif %}
+{% endblock %}

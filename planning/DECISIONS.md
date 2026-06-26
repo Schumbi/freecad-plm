@@ -73,3 +73,15 @@ Grund:
 - Ein spaeterer Wechsel auf PostgreSQL und Volumes soll nicht zum Umbau werden.
 
 Status: entschieden.
+
+## 2026-06-26: Gleicher Datei-Hash Pro Teil Wird Nicht Erneut Hochgeladen
+
+Entscheidung: Eine `FCStd`-Datei mit identischem SHA-256 darf fuer dasselbe Teil nicht als neue Revision hochgeladen werden.
+
+Grund:
+
+- Eine neue Revision soll einen neuen Dateistand repraesentieren.
+- Versehentliche Doppeluploads sollen frueh sichtbar werden.
+- Die Revisionshistorie bleibt aussagekraeftiger.
+
+Status: entschieden.
