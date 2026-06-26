@@ -88,3 +88,19 @@ Superuser anlegen und im Admin pruefen, ob Projekt, Teil/Baugruppe und Revision 
 ### Naechster Kleiner Schritt Nach Validierung
 
 Einen Upload-Service bauen, der eine validierte Datei als neue `Revision` anlegt und die Metadaten automatisch in `Revision` schreibt.
+
+### Fortschritt Upload-Service
+
+- Modul `plm/services.py` angelegt.
+- `next_revision_code(part)` erzeugt fortlaufende Codes im Format `R0001`, `R0002`, ...
+- `create_revision_from_upload(part, uploaded_file, created_by)`:
+  - validiert die Datei mit `validate_fcstd_upload()`
+  - speichert eine neue `Revision` im Status `draft`
+  - uebernimmt Originaldateiname, Dateigroesse, SHA-256 und extrahierte Basis-Metadaten
+  - legt ein `AuditEvent` fuer den Upload an
+- Tests fuer Start-Revisionscode, Metadaten, Code-Inkrement und fehlgeschlagene Uploads wurden ergaenzt.
+- `manage.py test plm` laeuft mit 8 Tests erfolgreich.
+
+### Naechster Kleiner Schritt Nach Upload-Service
+
+Ein Formular oder eine kleine View bauen, mit der ein angemeldeter Benutzer zu einem Teil eine `.FCStd`-Revision hochladen kann.
