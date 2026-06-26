@@ -17,3 +17,7 @@ def can_upload_revision(user):
     if user.is_superuser:
         return True
     return user.groups.filter(name__in=(ROLE_ADMIN, ROLE_EDITOR)).exists()
+
+
+def can_release_revision(user):
+    return is_plm_admin(user)

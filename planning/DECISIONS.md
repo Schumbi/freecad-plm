@@ -104,3 +104,22 @@ Grund:
 - Upload-Rechte sind fuer den ersten produktiven Pfad sofort durchsetzbar.
 
 Status: entschieden.
+
+## 2026-06-26: Nur Einfache Freigabe Fuer V1
+
+Entscheidung: V1 bekommt nur eine einfache Freigabe von `draft` nach `released`.
+
+Regeln:
+
+- Nur Superuser und Rolle `admin` duerfen freigeben.
+- Beim Freigeben wird `released_at` gesetzt.
+- Die Aktion wird im Audit-Trail protokolliert.
+- Es gibt vorerst keinen mehrstufigen Review-, Pruef- oder Approval-Prozess.
+
+Grund:
+
+- Der fachliche Nutzen einer klaren Freigabe ist wichtig.
+- Mehr Workflow-Tiefe wuerde aktuell zu frueh Komplexitaet erzeugen.
+- Der Fokus soll danach wieder auf praktischer Nutzbarkeit liegen.
+
+Status: entschieden.

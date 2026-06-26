@@ -162,3 +162,20 @@ Den aktuellen Web-Upload/Download-Pfad im Browser testen und danach committen.
 ### Naechster Kleiner Schritt Nach Rollen
 
 Eine Freigabe-Aktion fuer Revisionen bauen: Entwurf zu `released`, mit Rollenpruefung und AuditEvent.
+
+### Fortschritt Einfache Freigabe
+
+- `can_release_revision()` ergaenzt.
+- Service-Funktion `release_revision()` angelegt.
+- Revisionen koennen von `draft` auf `released` gesetzt werden.
+- `released_at` wird beim Freigeben gesetzt.
+- Freigabe erzeugt ein `AuditEvent` mit Aktion `revision_released`.
+- Freigabe ist auf Superuser und Rolle `admin` begrenzt.
+- Die Teildetail-Seite zeigt fuer Draft-Revisionen einen Button `Freigeben`, wenn der Nutzer freigeben darf.
+- Tests fuer Service, Login-Schutz, Superuser-Freigabe und Editor-Verbot wurden ergaenzt.
+- `manage.py test plm` laeuft mit 24 Tests erfolgreich.
+- Scope-Entscheidung: Vorerst bleibt es bei dieser einfachen Freigabe. Kein mehrstufiger Review- oder Approval-Workflow.
+
+### Naechster Kleiner Schritt Nach Einfacher Freigabe
+
+Freigabe im Browser testen und danach committen. Danach wieder auf Nutzbarkeit konzentrieren, nicht auf mehr Prozess-Tiefe.

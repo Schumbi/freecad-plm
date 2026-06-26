@@ -12,8 +12,13 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from .fcstd import validate_fcstd_upload
 from .models import AuditEvent, Part, Project, Revision
-from .permissions import ROLE_EDITOR, ROLE_READER, can_upload_revision
-from .services import create_revision_from_upload, next_revision_code
+from .permissions import (
+    ROLE_EDITOR,
+    ROLE_READER,
+    can_release_revision,
+    can_upload_revision,
+)
+from .services import create_revision_from_upload, next_revision_code, release_revision
 
 
 def make_zip_upload(name="part.FCStd", members=None):
@@ -134,6 +139,27 @@ class RevisionUploadServiceTests(TestCase):
         self.assertFalse(Revision.objects.exists())
         self.assertFalse(AuditEvent.objects.exists())
 
+    def test_release_revision_sets_status_timestamp_and_audit(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        AuditEvent.objects.all().delete()
+
+        release_revision(revision, self.user)
+
+        revision.refresh_from_db()
+        self.assertEqual(revision.status, Revision.Status.RELEASED)
+        self.assertIsNotNone(revision.released_at)
+        self.assertEqual(
+            AuditEvent.objects.get().action,
+            AuditEvent.Action.REVISION_RELEASED,
+        )
+
+    def test_release_revision_rejects_already_released_revision(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        release_revision(revision, self.user)
+
+        with self.assertRaises(ValidationError):
+            release_revision(revision, self.user)
+
 
 class RevisionUploadViewTests(TestCase):
     def setUp(self):
@@ -239,6 +265,29 @@ class RevisionUploadViewTests(TestCase):
             AuditEvent.Action.REVISION_DOWNLOADED,
         )
 
+    def test_release_revision_requires_login(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        response = self.client.post(reverse("plm:release_revision", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response["Location"])
+
+    def test_superuser_can_release_revision(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        AuditEvent.objects.all().delete()
+
+        response = self.client.post(reverse("plm:release_revision", args=[revision.id]))
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision.refresh_from_db()
+        self.assertEqual(revision.status, Revision.Status.RELEASED)
+        self.assertEqual(
+            AuditEvent.objects.get().action,
+            AuditEvent.Action.REVISION_RELEASED,
+        )
+
 
 class RolePermissionTests(TestCase):
     def setUp(self):
@@ -291,3 +340,14 @@ class RolePermissionTests(TestCase):
 
         self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
         self.assertEqual(Revision.objects.count(), 1)
+
+    def test_editor_cannot_release_revision(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        self.assertFalse(can_release_revision(self.editor))
+
+        self.client.force_login(self.editor)
+        response = self.client.post(reverse("plm:release_revision", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 403)
+        revision.refresh_from_db()
+        self.assertEqual(revision.status, Revision.Status.DRAFT)

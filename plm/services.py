@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 
 from .fcstd import read_uploaded_file, validate_fcstd_upload
 from .models import AuditEvent, Revision
@@ -49,6 +50,32 @@ def create_revision_from_upload(part, uploaded_file, created_by, revision_code=N
         object_repr=str(revision),
         metadata={
             "part_id": part.id,
+            "revision_id": revision.id,
+            "revision_code": revision.revision_code,
+            "sha256": revision.sha256,
+            "original_filename": revision.original_filename,
+        },
+    )
+    return revision
+
+
+@transaction.atomic
+def release_revision(revision, released_by):
+    if revision.status == Revision.Status.RELEASED:
+        raise ValidationError("Diese Revision ist bereits freigegeben.")
+    if revision.status != Revision.Status.DRAFT:
+        raise ValidationError("Nur Entwurfsrevisionen koennen freigegeben werden.")
+
+    revision.status = Revision.Status.RELEASED
+    revision.released_at = timezone.now()
+    revision.save(update_fields=["status", "released_at", "updated_at"])
+
+    AuditEvent.objects.create(
+        actor=released_by,
+        action=AuditEvent.Action.REVISION_RELEASED,
+        object_repr=str(revision),
+        metadata={
+            "part_id": revision.part_id,
             "revision_id": revision.id,
             "revision_code": revision.revision_code,
             "sha256": revision.sha256,

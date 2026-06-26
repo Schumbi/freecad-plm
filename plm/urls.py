@@ -14,4 +14,9 @@ urlpatterns = [
         views.download_revision,
         name="download_revision",
     ),
+    path(
+        "revisions/<int:revision_id>/release/",
+        views.release_revision_view,
+        name="release_revision",
+    ),
 ]

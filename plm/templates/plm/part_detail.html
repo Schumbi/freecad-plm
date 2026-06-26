@@ -28,6 +28,7 @@
           <th>Status</th>
           <th>Datei</th>
           <th>Download</th>
+          <th>Freigabe</th>
           <th>Groesse</th>
           <th>SHA-256</th>
           <th>Erstellt von</th>
@@ -40,6 +41,18 @@
             <td>{{ revision.get_status_display }}</td>
             <td>{{ revision.original_filename }}</td>
             <td><a href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a></td>
+            <td>
+              {% if can_release and revision.status == "draft" %}
+                <form method="post" action="{% url 'plm:release_revision' revision.id %}">
+                  {% csrf_token %}
+                  <button type="submit">Freigeben</button>
+                </form>
+              {% elif revision.released_at %}
+                {{ revision.released_at|date:"d.m.Y H:i" }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td>{{ revision.size_bytes }}</td>
             <td>{{ revision.sha256|slice:":12" }}</td>
             <td>{{ revision.created_by }}</td>

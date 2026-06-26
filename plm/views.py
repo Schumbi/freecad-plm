@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import RevisionUploadForm
 from .models import AuditEvent, Part, Project, Revision
-from .permissions import can_upload_revision
-from .services import create_revision_from_upload
+from .permissions import can_release_revision, can_upload_revision
+from .services import create_revision_from_upload, release_revision
 
 
 @login_required
@@ -43,6 +43,7 @@ def part_detail(request, part_id):
             "revisions": revisions,
             "form": RevisionUploadForm(),
             "can_upload": can_upload_revision(request.user),
+            "can_release": can_release_revision(request.user),
         },
     )
 
@@ -82,6 +83,7 @@ def upload_revision(request, part_id):
             "revisions": revisions,
             "form": form,
             "can_upload": can_upload_revision(request.user),
+            "can_release": can_release_revision(request.user),
         },
         status=400,
     )
@@ -110,3 +112,26 @@ def download_revision(request, revision_id):
         as_attachment=True,
         filename=revision.original_filename,
     )
+
+
+@login_required
+def release_revision_view(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_release_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Freigeben von Revisionen.")
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=revision.part_id)
+
+    try:
+        release_revision(revision, request.user)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        messages.success(
+            request,
+            f"Revision {revision.revision_code} wurde freigegeben.",
+        )
+    return redirect("plm:part_detail", part_id=revision.part_id)

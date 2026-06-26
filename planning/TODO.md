@@ -10,10 +10,10 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Download-Link fuer gespeicherte Revisionen im Browser testen.
 - Admin-Oberflaeche mit ersten Projekt-/Teil-/Revision-Daten pruefen.
 - Reader-/Editor-Rollen im Browser mit Testnutzern pruefen.
+- Freigabe-Button im Browser mit Admin/Superuser testen.
 
 ## Als Naechstes
 
-- Freigabe-Aktion fuer Revisionen konkretisieren und bauen.
 - Revisionsnummern-Format verfeinern.
 - Einfache Projekt-/Teil-Listen ausserhalb des Admins bauen.
 - Akzeptanzkriterien fuer v0 und v1 formulieren.
@@ -50,3 +50,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - AuditEvent fuer heruntergeladene Revisionen umgesetzt.
 - Rollen-Gruppen `admin`, `editor`, `reader` mit Management-Command angelegt.
 - Upload-Recht auf Superuser, `admin` und `editor` begrenzt; `reader` darf nicht hochladen.
+- Einfache Freigabe-Aktion `draft` -> `released` fuer Revisionen angelegt.
+- Freigabe auf Superuser und `admin` begrenzt.
+- AuditEvent fuer freigegebene Revisionen umgesetzt.
