@@ -68,3 +68,23 @@ Bei einer neuen Session zuerst `planning/README.md` lesen und danach die dort ge
 ### Naechster Kleiner Schritt
 
 Superuser anlegen und im Admin pruefen, ob Projekt, Teil/Baugruppe und Revision sinnvoll erfassbar sind. Danach `FCStd`-Validierung und Upload-Service bauen.
+
+### Fortschritt FCStd-Validierung
+
+- Modul `plm/fcstd.py` angelegt.
+- `validate_fcstd_upload()` prueft:
+  - Dateiendung `.FCStd`
+  - nicht-leeren Inhalt
+  - gueltiges ZIP-Archiv
+  - ZIP-Mitglieder
+- Die Validierung liefert erste Metadaten:
+  - Originaldateiname
+  - Dateigroesse
+  - SHA-256
+  - Anzahl ZIP-Mitglieder
+  - Hinweise auf `Document.xml` und `GuiDocument.xml`
+- Vier Tests in `plm/tests.py` laufen erfolgreich.
+
+### Naechster Kleiner Schritt Nach Validierung
+
+Einen Upload-Service bauen, der eine validierte Datei als neue `Revision` anlegt und die Metadaten automatisch in `Revision` schreibt.

@@ -8,13 +8,13 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 - Superuser fuer lokale Admin-Oberflaeche anlegen.
 - Admin-Oberflaeche mit ersten Projekt-/Teil-/Revision-Daten testen.
-- `FCStd`-Upload-Validierung als naechsten kleinen Code-Schritt bauen.
+- Upload-Service vorbereiten, der aus einer validierten `FCStd` eine Revision erzeugt.
 
 ## Als Naechstes
 
 - Rollen und Berechtigungen konkretisieren.
 - Revisionsnummern-Format verfeinern.
-- Upload- und Validierungsregeln fuer `FCStd` implementieren.
+- Upload-Formular fuer `FCStd`-Revisionen bauen.
 - Akzeptanzkriterien fuer v0 und v1 formulieren.
 - Projekt-/Teil-Listen ausserhalb des Admins skizzieren.
 
@@ -38,3 +38,5 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Erste Admin-Oberflaeche fuer die Basismodelle registriert.
 - Lokale SQLite-Migrationen erstellt und angewendet.
 - Kurze lokale Entwicklungsanleitung in der Root-`README.md` angelegt.
+- `FCStd`-Validierungsmodul mit ZIP-Pruefung, Hash und Basis-Metadaten angelegt.
+- Tests fuer gueltige, falsch benannte, defekte und leere `FCStd`-Uploads angelegt.
