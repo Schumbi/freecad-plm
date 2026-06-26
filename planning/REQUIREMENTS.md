@@ -46,6 +46,10 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Projektstaende koennen wieder als ZIP mit den urspruenglichen relativen Pfaden heruntergeladen werden.
 - FreeCAD-Referenzen aus `XLink` werden ausgelesen und pro Revision als Metadaten gespeichert.
 - Einzelne Dateien aus einem Projektstand koennen als ZIP mit ihren rekursiv referenzierten Dateien aus demselben Projektstand heruntergeladen werden.
+- FreeCAD-Dateien koennen die Dokumenteigenschaft `PLMRevision` enthalten.
+- Das PLM bleibt fuehrend fuer Revisionscodes; `PLMRevision` muss mit dem erwarteten PLM-Revisionscode uebereinstimmen.
+- Wenn `PLMRevision` beim Revisionsupload fehlt oder abweicht, meldet die Weboberflaeche den Konflikt und bietet Verwerfen oder Speichern einer PLM-normalisierten Kopie an.
+- Bei einer PLM-normalisierten Kopie wird nur `Document.xml` angepasst; Original-Hash, urspruenglicher Wert und Normalisierung werden in Metadaten und Audit-Trail festgehalten.
 
 ## Nicht Ziel Fuer V1
 

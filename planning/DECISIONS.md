@@ -163,3 +163,43 @@ Grund:
 - Snapshots ermoeglichen reproduzierbare Projektstaende ohne die Einzelhistorie der Dateien zu verlieren.
 
 Status: entschieden.
+
+## 2026-06-26: Kanonisches Revisionsformat `R0001`
+
+Entscheidung: Neue Revisionscodes werden zentral im Service als `R0001`, `R0002`, ... mit Prefix `R` und vierstelliger Nummer erzeugt.
+
+Regeln:
+
+- `R0001` ist die erste gueltige Revision.
+- Gueltige Codes reichen bis `R9999`.
+- Nicht-kanonische Alt-/Testcodes werden bei der Ermittlung der naechsten Nummer ignoriert.
+- `next_revision_code(part)` bleibt die zentrale Quelle fuer automatisch erzeugte Revisionscodes.
+
+Grund:
+
+- Das Format ist fuer Nutzer gut lesbar und sortierbar.
+- Alte Experimente oder manuelle Testcodes sollen die laufende Nummerierung nicht stoeren.
+- Die Formatregel soll an einer Stelle im Code wartbar bleiben.
+
+Status: entschieden.
+
+## 2026-06-26: PLM Fuehrt Revision, FreeCAD Spiegelt `PLMRevision`
+
+Entscheidung: Das PLM bleibt die fuehrende Quelle fuer Revisionscodes. FreeCAD-Dateien spiegeln den Code in der Dokumenteigenschaft `PLMRevision`.
+
+Regeln:
+
+- `Id` bleibt Teil-/Dokumentkennung und wird nicht als Revision verwendet.
+- Beim Revisionsupload muss `PLMRevision` zum erwarteten PLM-Code passen.
+- Fehlt `PLMRevision` oder weicht sie ab, zeigt die Weboberflaeche den Konflikt.
+- Der Nutzer kann den Upload verwerfen oder eine normalisierte Kopie speichern.
+- Bei der Normalisierung wird nur `Document.xml` im gespeicherten FCStd-ZIP angepasst.
+- Original-Hash, hochgeladener Wert, erwarteter Wert und gespeicherter Hash werden in Metadaten und Audit-Trail abgelegt.
+
+Grund:
+
+- FreeCAD soll im Alltag die PLM-Revision sichtbar mittragen.
+- Das PLM darf die Revisionshistorie trotzdem eindeutig und fortlaufend fuehren.
+- Konflikte werden nicht stillschweigend akzeptiert, sondern bewusst entschieden.
+
+Status: entschieden.

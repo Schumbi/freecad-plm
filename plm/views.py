@@ -1,10 +1,14 @@
 from io import BytesIO
 from pathlib import PurePosixPath
+from uuid import uuid4
 from zipfile import ZipFile
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.http import FileResponse
 from django.http import HttpResponseForbidden
@@ -30,12 +34,43 @@ from .permissions import (
     can_upload_revision,
 )
 from .services import (
+    PLMRevisionConflict,
     create_revision_from_upload,
     import_project_snapshot,
     next_part_number,
     release_revision,
     snapshot_entries_with_references,
 )
+
+
+PENDING_REVISION_UPLOAD_SESSION_KEY = "pending_revision_upload"
+
+
+def save_pending_revision_upload(part, uploaded_file, conflict):
+    pending_name = (
+        f"pending_uploads/{uuid4().hex}-{PurePosixPath(uploaded_file.name).name}"
+    )
+    if hasattr(uploaded_file, "seek"):
+        uploaded_file.seek(0)
+    saved_name = default_storage.save(pending_name, ContentFile(uploaded_file.read()))
+
+    pending = {
+        "part_id": part.id,
+        "storage_name": saved_name,
+        "original_filename": PurePosixPath(uploaded_file.name).name,
+        "expected": conflict.expected,
+        "actual": conflict.actual,
+        "original_sha256": conflict.original_sha256,
+    }
+    return pending
+
+
+def clear_pending_revision_upload(request):
+    pending = request.session.pop(PENDING_REVISION_UPLOAD_SESSION_KEY, None)
+    request.session.modified = True
+    if pending and default_storage.exists(pending["storage_name"]):
+        default_storage.delete(pending["storage_name"])
+    return pending
 
 
 @login_required
@@ -143,6 +178,7 @@ def create_part(request, project_id):
                         part=part,
                         uploaded_file=form.cleaned_data["file"],
                         created_by=request.user,
+                        normalize_plm_revision=True,
                     )
             except ValidationError as exc:
                 form.add_error("file", exc)
@@ -201,6 +237,19 @@ def upload_revision(request, part_id):
                 uploaded_file=form.cleaned_data["file"],
                 created_by=request.user,
             )
+        except PLMRevisionConflict as exc:
+            pending = save_pending_revision_upload(part, form.cleaned_data["file"], exc)
+            request.session[PENDING_REVISION_UPLOAD_SESSION_KEY] = pending
+            request.session.modified = True
+            return render(
+                request,
+                "plm/revision_upload_conflict.html",
+                {
+                    "part": part,
+                    "pending": pending,
+                },
+                status=409,
+            )
         except ValidationError as exc:
             form.add_error("file", exc)
         else:
@@ -224,6 +273,54 @@ def upload_revision(request, part_id):
         },
         status=400,
     )
+
+
+@login_required
+def confirm_revision_upload(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Hochladen von Revisionen.")
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=part.id)
+
+    pending = request.session.get(PENDING_REVISION_UPLOAD_SESSION_KEY)
+    if not pending or pending.get("part_id") != part.id:
+        messages.error(request, "Es gibt keinen offenen Revisionsupload.")
+        return redirect("plm:part_detail", part_id=part.id)
+
+    action = request.POST.get("action")
+    if action == "discard":
+        clear_pending_revision_upload(request)
+        messages.info(request, "Der Revisionsupload wurde verworfen.")
+        return redirect("plm:part_detail", part_id=part.id)
+
+    if action != "normalize":
+        messages.error(request, "Unbekannte Upload-Aktion.")
+        return redirect("plm:part_detail", part_id=part.id)
+
+    try:
+        with default_storage.open(pending["storage_name"], "rb") as source:
+            uploaded_file = SimpleUploadedFile(
+                pending["original_filename"],
+                source.read(),
+            )
+        revision = create_revision_from_upload(
+            part=part,
+            uploaded_file=uploaded_file,
+            created_by=request.user,
+            normalize_plm_revision=True,
+        )
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        messages.success(
+            request,
+            f"Revision {revision.revision_code} wurde an das PLM angepasst und hochgeladen.",
+        )
+    finally:
+        clear_pending_revision_upload(request)
+
+    return redirect("plm:part_detail", part_id=part.id)
 
 
 @login_required

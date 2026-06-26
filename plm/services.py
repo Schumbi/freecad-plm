@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import PurePosixPath
@@ -9,8 +10,21 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.utils import timezone
 
-from .fcstd import read_uploaded_file, validate_fcstd_upload
+from .fcstd import (
+    PLM_REVISION_PROPERTY,
+    fcstd_with_plm_revision,
+    read_uploaded_file,
+    validate_fcstd_upload,
+)
 from .models import AuditEvent, Part, ProjectSnapshot, ProjectSnapshotEntry, Revision
+
+
+REVISION_CODE_PREFIX = "R"
+REVISION_CODE_NUMBER_WIDTH = 4
+REVISION_CODE_MAX_NUMBER = 10**REVISION_CODE_NUMBER_WIDTH - 1
+REVISION_CODE_PATTERN = re.compile(
+    rf"^{re.escape(REVISION_CODE_PREFIX)}(\d{{{REVISION_CODE_NUMBER_WIDTH}}})$"
+)
 
 
 @dataclass(frozen=True)
@@ -19,12 +33,94 @@ class ProjectZipMember:
     data: bytes
 
 
+class PLMRevisionConflict(ValidationError):
+    def __init__(self, *, expected, actual, original_filename, original_sha256):
+        if actual:
+            message = (
+                f"{PLM_REVISION_PROPERTY} in der FCStd-Datei ist {actual}, "
+                f"erwartet wird {expected}."
+            )
+        else:
+            message = (
+                f"{PLM_REVISION_PROPERTY} fehlt in der FCStd-Datei; "
+                f"erwartet wird {expected}."
+            )
+        super().__init__(message)
+        self.expected = expected
+        self.actual = actual
+        self.original_filename = original_filename
+        self.original_sha256 = original_sha256
+
+
+def revision_code_number(code):
+    match = REVISION_CODE_PATTERN.fullmatch(code or "")
+    if not match:
+        return None
+
+    number = int(match.group(1))
+    if number == 0:
+        return None
+    return number
+
+
+def format_revision_code(number):
+    if number < 1 or number > REVISION_CODE_MAX_NUMBER:
+        highest_code = (
+            f"{REVISION_CODE_PREFIX}"
+            f"{REVISION_CODE_MAX_NUMBER:0{REVISION_CODE_NUMBER_WIDTH}d}"
+        )
+        raise ValidationError(
+            f"Revisionscode muss zwischen {REVISION_CODE_PREFIX}0001 "
+            f"und {highest_code} liegen."
+        )
+    return f"{REVISION_CODE_PREFIX}{number:0{REVISION_CODE_NUMBER_WIDTH}d}"
+
+
 def next_revision_code(part):
     max_number = 0
     for code in part.revisions.values_list("revision_code", flat=True):
-        if len(code) == 5 and code.startswith("R") and code[1:].isdigit():
-            max_number = max(max_number, int(code[1:]))
-    return f"R{max_number + 1:04d}"
+        number = revision_code_number(code)
+        if number is not None:
+            max_number = max(max_number, number)
+    return format_revision_code(max_number + 1)
+
+
+def revision_metadata_from_validation(metadata, plm_revision=None):
+    extracted = {
+        "zip_member_count": metadata["zip_member_count"],
+        "has_document_xml": metadata["has_document_xml"],
+        "has_gui_document_xml": metadata["has_gui_document_xml"],
+        "freecad_document": metadata["freecad_document"],
+    }
+    if plm_revision:
+        extracted["plm_revision"] = plm_revision
+    return extracted
+
+
+def freecad_plm_revision(metadata):
+    return (
+        metadata.get("freecad_document", {})
+        .get("properties", {})
+        .get(PLM_REVISION_PROPERTY, "")
+        .strip()
+    )
+
+
+def existing_revision_for_upload_hash(part, sha256):
+    for revision in part.revisions.all():
+        plm_revision = (revision.extracted_metadata or {}).get("plm_revision", {})
+        if revision.sha256 == sha256 or plm_revision.get("original_upload_sha256") == sha256:
+            return revision
+    return None
+
+
+def validate_revision_code_argument(revision_code):
+    if revision_code is None:
+        return None
+    number = revision_code_number(revision_code)
+    if number is None or format_revision_code(number) != revision_code:
+        raise ValidationError("Manuelle Revisionscodes muessen das Format R0001 verwenden.")
+    return revision_code
 
 
 def next_part_number(project):
@@ -74,24 +170,38 @@ def part_identity_from_metadata(project, path, metadata):
 def create_or_reuse_revision(part, path, data, created_by):
     upload = SimpleUploadedFile(PurePosixPath(path).name, data)
     metadata = validate_fcstd_upload(upload)
-    existing = part.revisions.filter(sha256=metadata["sha256"]).first()
+    existing = existing_revision_for_upload_hash(part, metadata["sha256"])
     if existing:
         return existing, False
 
+    revision_code = next_revision_code(part)
+    uploaded_plm_revision = freecad_plm_revision(metadata)
+    original_sha256 = metadata["sha256"]
+    normalized = uploaded_plm_revision != revision_code
+    if normalized:
+        data = fcstd_with_plm_revision(data, revision_code)
+        metadata = validate_fcstd_upload(
+            SimpleUploadedFile(PurePosixPath(path).name, data)
+        )
+
     revision = Revision.objects.create(
         part=part,
-        revision_code=next_revision_code(part),
+        revision_code=revision_code,
         status=Revision.Status.DRAFT,
         file=ContentFile(data, name=PurePosixPath(path).name),
         original_filename=PurePosixPath(path).name,
         sha256=metadata["sha256"],
         size_bytes=metadata["size_bytes"],
-        extracted_metadata={
-            "zip_member_count": metadata["zip_member_count"],
-            "has_document_xml": metadata["has_document_xml"],
-            "has_gui_document_xml": metadata["has_gui_document_xml"],
-            "freecad_document": metadata["freecad_document"],
-        },
+        extracted_metadata=revision_metadata_from_validation(
+            metadata,
+            {
+                "expected": revision_code,
+                "uploaded": uploaded_plm_revision,
+                "normalized": normalized,
+                "original_upload_sha256": original_sha256,
+                "stored_sha256": metadata["sha256"],
+            },
+        ),
         created_by=created_by,
     )
     return revision, True
@@ -160,6 +270,7 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
                     "sha256": revision.sha256,
                     "original_filename": revision.original_filename,
                     "snapshot_path": member.path,
+                    "plm_revision": revision.extracted_metadata.get("plm_revision", {}),
                 },
             )
         ProjectSnapshotEntry.objects.create(
@@ -223,10 +334,39 @@ def snapshot_entries_with_references(root_entry):
 
 
 @transaction.atomic
-def create_revision_from_upload(part, uploaded_file, created_by, revision_code=None):
+def create_revision_from_upload(
+    part,
+    uploaded_file,
+    created_by,
+    revision_code=None,
+    normalize_plm_revision=False,
+):
     metadata = validate_fcstd_upload(uploaded_file)
     file_data = read_uploaded_file(uploaded_file)
-    code = revision_code or next_revision_code(part)
+    code = validate_revision_code_argument(revision_code) or next_revision_code(part)
+    uploaded_plm_revision = freecad_plm_revision(metadata)
+    original_sha256 = metadata["sha256"]
+
+    if existing_revision_for_upload_hash(part, original_sha256):
+        raise ValidationError(
+            "Diese FCStd-Datei wurde fuer dieses Teil bereits hochgeladen."
+        )
+
+    normalized = False
+    if uploaded_plm_revision != code:
+        if not normalize_plm_revision:
+            raise PLMRevisionConflict(
+                expected=code,
+                actual=uploaded_plm_revision,
+                original_filename=metadata["original_filename"],
+                original_sha256=original_sha256,
+            )
+        file_data = fcstd_with_plm_revision(file_data, code)
+        uploaded_file = ContentFile(file_data, name=metadata["original_filename"])
+        metadata = validate_fcstd_upload(
+            SimpleUploadedFile(metadata["original_filename"], file_data)
+        )
+        normalized = True
 
     if part.revisions.filter(sha256=metadata["sha256"]).exists():
         raise ValidationError(
@@ -241,12 +381,16 @@ def create_revision_from_upload(part, uploaded_file, created_by, revision_code=N
         original_filename=metadata["original_filename"],
         sha256=metadata["sha256"],
         size_bytes=metadata["size_bytes"],
-        extracted_metadata={
-            "zip_member_count": metadata["zip_member_count"],
-            "has_document_xml": metadata["has_document_xml"],
-            "has_gui_document_xml": metadata["has_gui_document_xml"],
-            "freecad_document": metadata["freecad_document"],
-        },
+        extracted_metadata=revision_metadata_from_validation(
+            metadata,
+            {
+                "expected": code,
+                "uploaded": uploaded_plm_revision,
+                "normalized": normalized,
+                "original_upload_sha256": original_sha256,
+                "stored_sha256": metadata["sha256"],
+            },
+        ),
         created_by=created_by,
     )
 
@@ -263,6 +407,7 @@ def create_revision_from_upload(part, uploaded_file, created_by, revision_code=N
             "revision_code": revision.revision_code,
             "sha256": revision.sha256,
             "original_filename": revision.original_filename,
+            "plm_revision": revision.extracted_metadata["plm_revision"],
         },
     )
     return revision

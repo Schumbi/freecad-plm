@@ -1,0 +1,37 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <p><a href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a></p>
+  <h1>PLMRevision pruefen</h1>
+  <p>
+    Die hochgeladene Datei passt nicht zur naechsten PLM-Revision fuer
+    {{ part.number }} - {{ part.name }}.
+  </p>
+
+  <table>
+    <tbody>
+      <tr>
+        <th>Datei</th>
+        <td>{{ pending.original_filename }}</td>
+      </tr>
+      <tr>
+        <th>PLM erwartet</th>
+        <td>{{ pending.expected }}</td>
+      </tr>
+      <tr>
+        <th>FCStd enthaelt</th>
+        <td>{% if pending.actual %}{{ pending.actual }}{% else %}keine PLMRevision{% endif %}</td>
+      </tr>
+      <tr>
+        <th>Original-SHA-256</th>
+        <td>{{ pending.original_sha256|slice:":12" }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <form method="post" action="{% url 'plm:confirm_revision_upload' part.id %}">
+    {% csrf_token %}
+    <button type="submit" name="action" value="normalize">An PLM anpassen und hochladen</button>
+    <button type="submit" name="action" value="discard" class="secondary">Upload verwerfen</button>
+  </form>
+{% endblock %}

@@ -270,8 +270,32 @@ Browser-Test der Teilanlage, danach committen. Danach V0-Akzeptanzkriterien form
   - `Chip.FCStd`
   - `Deckel.FCStd`
   - `Druck.FCStd`
-- `manage.py test plm` laeuft mit 39 Tests erfolgreich.
+- `manage.py test plm` laeuft mit 43 Tests erfolgreich.
 
 ### Naechster Kleiner Schritt Nach Snapshots
 
 Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
+
+### Fortschritt Revisionscode-Format
+
+- Das kanonische Revisionsformat ist jetzt zentral in `plm/services.py` definiert:
+  - Prefix `R`
+  - vierstellige Nummer
+  - gueltiger Bereich `R0001` bis `R9999`
+- `next_revision_code(part)` ignoriert nicht-kanonische Alt-/Testcodes bei der Nummernermittlung.
+- Beim Ueberschreiten von `R9999` wird eine klare `ValidationError` ausgeloest.
+- `planning/DECISIONS.md` dokumentiert die Formatentscheidung.
+- `planning/TODO.md` fuehrt den zugehoerigen TODO-Punkt unter `Erledigt`.
+- `.venv/bin/python manage.py test plm` laeuft mit 43 Tests erfolgreich.
+
+### Fortschritt PLMRevision-Abgleich
+
+- FreeCAD-Property `PLMRevision` wird aus `Document.xml` extrahiert.
+- Das PLM bleibt fuehrend fuer Revisionscodes; `Id` bleibt Teil-/Dokumentkennung.
+- Beim normalen Revisionsupload wird `PLMRevision` gegen den erwarteten PLM-Code geprueft.
+- Fehlt `PLMRevision` oder weicht sie ab, zeigt die Weboberflaeche eine Bestaetigungsseite.
+- Nutzer koennen den Upload verwerfen oder eine PLM-normalisierte Kopie speichern.
+- Die Normalisierung passt nur `Document.xml` im gespeicherten FCStd-ZIP an.
+- Original-Hash, hochgeladener Wert, erwarteter Wert und gespeicherter Hash werden in Metadaten und AuditEvent festgehalten.
+- Projekt-ZIP-Import normalisiert nicht interaktiv, damit Snapshots reproduzierbar importierbar bleiben; unveraenderte Rohdateien werden ueber den Original-Hash wiedererkannt.
+- `.venv/bin/python manage.py test plm` laeuft mit 50 Tests erfolgreich.

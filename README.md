@@ -33,8 +33,10 @@ Die V1-Rollen werden als Django-Gruppen angelegt:
 1. Projekt im Admin oder in vorhandenen Daten oeffnen.
 2. Teil oder Baugruppe im Projekt mit initialer `.FCStd`-Datei anlegen.
 3. FreeCAD-Metadaten pruefen. Teilenummer und Name koennen leer bleiben; dann nutzt das PLM FreeCAD-`Id`/`Label` oder automatisch `P-001`, `P-002`, ...
-5. Optional Anmerkungen ergaenzen.
-6. Optional Revision freigeben.
+4. Neue Revisionen werden automatisch kanonisch als `R0001`, `R0002`, ... vergeben; alte oder testweise abweichende Codes werden bei der naechsten Nummer ignoriert.
+5. Beim Hochladen einer neuen Revision fehlende oder abweichende FreeCAD-Property `PLMRevision` verwerfen oder als PLM-normalisierte Kopie speichern.
+6. Optional Anmerkungen ergaenzen.
+7. Optional Revision freigeben.
 
 ## Projektstaende
 

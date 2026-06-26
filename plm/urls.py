@@ -16,6 +16,11 @@ urlpatterns = [
     path("parts/<int:part_id>/", views.part_detail, name="part_detail"),
     path("parts/<int:part_id>/upload/", views.upload_revision, name="upload_revision"),
     path(
+        "parts/<int:part_id>/upload/confirm/",
+        views.confirm_revision_upload,
+        name="confirm_revision_upload",
+    ),
+    path(
         "revisions/<int:revision_id>/download/",
         views.download_revision,
         name="download_revision",

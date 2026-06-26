@@ -18,8 +18,11 @@ FREECAD_STRING_PROPERTIES = (
     "LastModifiedDate",
     "License",
     "LicenseURL",
+    "PLMRevision",
     "Uid",
 )
+
+PLM_REVISION_PROPERTY = "PLMRevision"
 
 
 def read_uploaded_file(uploaded_file):
@@ -86,6 +89,67 @@ def extract_document_xml_metadata(document_xml):
         properties[name] = value
 
     return metadata
+
+
+def set_document_string_property(document_xml, name, value):
+    root = ElementTree.fromstring(document_xml)
+    properties_node = root.find("./Properties")
+    if properties_node is None:
+        properties_node = ElementTree.SubElement(root, "Properties")
+
+    property_node = None
+    for candidate in properties_node.findall("./Property"):
+        if candidate.attrib.get("name") == name:
+            property_node = candidate
+            break
+
+    if property_node is None:
+        property_node = ElementTree.SubElement(
+            properties_node,
+            "Property",
+            {"name": name, "type": "App::PropertyString"},
+        )
+    else:
+        property_node.attrib["type"] = "App::PropertyString"
+
+    for child in list(property_node):
+        property_node.remove(child)
+    ElementTree.SubElement(property_node, "String", {"value": value})
+
+    properties_node.attrib["Count"] = str(len(properties_node.findall("./Property")))
+    return ElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def fcstd_with_plm_revision(data, revision_code):
+    source = BytesIO(data)
+    target = BytesIO()
+    try:
+        with ZipFile(source) as archive:
+            if "Document.xml" not in archive.namelist():
+                raise ValidationError(
+                    "Die FCStd-Datei enthaelt keine Document.xml fuer PLMRevision."
+                )
+
+            updated_document_xml = set_document_string_property(
+                archive.read("Document.xml"),
+                PLM_REVISION_PROPERTY,
+                revision_code,
+            )
+
+            with ZipFile(target, "w") as updated_archive:
+                for info in archive.infolist():
+                    content = (
+                        updated_document_xml
+                        if info.filename == "Document.xml"
+                        else archive.read(info.filename)
+                    )
+                    updated_archive.writestr(info, content)
+    except BadZipFile as exc:
+        raise ValidationError("Die FCStd-Datei muss ein gueltiges ZIP-Archiv sein.") from exc
+    except ElementTree.ParseError as exc:
+        raise ValidationError("Document.xml konnte nicht gelesen werden.") from exc
+
+    return target.getvalue()
 
 
 def validate_fcstd_upload(uploaded_file):

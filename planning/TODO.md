@@ -13,13 +13,13 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Freigabe-Button im Browser mit Admin/Superuser testen.
 - Revisionsanmerkungen im Browser mit Editor und Reader testen.
 - FreeCAD-Metadatenanzeige im Browser mit bestehenden Revisionen pruefen.
+- PLMRevision-Konflikt im Browser testen: fehlende/abweichende Property verwerfen oder normalisiert speichern.
 - Teil-/Baugruppenanlage mit initialer `.FCStd` im Browser testen.
 - Projekt-ZIP-Import und Snapshot-Download im Browser testen.
 - Baugruppen-Download mit Referenzen im Browser testen.
 
 ## Als Naechstes
 
-- Revisionsnummern-Format verfeinern.
 - Projekt-Anlage ausserhalb des Admins pruefen.
 - Akzeptanzkriterien fuer v0 und v1 formulieren.
 
@@ -73,3 +73,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - FreeCAD-`XLink`-Referenzen werden extrahiert.
 - Einzeldatei-Download aus Snapshot kann rekursiv referenzierte `FCStd`-Dateien als ZIP mitnehmen.
 - `test-model/` wird ignoriert.
+- Revisionscode-Format `R0001`, `R0002`, ... zentral in `plm/services.py` definiert und gegen nicht-kanonische Alt-/Testcodes abgesichert.
+- FreeCAD-Property `PLMRevision` wird extrahiert und beim Revisionsupload gegen den PLM-Revisionscode geprueft.
+- Revisionsupload kann fehlende oder abweichende `PLMRevision` als normalisierte FCStd-Kopie speichern.

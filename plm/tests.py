@@ -10,7 +10,7 @@ from django.core.management import call_command
 from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from .fcstd import validate_fcstd_upload
+from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
 from .models import AuditEvent, Part, Project, ProjectSnapshot, ProjectSnapshotEntry, Revision
 from .permissions import (
     can_edit_revision_notes,
@@ -20,6 +20,7 @@ from .permissions import (
     can_upload_revision,
 )
 from .services import (
+    PLMRevisionConflict,
     create_revision_from_upload,
     import_project_snapshot,
     next_revision_code,
@@ -41,6 +42,9 @@ FREECAD_DOCUMENT_XML = """
                     </Property>
                     <Property name="Id" type="App::PropertyString">
                         <String value="FC-P-123"/>
+                    </Property>
+                    <Property name="PLMRevision" type="App::PropertyString">
+                        <String value="R0001"/>
                     </Property>
                     <Property name="Uid" type="App::PropertyUUID">
                         <Uuid value="11111111-2222-3333-4444-555555555555"/>
@@ -160,9 +164,24 @@ class FcstdValidationTests(SimpleTestCase):
             metadata["freecad_document"]["properties"]["Id"],
             "FC-P-123",
         )
+        self.assertEqual(
+            metadata["freecad_document"]["properties"]["PLMRevision"],
+            "R0001",
+        )
         self.assertEqual(metadata["freecad_document"]["program_version"], "1.1R1")
         self.assertEqual(len(metadata["sha256"]), 64)
         self.assertGreater(metadata["size_bytes"], 0)
+
+    def test_can_set_plm_revision_in_document_xml(self):
+        upload = make_zip_upload(members={"Document.xml": "<Document />"})
+
+        updated = fcstd_with_plm_revision(upload.read(), "R0007")
+        metadata = validate_fcstd_upload(SimpleUploadedFile("part.FCStd", updated))
+
+        self.assertEqual(
+            metadata["freecad_document"]["properties"]["PLMRevision"],
+            "R0007",
+        )
 
     def test_rejects_wrong_extension(self):
         upload = make_zip_upload(name="part.zip")
@@ -204,8 +223,43 @@ class RevisionUploadServiceTests(TestCase):
         self.settings_override.disable()
         self.media_root.cleanup()
 
+    def create_stored_revision(self, revision_code):
+        return Revision.objects.create(
+            part=self.part,
+            revision_code=revision_code,
+            file=f"{revision_code or 'invalid'}.FCStd",
+            original_filename=f"{revision_code or 'invalid'}.FCStd",
+            sha256=f"{Revision.objects.count():064d}",
+            size_bytes=1,
+            created_by=self.user,
+        )
+
     def test_next_revision_code_starts_at_r0001(self):
         self.assertEqual(next_revision_code(self.part), "R0001")
+
+    def test_next_revision_code_uses_four_digit_format(self):
+        self.create_stored_revision("R0009")
+
+        self.assertEqual(next_revision_code(self.part), "R0010")
+
+    def test_next_revision_code_increments_from_highest_existing_code(self):
+        self.create_stored_revision("R0001")
+        self.create_stored_revision("R0002")
+
+        self.assertEqual(next_revision_code(self.part), "R0003")
+
+    def test_next_revision_code_does_not_reuse_gaps(self):
+        self.create_stored_revision("R0001")
+        self.create_stored_revision("R0003")
+
+        self.assertEqual(next_revision_code(self.part), "R0004")
+
+    def test_next_revision_code_ignores_invalid_existing_codes(self):
+        for code in ["A0009", "R001", "R0000", "R10000", "R12A4", "R-001", ""]:
+            self.create_stored_revision(code)
+        self.create_stored_revision("R0002")
+
+        self.assertEqual(next_revision_code(self.part), "R0003")
 
     def test_create_revision_from_upload_stores_revision_metadata_and_audit(self):
         upload = make_zip_upload(
@@ -244,11 +298,81 @@ class RevisionUploadServiceTests(TestCase):
 
         revision = create_revision_from_upload(
             self.part,
-            make_zip_upload(members={"Document.xml": "<Document changed='yes' />"}),
+            make_zip_upload(
+                members={
+                    "Document.xml": """
+                        <Document changed="yes">
+                            <Properties Count="1">
+                                <Property name="PLMRevision" type="App::PropertyString">
+                                    <String value="R0002"/>
+                                </Property>
+                            </Properties>
+                        </Document>
+                    """,
+                }
+            ),
             self.user,
         )
 
         self.assertEqual(revision.revision_code, "R0002")
+
+    def test_missing_plm_revision_raises_conflict_without_normalization(self):
+        upload = make_zip_upload(members={"Document.xml": "<Document />"})
+
+        with self.assertRaises(PLMRevisionConflict) as context:
+            create_revision_from_upload(self.part, upload, self.user)
+
+        self.assertEqual(context.exception.expected, "R0001")
+        self.assertEqual(context.exception.actual, "")
+        self.assertFalse(Revision.objects.exists())
+
+    def test_normalization_adds_plm_revision_and_audits_original_hash(self):
+        upload = make_zip_upload(members={"Document.xml": "<Document />"})
+        original_hash = validate_fcstd_upload(upload)["sha256"]
+
+        revision = create_revision_from_upload(
+            self.part,
+            upload,
+            self.user,
+            normalize_plm_revision=True,
+        )
+
+        stored_metadata = validate_fcstd_upload(revision.file)
+        self.assertEqual(
+            stored_metadata["freecad_document"]["properties"]["PLMRevision"],
+            "R0001",
+        )
+        self.assertNotEqual(revision.sha256, original_hash)
+        self.assertTrue(revision.extracted_metadata["plm_revision"]["normalized"])
+        self.assertEqual(
+            revision.extracted_metadata["plm_revision"]["original_upload_sha256"],
+            original_hash,
+        )
+        self.assertEqual(
+            AuditEvent.objects.get().metadata["plm_revision"]["original_upload_sha256"],
+            original_hash,
+        )
+
+    def test_wrong_plm_revision_raises_conflict(self):
+        upload = make_zip_upload(
+            members={
+                "Document.xml": """
+                    <Document>
+                        <Properties Count="1">
+                            <Property name="PLMRevision" type="App::PropertyString">
+                                <String value="R0099"/>
+                            </Property>
+                        </Properties>
+                    </Document>
+                """,
+            }
+        )
+
+        with self.assertRaises(PLMRevisionConflict) as context:
+            create_revision_from_upload(self.part, upload, self.user)
+
+        self.assertEqual(context.exception.expected, "R0001")
+        self.assertEqual(context.exception.actual, "R0099")
 
     def test_duplicate_file_for_same_part_is_rejected(self):
         create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -423,6 +547,56 @@ class RevisionUploadViewTests(TestCase):
         self.assertContains(response, "gueltiges ZIP-Archiv", status_code=400)
         self.assertFalse(Revision.objects.exists())
         self.assertFalse(AuditEvent.objects.exists())
+
+    def test_missing_plm_revision_shows_confirmation_page(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_zip_upload(members={"Document.xml": "<Document />"})},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertContains(response, "PLMRevision pruefen", status_code=409)
+        self.assertContains(response, "R0001", status_code=409)
+        self.assertContains(response, "keine PLMRevision", status_code=409)
+        self.assertFalse(Revision.objects.exists())
+
+    def test_pending_plm_revision_upload_can_be_discarded(self):
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_zip_upload(members={"Document.xml": "<Document />"})},
+        )
+
+        response = self.client.post(
+            reverse("plm:confirm_revision_upload", args=[self.part.id]),
+            {"action": "discard"},
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        self.assertFalse(Revision.objects.exists())
+
+    def test_pending_plm_revision_upload_can_be_normalized(self):
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_zip_upload(members={"Document.xml": "<Document />"})},
+        )
+
+        response = self.client.post(
+            reverse("plm:confirm_revision_upload", args=[self.part.id]),
+            {"action": "normalize"},
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision = Revision.objects.get()
+        metadata = validate_fcstd_upload(revision.file)
+        self.assertEqual(
+            metadata["freecad_document"]["properties"]["PLMRevision"],
+            "R0001",
+        )
+        self.assertTrue(revision.extracted_metadata["plm_revision"]["normalized"])
 
     def test_download_revision_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
