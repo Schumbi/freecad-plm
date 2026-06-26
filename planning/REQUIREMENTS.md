@@ -36,6 +36,16 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Revisionen koennen Freitext-Anmerkungen enthalten, z.B. naechste Schritte, Einbauhinweise oder kurze Arbeitsnotizen.
 - FreeCAD-Dokumentmetadaten aus `Document.xml` sollen beim Upload ausgelesen und pro Revision gespeichert werden.
 - Aenderungen an FreeCAD-Dokumentmetadaten wie License, Label oder Comment erzeugen durch erneuten Upload eine neue Revision; bestehende Revisionen werden nicht veraendert.
+- Teilenummern koennen manuell vergeben werden oder leer bleiben; bei leerer Nummer vergibt das PLM pro Projekt automatisch `P-001`, `P-002`, ...
+- Die FreeCAD-Dokumenteigenschaft `Id` wird beim Upload mit extrahiert und kann spaeter als Quelle fuer eine Teilenummer genutzt werden.
+- Neue Teile/Baugruppen werden in der Weboberflaeche nur mit initialer `FCStd`-Datei angelegt.
+- Wenn beim Anlegen die Teilenummer leer bleibt, nutzt das PLM zuerst FreeCAD-`Id`; wenn keine `Id` vorhanden ist, wird automatisch `P-001`, `P-002`, ... vergeben.
+- Wenn beim Anlegen der Name leer bleibt, nutzt das PLM FreeCAD-`Label`.
+- FreeCAD-Projekte mit mehreren referenzierten `FCStd`-Dateien koennen als Projekt-ZIP importiert werden.
+- Ein Projektstand/Snapshot speichert, welche konkreten Dateirevisionen mit welchen relativen Pfaden zusammengehoeren.
+- Projektstaende koennen wieder als ZIP mit den urspruenglichen relativen Pfaden heruntergeladen werden.
+- FreeCAD-Referenzen aus `XLink` werden ausgelesen und pro Revision als Metadaten gespeichert.
+- Einzelne Dateien aus einem Projektstand koennen als ZIP mit ihren rekursiv referenzierten Dateien aus demselben Projektstand heruntergeladen werden.
 
 ## Nicht Ziel Fuer V1
 

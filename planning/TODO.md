@@ -13,11 +13,14 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Freigabe-Button im Browser mit Admin/Superuser testen.
 - Revisionsanmerkungen im Browser mit Editor und Reader testen.
 - FreeCAD-Metadatenanzeige im Browser mit bestehenden Revisionen pruefen.
+- Teil-/Baugruppenanlage mit initialer `.FCStd` im Browser testen.
+- Projekt-ZIP-Import und Snapshot-Download im Browser testen.
+- Baugruppen-Download mit Referenzen im Browser testen.
 
 ## Als Naechstes
 
 - Revisionsnummern-Format verfeinern.
-- Einfache Projekt-/Teil-Listen ausserhalb des Admins bauen.
+- Projekt-Anlage ausserhalb des Admins pruefen.
 - Akzeptanzkriterien fuer v0 und v1 formulieren.
 
 ## Spaeter
@@ -59,3 +62,14 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Anmerkungen sind fuer eingeloggte Nutzer sichtbar und fuer Editor/Admin/Superuser editierbar.
 - FreeCAD-Dokumentmetadaten aus `Document.xml` werden beim Upload extrahiert.
 - FreeCAD-Metadaten werden pro Revision angezeigt.
+- Teile und Baugruppen koennen in der Weboberflaeche innerhalb eines Projekts angelegt werden.
+- Leere Teilenummern werden automatisch als `P-001`, `P-002`, ... pro Projekt vergeben.
+- FreeCAD-Property `Id` wird als Dokumentmetadatum extrahiert.
+- Teil-/Baugruppenanlage erfordert eine initiale `.FCStd` und erzeugt direkt `R0001`.
+- Leere Teilenummer nutzt zuerst FreeCAD-`Id`, sonst automatische Nummerierung.
+- Leerer Name nutzt FreeCAD-`Label`.
+- Projektstaende/Snapshots fuer mehrere `FCStd`-Dateien aus ZIP angelegt.
+- Snapshot-Download stellt die importierten relativen Pfade wieder als ZIP her.
+- FreeCAD-`XLink`-Referenzen werden extrahiert.
+- Einzeldatei-Download aus Snapshot kann rekursiv referenzierte `FCStd`-Dateien als ZIP mitnehmen.
+- `test-model/` wird ignoriert.

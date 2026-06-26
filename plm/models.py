@@ -100,6 +100,53 @@ class Revision(TimeStampedModel):
         return f"{self.part.number} {self.revision_code}"
 
 
+class ProjectSnapshot(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name="snapshots",
+    )
+    name = models.CharField(max_length=200)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_project_snapshots",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.project.code} - {self.name}"
+
+
+class ProjectSnapshotEntry(models.Model):
+    snapshot = models.ForeignKey(
+        ProjectSnapshot,
+        on_delete=models.CASCADE,
+        related_name="entries",
+    )
+    path = models.CharField(max_length=500)
+    revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        related_name="snapshot_entries",
+    )
+
+    class Meta:
+        ordering = ["path"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["snapshot", "path"],
+                name="unique_path_per_project_snapshot",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.path} -> {self.revision}"
+
+
 class AuditEvent(models.Model):
     class Action(models.TextChoices):
         PROJECT_CREATED = "project_created", "Projekt angelegt"
@@ -108,6 +155,7 @@ class AuditEvent(models.Model):
         REVISION_RELEASED = "revision_released", "Revision freigegeben"
         REVISION_DOWNLOADED = "revision_downloaded", "Revision heruntergeladen"
         REVISION_NOTES_UPDATED = "revision_notes_updated", "Revisionsnotiz geaendert"
+        PROJECT_SNAPSHOT_CREATED = "project_snapshot_created", "Projektstand angelegt"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

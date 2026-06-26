@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .fcstd import validate_fcstd_upload
-from .models import AuditEvent, Part, Project, Revision
+from .models import AuditEvent, Part, Project, ProjectSnapshot, ProjectSnapshotEntry, Revision
 from .permissions import (
     can_edit_revision_notes,
     ROLE_EDITOR,
@@ -19,7 +19,12 @@ from .permissions import (
     can_release_revision,
     can_upload_revision,
 )
-from .services import create_revision_from_upload, next_revision_code, release_revision
+from .services import (
+    create_revision_from_upload,
+    import_project_snapshot,
+    next_revision_code,
+    release_revision,
+)
 
 
 FREECAD_DOCUMENT_XML = """
@@ -31,11 +36,14 @@ FREECAD_DOCUMENT_XML = """
             <Property name="License" type="App::PropertyString">
                 <String value="CC-BY"/>
             </Property>
-            <Property name="CreatedBy" type="App::PropertyString">
-                <String value="Ralf Warmuth"/>
-            </Property>
-            <Property name="Uid" type="App::PropertyUUID">
-                <Uuid value="11111111-2222-3333-4444-555555555555"/>
+                    <Property name="CreatedBy" type="App::PropertyString">
+                        <String value="Ralf Warmuth"/>
+                    </Property>
+                    <Property name="Id" type="App::PropertyString">
+                        <String value="FC-P-123"/>
+                    </Property>
+                    <Property name="Uid" type="App::PropertyUUID">
+                        <Uuid value="11111111-2222-3333-4444-555555555555"/>
             </Property>
         </Properties>
     </Document>
@@ -50,6 +58,78 @@ def make_zip_upload(name="part.FCStd", members=None):
     with ZipFile(buffer, "w") as archive:
         for member_name, content in members.items():
             archive.writestr(member_name, content)
+    return SimpleUploadedFile(name, buffer.getvalue())
+
+
+def freecad_document_xml(label, freecad_id="", object_type="PartDesign::Body", xlinks=None):
+    xlinks = xlinks or []
+    xlink_xml = "\n".join(
+        f'<XLink file="{file_name}" name="{name}"/>' for file_name, name in xlinks
+    )
+    return f"""
+        <Document SchemaVersion="4" ProgramVersion="1.1R1" FileVersion="1">
+            <Properties Count="2">
+                <Property name="Label" type="App::PropertyString">
+                    <String value="{label}"/>
+                </Property>
+                <Property name="Id" type="App::PropertyString">
+                    <String value="{freecad_id}"/>
+                </Property>
+            </Properties>
+            <Objects Count="1">
+                <Object type="{object_type}" name="{label}" id="1" />
+            </Objects>
+            <ObjectData Count="1">
+                <Object name="{label}">
+                    <Properties Count="1">
+                        <Property name="LinkedObject" type="App::PropertyXLink">
+                            {xlink_xml}
+                        </Property>
+                    </Properties>
+                </Object>
+            </ObjectData>
+        </Document>
+    """
+
+
+def make_fcstd_bytes(label, freecad_id="", object_type="PartDesign::Body", xlinks=None):
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr(
+            "Document.xml",
+            freecad_document_xml(label, freecad_id, object_type, xlinks),
+        )
+    return buffer.getvalue()
+
+
+def make_project_zip_upload(name="project.zip"):
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr("Chip.FCStd", make_fcstd_bytes("Chip", object_type="App::VarSet"))
+        archive.writestr(
+            "Box.FCStd",
+            make_fcstd_bytes("Box", xlinks=[("Chip.FCStd", "VarSet")]),
+        )
+        archive.writestr(
+            "Deckel.FCStd",
+            make_fcstd_bytes("Deckel", xlinks=[("Chip.FCStd", "VarSet")]),
+        )
+        archive.writestr(
+            "Druck.FCStd",
+            make_fcstd_bytes(
+                "Druck",
+                object_type="Assembly::AssemblyObject",
+                xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+            ),
+        )
+        archive.writestr(
+            "Zusammenbau.FCStd",
+            make_fcstd_bytes(
+                "Zusammenbau",
+                object_type="Assembly::AssemblyObject",
+                xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+            ),
+        )
     return SimpleUploadedFile(name, buffer.getvalue())
 
 
@@ -75,6 +155,10 @@ class FcstdValidationTests(SimpleTestCase):
         self.assertEqual(
             metadata["freecad_document"]["properties"]["License"],
             "CC-BY",
+        )
+        self.assertEqual(
+            metadata["freecad_document"]["properties"]["Id"],
+            "FC-P-123",
         )
         self.assertEqual(metadata["freecad_document"]["program_version"], "1.1R1")
         self.assertEqual(len(metadata["sha256"]), 64)
@@ -148,6 +232,10 @@ class RevisionUploadServiceTests(TestCase):
             revision.extracted_metadata["freecad_document"]["properties"]["License"],
             "CC-BY",
         )
+        self.assertEqual(
+            revision.extracted_metadata["freecad_document"]["properties"]["Id"],
+            "FC-P-123",
+        )
         self.assertTrue(revision.file.storage.exists(revision.file.name))
         self.assertEqual(AuditEvent.objects.count(), 1)
 
@@ -178,6 +266,52 @@ class RevisionUploadServiceTests(TestCase):
 
         self.assertFalse(Revision.objects.exists())
         self.assertFalse(AuditEvent.objects.exists())
+
+    def test_import_project_snapshot_creates_entries_and_revisions(self):
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload("Sommerrodelbahn-Chipbox.zip"),
+            self.user,
+        )
+
+        self.assertEqual(snapshot.name, "Sommerrodelbahn-Chipbox")
+        self.assertEqual(snapshot.entries.count(), 5)
+        self.assertEqual(Revision.objects.count(), 5)
+        self.assertTrue(Part.objects.filter(number="Box").exists())
+        self.assertTrue(Part.objects.filter(number="Deckel").exists())
+        self.assertEqual(Part.objects.get(number="Chip").category, Part.Category.PART)
+        druck = Part.objects.get(number="Druck")
+        self.assertEqual(druck.category, Part.Category.ASSEMBLY)
+        druck_revision = druck.revisions.get()
+        self.assertEqual(
+            druck_revision.extracted_metadata["freecad_document"]["document_kind"],
+            "assembly",
+        )
+        self.assertEqual(
+            {
+                reference["file"]
+                for reference in druck_revision.extracted_metadata["freecad_document"][
+                    "references"
+                ]
+            },
+            {"Box.FCStd", "Deckel.FCStd"},
+        )
+
+    def test_import_project_snapshot_reuses_unchanged_revision(self):
+        first = import_project_snapshot(
+            self.project,
+            make_project_zip_upload("first.zip"),
+            self.user,
+        )
+        second = import_project_snapshot(
+            self.project,
+            make_project_zip_upload("second.zip"),
+            self.user,
+        )
+
+        self.assertEqual(first.entries.count(), 5)
+        self.assertEqual(second.entries.count(), 5)
+        self.assertEqual(Revision.objects.count(), 5)
 
     def test_release_revision_sets_status_timestamp_and_audit(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -338,6 +472,70 @@ class RevisionUploadViewTests(TestCase):
             AuditEvent.Action.REVISION_RELEASED,
         )
 
+    def test_project_snapshot_upload_and_download_zip(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("plm:upload_project_snapshot", args=[self.project.id]),
+            {
+                "name": "Druckstand",
+                "file": make_project_zip_upload(),
+            },
+        )
+
+        snapshot = ProjectSnapshot.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("plm:project_detail", args=[self.project.id]),
+        )
+        self.assertEqual(snapshot.entries.count(), 5)
+
+        response = self.client.get(
+            reverse("plm:download_project_snapshot", args=[snapshot.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = b"".join(response.streaming_content)
+        with ZipFile(BytesIO(content)) as archive:
+            self.assertEqual(
+                set(archive.namelist()),
+                {
+                    "Box.FCStd",
+                    "Chip.FCStd",
+                    "Deckel.FCStd",
+                    "Druck.FCStd",
+                    "Zusammenbau.FCStd",
+                },
+            )
+
+    def test_snapshot_entry_download_includes_references_recursively(self):
+        self.client.force_login(self.user)
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Druckstand",
+        )
+        druck_entry = ProjectSnapshotEntry.objects.get(
+            snapshot=snapshot,
+            path="Druck.FCStd",
+        )
+
+        response = self.client.get(
+            reverse(
+                "plm:download_snapshot_entry_with_references",
+                args=[druck_entry.id],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = b"".join(response.streaming_content)
+        with ZipFile(BytesIO(content)) as archive:
+            self.assertEqual(
+                set(archive.namelist()),
+                {"Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"},
+            )
+
 
 class RolePermissionTests(TestCase):
     def setUp(self):
@@ -445,3 +643,132 @@ class RolePermissionTests(TestCase):
         self.assertEqual(response.status_code, 403)
         revision.refresh_from_db()
         self.assertEqual(revision.notes, "")
+
+    def test_editor_can_create_part_from_project(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "P-002",
+                "name": "Neues Teil",
+                "category": Part.Category.PART,
+                "description": "Aus der Weboberflaeche angelegt.",
+                "material": "PLA",
+                "supplier": "",
+                "tags": "test",
+                "file": make_zip_upload(),
+            },
+        )
+
+        part = Part.objects.get(number="P-002")
+        self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
+        self.assertEqual(part.project, self.project)
+        self.assertEqual(part.name, "Neues Teil")
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.PART_CREATED).count(),
+            1,
+        )
+        self.assertEqual(part.revisions.count(), 1)
+        self.assertEqual(part.revisions.get().revision_code, "R0001")
+
+    def test_empty_part_number_is_generated(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "",
+                "name": "Automatisch nummeriert",
+                "category": Part.Category.PART,
+                "file": make_zip_upload(members={"Document.xml": "<Document />"}),
+            },
+        )
+
+        part = Part.objects.get(name="Automatisch nummeriert")
+        self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
+        self.assertEqual(part.number, "P-002")
+
+    def test_empty_part_number_uses_freecad_id_when_present(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "",
+                "name": "",
+                "category": Part.Category.PART,
+                "file": make_zip_upload(),
+            },
+        )
+
+        part = Part.objects.get(number="FC-P-123")
+        self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
+        self.assertEqual(part.name, "Testteil aus FreeCAD")
+        self.assertEqual(part.revisions.count(), 1)
+
+    def test_empty_part_number_uses_next_available_p_number(self):
+        Part.objects.create(project=self.project, number="P-010", name="Zehn")
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "",
+                "name": "Naechstes Teil",
+                "category": Part.Category.PART,
+                "file": make_zip_upload(members={"Document.xml": "<Document />"}),
+            },
+        )
+
+        part = Part.objects.get(name="Naechstes Teil")
+        self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
+        self.assertEqual(part.number, "P-011")
+
+    def test_reader_cannot_create_part(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "P-002",
+                "name": "Neues Teil",
+                "category": Part.Category.PART,
+                "file": make_zip_upload(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Part.objects.filter(number="P-002").exists())
+
+    def test_duplicate_part_number_shows_error(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "P-001",
+                "name": "Doppelt",
+                "category": Part.Category.PART,
+                "file": make_zip_upload(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "bereits", status_code=400)
+        self.assertEqual(Part.objects.filter(number="P-001").count(), 1)
+
+    def test_create_part_requires_initial_fcstd_file(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "",
+                "name": "Ohne Datei",
+                "category": Part.Category.PART,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Part.objects.filter(name="Ohne Datei").exists())

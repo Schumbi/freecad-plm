@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AuditEvent, Part, Project, Revision
+from .models import AuditEvent, Part, Project, ProjectSnapshot, ProjectSnapshotEntry, Revision
 
 
 @admin.register(Project)
@@ -37,6 +37,22 @@ class RevisionAdmin(admin.ModelAdmin):
         "sha256",
     )
     readonly_fields = ("created_at", "updated_at")
+
+
+class ProjectSnapshotEntryInline(admin.TabularInline):
+    model = ProjectSnapshotEntry
+    extra = 0
+    readonly_fields = ("path", "revision")
+    can_delete = False
+
+
+@admin.register(ProjectSnapshot)
+class ProjectSnapshotAdmin(admin.ModelAdmin):
+    list_display = ("name", "project", "created_by", "created_at")
+    list_filter = ("project",)
+    search_fields = ("name", "project__code", "project__name")
+    readonly_fields = ("created_at",)
+    inlines = (ProjectSnapshotEntryInline,)
 
 
 @admin.register(AuditEvent)

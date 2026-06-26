@@ -6,6 +6,23 @@
   <p>{{ project.description }}</p>
 
   <h2>Teile und Baugruppen</h2>
+  {% if can_create_part %}
+    <p><a href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe anlegen</a></p>
+    <details>
+      <summary>Projektstand aus ZIP importieren</summary>
+      <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ snapshot_form.name.label_tag }}
+        {{ snapshot_form.name }}
+        {{ snapshot_form.file.label_tag }}
+        {{ snapshot_form.file }}
+        {% if snapshot_form.file.errors %}
+          <div class="errors">{{ snapshot_form.file.errors }}</div>
+        {% endif %}
+        <button type="submit">Projektstand importieren</button>
+      </form>
+    </details>
+  {% endif %}
   {% if parts %}
     <table>
       <thead>
@@ -29,5 +46,43 @@
     </table>
   {% else %}
     <p>Noch keine Teile oder Baugruppen vorhanden.</p>
+  {% endif %}
+
+  <h2>Projektstaende</h2>
+  {% if snapshots %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Dateien</th>
+          <th>Erstellt von</th>
+          <th>Download</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for snapshot in snapshots %}
+          <tr>
+            <td>{{ snapshot.name }}</td>
+            <td>
+              <details>
+                <summary>{{ snapshot.entries.count }} Dateien</summary>
+                <ul>
+                  {% for entry in snapshot.entries.all %}
+                    <li>
+                      {{ entry.path }} -> {{ entry.revision.part.number }} {{ entry.revision.revision_code }}
+                      (<a href="{% url 'plm:download_snapshot_entry_with_references' entry.id %}">mit Referenzen herunterladen</a>)
+                    </li>
+                  {% endfor %}
+                </ul>
+              </details>
+            </td>
+            <td>{{ snapshot.created_by }}</td>
+            <td><a href="{% url 'plm:download_project_snapshot' snapshot.id %}">ZIP herunterladen</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Noch keine Projektstaende vorhanden.</p>
   {% endif %}
 {% endblock %}

@@ -1,18 +1,41 @@
+from io import BytesIO
+from pathlib import PurePosixPath
+from zipfile import ZipFile
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import FileResponse
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import RevisionNotesForm, RevisionUploadForm
-from .models import AuditEvent, Part, Project, Revision
+from .forms import (
+    PartForm,
+    ProjectSnapshotUploadForm,
+    RevisionNotesForm,
+    RevisionUploadForm,
+)
+from .models import (
+    AuditEvent,
+    Part,
+    Project,
+    ProjectSnapshot,
+    ProjectSnapshotEntry,
+    Revision,
+)
 from .permissions import (
     can_edit_revision_notes,
     can_release_revision,
     can_upload_revision,
 )
-from .services import create_revision_from_upload, release_revision
+from .services import (
+    create_revision_from_upload,
+    import_project_snapshot,
+    next_part_number,
+    release_revision,
+    snapshot_entries_with_references,
+)
 
 
 @login_required
@@ -25,13 +48,121 @@ def project_list(request):
 def project_detail(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     parts = project.parts.filter(is_archived=False).order_by("number")
+    snapshots = (
+        project.snapshots.select_related("created_by")
+        .prefetch_related("entries__revision__part")
+        .order_by("-created_at")
+    )
     return render(
         request,
         "plm/project_detail.html",
         {
             "project": project,
             "parts": parts,
+            "snapshots": snapshots,
+            "snapshot_form": ProjectSnapshotUploadForm(),
+            "can_create_part": can_upload_revision(request.user),
         },
+    )
+
+
+@login_required
+def upload_project_snapshot(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Importieren von Projektstaenden.")
+    if request.method != "POST":
+        return redirect("plm:project_detail", project_id=project.id)
+
+    form = ProjectSnapshotUploadForm(request.POST, request.FILES)
+    if form.is_valid():
+        try:
+            snapshot = import_project_snapshot(
+                project=project,
+                uploaded_zip=form.cleaned_data["file"],
+                created_by=request.user,
+                name=form.cleaned_data["name"],
+            )
+        except ValidationError as exc:
+            form.add_error("file", exc)
+        else:
+            messages.success(
+                request,
+                f"Projektstand {snapshot.name} wurde importiert.",
+            )
+            return redirect("plm:project_detail", project_id=project.id)
+
+    parts = project.parts.filter(is_archived=False).order_by("number")
+    snapshots = (
+        project.snapshots.select_related("created_by")
+        .prefetch_related("entries__revision__part")
+        .order_by("-created_at")
+    )
+    return render(
+        request,
+        "plm/project_detail.html",
+        {
+            "project": project,
+            "parts": parts,
+            "snapshots": snapshots,
+            "snapshot_form": form,
+            "can_create_part": can_upload_revision(request.user),
+        },
+        status=400,
+    )
+
+
+@login_required
+def create_part(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Anlegen von Teilen.")
+
+    if request.method == "POST":
+        form = PartForm(request.POST, request.FILES, project=project)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    part = form.save(commit=False)
+                    part.project = project
+                    if not part.number:
+                        part.number = next_part_number(project)
+                    part.save()
+                    AuditEvent.objects.create(
+                        actor=request.user,
+                        action=AuditEvent.Action.PART_CREATED,
+                        object_repr=str(part),
+                        metadata={
+                            "project_id": project.id,
+                            "part_id": part.id,
+                            "part_number": part.number,
+                            "category": part.category,
+                        },
+                    )
+                    create_revision_from_upload(
+                        part=part,
+                        uploaded_file=form.cleaned_data["file"],
+                        created_by=request.user,
+                    )
+            except ValidationError as exc:
+                form.add_error("file", exc)
+            else:
+                messages.success(
+                    request,
+                    f"{part.number} wurde mit initialer Revision angelegt.",
+                )
+                return redirect("plm:part_detail", part_id=part.id)
+    else:
+        form = PartForm(project=project)
+
+    return render(
+        request,
+        "plm/part_form.html",
+        {
+            "project": project,
+            "form": form,
+        },
+        status=400 if request.method == "POST" else 200,
     )
 
 
@@ -174,3 +305,48 @@ def update_revision_notes(request, revision_id):
             f"Anmerkungen fuer Revision {revision.revision_code} wurden gespeichert.",
         )
     return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def download_project_snapshot(request, snapshot_id):
+    snapshot = get_object_or_404(
+        ProjectSnapshot.objects.select_related("project", "created_by"),
+        id=snapshot_id,
+    )
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        for entry in snapshot.entries.select_related("revision").order_by("path"):
+            with entry.revision.file.open("rb") as fh:
+                archive.writestr(entry.path, fh.read())
+    buffer.seek(0)
+    return FileResponse(
+        buffer,
+        as_attachment=True,
+        filename=f"{snapshot.project.code}-{snapshot.name}.zip",
+    )
+
+
+@login_required
+def download_snapshot_entry_with_references(request, entry_id):
+    root_entry = get_object_or_404(
+        ProjectSnapshotEntry.objects.select_related(
+            "snapshot",
+            "snapshot__project",
+            "revision",
+            "revision__part",
+        ),
+        id=entry_id,
+    )
+    entries = snapshot_entries_with_references(root_entry)
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        for entry in entries:
+            with entry.revision.file.open("rb") as fh:
+                archive.writestr(entry.path, fh.read())
+    buffer.seek(0)
+    return FileResponse(
+        buffer,
+        as_attachment=True,
+        filename=f"{root_entry.snapshot.project.code}-{PurePosixPath(root_entry.path).stem}-with-references.zip",
+    )

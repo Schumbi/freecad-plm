@@ -7,6 +7,12 @@ app_name = "plm"
 urlpatterns = [
     path("", views.project_list, name="project_list"),
     path("projects/<int:project_id>/", views.project_detail, name="project_detail"),
+    path(
+        "projects/<int:project_id>/snapshots/upload/",
+        views.upload_project_snapshot,
+        name="upload_project_snapshot",
+    ),
+    path("projects/<int:project_id>/parts/new/", views.create_part, name="create_part"),
     path("parts/<int:part_id>/", views.part_detail, name="part_detail"),
     path("parts/<int:part_id>/upload/", views.upload_revision, name="upload_revision"),
     path(
@@ -23,5 +29,15 @@ urlpatterns = [
         "revisions/<int:revision_id>/notes/",
         views.update_revision_notes,
         name="update_revision_notes",
+    ),
+    path(
+        "snapshots/<int:snapshot_id>/download/",
+        views.download_project_snapshot,
+        name="download_project_snapshot",
+    ),
+    path(
+        "snapshot-entries/<int:entry_id>/download-with-references/",
+        views.download_snapshot_entry_with_references,
+        name="download_snapshot_entry_with_references",
     ),
 ]

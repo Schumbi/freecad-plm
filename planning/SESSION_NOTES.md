@@ -220,3 +220,58 @@ Revisionsanmerkungen im Browser testen und danach committen.
 ### Naechster Kleiner Schritt Nach FreeCAD-Metadaten
 
 Metadatenanzeige im Browser pruefen und danach committen.
+
+### Fortschritt Teil-/Baugruppenanlage Im Web
+
+- `PartForm` angelegt.
+- Projekt-Detailseite zeigt fuer berechtigte Nutzer einen Link `Neues Teil oder Baugruppe anlegen`.
+- Neue Route `projects/<project_id>/parts/new/` angelegt.
+- `editor`, `admin` und Superuser koennen Teile/Baugruppen anlegen.
+- `reader` darf keine Teile/Baugruppen anlegen.
+- Doppelte Teilenummern innerhalb eines Projekts werden im Formular abgefangen.
+- Die Anlage erfordert jetzt eine initiale `.FCStd`-Datei.
+- Beim Anlegen wird direkt die erste Revision `R0001` erzeugt.
+- Wenn die Teilenummer leer bleibt, nutzt das PLM zuerst FreeCAD-`Id`; wenn keine `Id` vorhanden ist, erzeugt es automatisch die naechste Nummer im Format `P-001`, `P-002`, ...
+- Wenn der Name leer bleibt, nutzt das PLM FreeCAD-`Label`.
+- Die FreeCAD-Property `Id` wird beim Upload mit aus `Document.xml` extrahiert.
+- Beim Anlegen wird ein `AuditEvent` mit Aktion `part_created` geschrieben.
+- `test-model/` wurde in `.gitignore` aufgenommen.
+- `manage.py test plm` laeuft mit 35 Tests erfolgreich.
+
+### Naechster Kleiner Schritt Nach Teilanlage
+
+Browser-Test der Teilanlage, danach committen. Danach V0-Akzeptanzkriterien formulieren.
+
+### Fortschritt Projektstaende / ZIP-Snapshots
+
+- Modelle `ProjectSnapshot` und `ProjectSnapshotEntry` angelegt.
+- Ein Projektstand speichert eine Sammlung konkreter Revisionen mit ihren relativen ZIP-Pfaden.
+- Projekt-ZIP-Import angelegt:
+  - liest alle `.FCStd`-Dateien aus einem ZIP
+  - legt passende Teile/Baugruppen an, falls sie noch fehlen
+  - erzeugt oder nutzt passende Revisionen
+  - erzeugt einen Snapshot mit Dateipfad -> Revision-Zuordnung
+- Snapshot-Download erzeugt wieder ein ZIP mit den gespeicherten relativen Pfaden.
+- Download einer einzelnen Snapshot-Datei mit Referenzen angelegt.
+- Die Referenzauflösung bleibt im Snapshot-Kontext und sammelt rekursiv `XLink`-Referenzen ein.
+- FreeCAD-Dokumentanalyse erkennt:
+  - `assembly`, wenn `Assembly::AssemblyObject` vorhanden ist
+  - `parameters`, wenn `App::VarSet` vorhanden ist
+  - sonst `part`
+- FreeCAD-`XLink`-Referenzen werden extrahiert.
+- Echter Testimport von `test-model/Sommerrodelbahn-Chipbox.zip`:
+  - `Box.FCStd`: part, referenziert u.a. `Chip.FCStd`
+  - `Chip.FCStd`: parameters
+  - `Deckel.FCStd`: part, referenziert `Chip.FCStd`
+  - `Druck.FCStd`: assembly, referenziert `Box.FCStd` und `Deckel.FCStd`
+  - `Zusammenbau.FCStd`: assembly, referenziert `Box.FCStd` und `Deckel.FCStd`
+- Referenzdownload fuer `Druck.FCStd` im echten Snapshot sammelt:
+  - `Box.FCStd`
+  - `Chip.FCStd`
+  - `Deckel.FCStd`
+  - `Druck.FCStd`
+- `manage.py test plm` laeuft mit 39 Tests erfolgreich.
+
+### Naechster Kleiner Schritt Nach Snapshots
+
+Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.

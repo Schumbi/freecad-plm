@@ -13,6 +13,7 @@ FREECAD_STRING_PROPERTIES = (
     "Company",
     "CreatedBy",
     "CreationDate",
+    "Id",
     "LastModifiedBy",
     "LastModifiedDate",
     "License",
@@ -39,8 +40,35 @@ def extract_document_xml_metadata(document_xml):
         "schema_version": root.attrib.get("SchemaVersion", ""),
         "program_version": root.attrib.get("ProgramVersion", ""),
         "file_version": root.attrib.get("FileVersion", ""),
+        "document_kind": "part",
+        "references": [],
         "properties": {},
     }
+
+    object_types = [
+        node.attrib.get("type", "") for node in root.findall("./Objects/Object")
+    ]
+    if any(object_type == "Assembly::AssemblyObject" for object_type in object_types):
+        metadata["document_kind"] = "assembly"
+    elif any(object_type == "App::VarSet" for object_type in object_types):
+        metadata["document_kind"] = "parameters"
+
+    references = []
+    seen_references = set()
+    for xlink in root.findall(".//XLink"):
+        file_name = xlink.attrib.get("file")
+        if not file_name or not file_name.lower().endswith(".fcstd"):
+            continue
+        reference = {
+            "file": file_name,
+            "name": xlink.attrib.get("name", ""),
+            "sub": xlink.attrib.get("sub", ""),
+        }
+        key = tuple(reference.items())
+        if key not in seen_references:
+            references.append(reference)
+            seen_references.add(key)
+    metadata["references"] = references
 
     properties = metadata["properties"]
     for property_node in root.findall("./Properties/Property"):

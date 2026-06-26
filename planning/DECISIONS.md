@@ -123,3 +123,43 @@ Grund:
 - Der Fokus soll danach wieder auf praktischer Nutzbarkeit liegen.
 
 Status: entschieden.
+
+## 2026-06-26: Teilanlage Nur Mit Initialer FreeCAD-Datei
+
+Entscheidung: Neue Teile oder Baugruppen werden in der Weboberflaeche nur zusammen mit einer initialen `.FCStd`-Datei angelegt.
+
+Regeln:
+
+- Die initiale Datei erzeugt direkt Revision `R0001`.
+- Wenn die Teilenummer leer bleibt, nutzt das PLM zuerst die FreeCAD-Property `Id`.
+- Wenn keine FreeCAD-`Id` vorhanden ist, vergibt das PLM automatisch `P-001`, `P-002`, ...
+- Wenn der Name leer bleibt, nutzt das PLM FreeCAD-`Label`.
+
+Grund:
+
+- Ein PLM-Teil ohne CAD-Dateistand ist fuer den aktuellen V0-Alltag wenig nuetzlich.
+- FreeCAD bleibt die Quelle fuer CAD-nahe Dokumentdaten.
+- PLM-spezifische Daten wie Revision, Status, Audit und Notizen bleiben in der Datenbank.
+
+Status: entschieden.
+
+## 2026-06-26: Projektstaende Fuer Referenzierte FreeCAD-Dateisets
+
+Entscheidung: Referenzierte FreeCAD-Projekte werden als Projektstaende/Snapshots abgebildet.
+
+Regeln:
+
+- Ein Snapshot enthaelt konkrete Revisionen mehrerer `FCStd`-Dateien.
+- Der Snapshot speichert die relativen Pfade aus dem importierten ZIP.
+- Beim Download wird der Snapshot wieder als ZIP mit diesen Pfaden ausgegeben.
+- Einzelne Dateien aus einem Snapshot koennen als ZIP mit ihren rekursiv referenzierten Dateien heruntergeladen werden.
+- Einzelne Dateien behalten ihre eigene Revisionshistorie.
+- Aenderungen an einer Datei erzeugen neue Revisionen; ein neuer Projektstand kann dann eine neue Kombination dieser Revisionen festhalten.
+
+Grund:
+
+- FreeCAD-Assemblies referenzieren externe `FCStd`-Dateien.
+- Ein einzelner Download einer Baugruppendatei reicht nicht, wenn relative Referenzen erhalten bleiben sollen.
+- Snapshots ermoeglichen reproduzierbare Projektstaende ohne die Einzelhistorie der Dateien zu verlieren.
+
+Status: entschieden.

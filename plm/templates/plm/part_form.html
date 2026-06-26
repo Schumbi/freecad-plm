@@ -1,0 +1,23 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <p><a href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a></p>
+  <h1>Neues Teil oder Baugruppe</h1>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in form %}
+      <p>
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+          <small>{{ field.help_text }}</small>
+        {% endif %}
+        {% if field.errors %}
+          <span class="errors">{{ field.errors }}</span>
+        {% endif %}
+      </p>
+    {% endfor %}
+    <button type="submit">Anlegen</button>
+  </form>
+{% endblock %}
