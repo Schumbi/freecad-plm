@@ -179,3 +179,18 @@ Eine Freigabe-Aktion fuer Revisionen bauen: Entwurf zu `released`, mit Rollenpru
 ### Naechster Kleiner Schritt Nach Einfacher Freigabe
 
 Freigabe im Browser testen und danach committen. Danach wieder auf Nutzbarkeit konzentrieren, nicht auf mehr Prozess-Tiefe.
+
+### Fortschritt Revisionsanmerkungen
+
+- `Revision.notes` als Freitextfeld angelegt.
+- Teildetail zeigt pro Revision einen aufklappbaren Bereich `Anmerkungen`.
+- Eingeloggte Nutzer koennen vorhandene Anmerkungen lesen.
+- Superuser, `admin` und `editor` koennen Anmerkungen bearbeiten.
+- `reader` kann Anmerkungen lesen, aber nicht bearbeiten.
+- Jede Aenderung erzeugt ein `AuditEvent` mit Aktion `revision_notes_updated`.
+- Migration `plm.0002_revision_notes_alter_auditevent_action` wurde erstellt und lokal angewendet.
+- `manage.py test plm` laeuft mit 27 Tests erfolgreich.
+
+### Naechster Kleiner Schritt Nach Revisionsanmerkungen
+
+Revisionsanmerkungen im Browser testen und danach committen.

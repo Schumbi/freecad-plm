@@ -19,4 +19,9 @@ urlpatterns = [
         views.release_revision_view,
         name="release_revision",
     ),
+    path(
+        "revisions/<int:revision_id>/notes/",
+        views.update_revision_notes,
+        name="update_revision_notes",
+    ),
 ]

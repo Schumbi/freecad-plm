@@ -33,6 +33,7 @@ class RevisionAdmin(admin.ModelAdmin):
         "part__name",
         "revision_code",
         "original_filename",
+        "notes",
         "sha256",
     )
     readonly_fields = ("created_at", "updated_at")

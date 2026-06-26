@@ -5,9 +5,13 @@ from django.http import FileResponse
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import RevisionUploadForm
+from .forms import RevisionNotesForm, RevisionUploadForm
 from .models import AuditEvent, Part, Project, Revision
-from .permissions import can_release_revision, can_upload_revision
+from .permissions import (
+    can_edit_revision_notes,
+    can_release_revision,
+    can_upload_revision,
+)
 from .services import create_revision_from_upload, release_revision
 
 
@@ -44,6 +48,7 @@ def part_detail(request, part_id):
             "form": RevisionUploadForm(),
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
+            "can_edit_notes": can_edit_revision_notes(request.user),
         },
     )
 
@@ -84,6 +89,7 @@ def upload_revision(request, part_id):
             "form": form,
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
+            "can_edit_notes": can_edit_revision_notes(request.user),
         },
         status=400,
     )
@@ -133,5 +139,38 @@ def release_revision_view(request, revision_id):
         messages.success(
             request,
             f"Revision {revision.revision_code} wurde freigegeben.",
+        )
+    return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def update_revision_notes(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_edit_revision_notes(request.user):
+        return HttpResponseForbidden(
+            "Keine Berechtigung zum Bearbeiten von Revisionsnotizen."
+        )
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=revision.part_id)
+
+    form = RevisionNotesForm(request.POST, instance=revision)
+    if form.is_valid():
+        form.save()
+        AuditEvent.objects.create(
+            actor=request.user,
+            action=AuditEvent.Action.REVISION_NOTES_UPDATED,
+            object_repr=str(revision),
+            metadata={
+                "part_id": revision.part_id,
+                "revision_id": revision.id,
+                "revision_code": revision.revision_code,
+            },
+        )
+        messages.success(
+            request,
+            f"Anmerkungen fuer Revision {revision.revision_code} wurden gespeichert.",
         )
     return redirect("plm:part_detail", part_id=revision.part_id)

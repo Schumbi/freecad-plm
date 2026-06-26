@@ -33,6 +33,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Wichtige Aktionen werden in einem Audit-Trail protokolliert.
 - `FCStd`-Uploads werden mindestens als ZIP-Datei validiert.
 - Soweit ohne FreeCAD-Installation moeglich, werden Metadaten aus der `FCStd`-Datei extrahiert.
+- Revisionen koennen Freitext-Anmerkungen enthalten, z.B. naechste Schritte, Einbauhinweise oder kurze Arbeitsnotizen.
 
 ## Nicht Ziel Fuer V1
 

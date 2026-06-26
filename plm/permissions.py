@@ -21,3 +21,7 @@ def can_upload_revision(user):
 
 def can_release_revision(user):
     return is_plm_admin(user)
+
+
+def can_edit_revision_notes(user):
+    return can_upload_revision(user)

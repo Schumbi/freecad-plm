@@ -29,6 +29,7 @@
           <th>Datei</th>
           <th>Download</th>
           <th>Freigabe</th>
+          <th>Anmerkungen</th>
           <th>Groesse</th>
           <th>SHA-256</th>
           <th>Erstellt von</th>
@@ -52,6 +53,24 @@
               {% else %}
                 -
               {% endif %}
+            </td>
+            <td>
+              <details>
+                <summary>Anmerkungen</summary>
+                {% if revision.notes %}
+                  <div class="notes-text">{{ revision.notes }}</div>
+                {% else %}
+                  <p>Noch keine Anmerkungen.</p>
+                {% endif %}
+                {% if can_edit_notes %}
+                  <form method="post" action="{% url 'plm:update_revision_notes' revision.id %}">
+                    {% csrf_token %}
+                    <label for="notes-{{ revision.id }}">Anmerkungen</label>
+                    <textarea id="notes-{{ revision.id }}" name="notes" rows="5">{{ revision.notes }}</textarea>
+                    <button type="submit">Speichern</button>
+                  </form>
+                {% endif %}
+              </details>
             </td>
             <td>{{ revision.size_bytes }}</td>
             <td>{{ revision.sha256|slice:":12" }}</td>

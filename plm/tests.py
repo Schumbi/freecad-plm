@@ -13,6 +13,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from .fcstd import validate_fcstd_upload
 from .models import AuditEvent, Part, Project, Revision
 from .permissions import (
+    can_edit_revision_notes,
     ROLE_EDITOR,
     ROLE_READER,
     can_release_revision,
@@ -351,3 +352,47 @@ class RolePermissionTests(TestCase):
         self.assertEqual(response.status_code, 403)
         revision.refresh_from_db()
         self.assertEqual(revision.status, Revision.Status.DRAFT)
+
+    def test_editor_can_update_revision_notes(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        AuditEvent.objects.all().delete()
+        self.assertTrue(can_edit_revision_notes(self.editor))
+
+        self.client.force_login(self.editor)
+        response = self.client.post(
+            reverse("plm:update_revision_notes", args=[revision.id]),
+            {"notes": "Naechster Schritt: in Baugruppe pruefen."},
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision.refresh_from_db()
+        self.assertEqual(revision.notes, "Naechster Schritt: in Baugruppe pruefen.")
+        self.assertEqual(
+            AuditEvent.objects.get().action,
+            AuditEvent.Action.REVISION_NOTES_UPDATED,
+        )
+
+    def test_reader_can_see_revision_notes_but_not_edit_form(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        revision.notes = "Einbau mit zwei Schrauben."
+        revision.save(update_fields=["notes"])
+
+        self.client.force_login(self.reader)
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, "Einbau mit zwei Schrauben.")
+        self.assertNotContains(response, "Speichern")
+
+    def test_reader_cannot_update_revision_notes(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        self.assertFalse(can_edit_revision_notes(self.reader))
+
+        self.client.force_login(self.reader)
+        response = self.client.post(
+            reverse("plm:update_revision_notes", args=[revision.id]),
+            {"notes": "Soll nicht gespeichert werden."},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        revision.refresh_from_db()
+        self.assertEqual(revision.notes, "")

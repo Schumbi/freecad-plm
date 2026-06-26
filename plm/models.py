@@ -78,6 +78,7 @@ class Revision(TimeStampedModel):
     original_filename = models.CharField(max_length=255)
     sha256 = models.CharField(max_length=64)
     size_bytes = models.PositiveBigIntegerField()
+    notes = models.TextField(blank=True)
     extracted_metadata = models.JSONField(default=dict, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -106,6 +107,7 @@ class AuditEvent(models.Model):
         REVISION_UPLOADED = "revision_uploaded", "Revision hochgeladen"
         REVISION_RELEASED = "revision_released", "Revision freigegeben"
         REVISION_DOWNLOADED = "revision_downloaded", "Revision heruntergeladen"
+        REVISION_NOTES_UPDATED = "revision_notes_updated", "Revisionsnotiz geaendert"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

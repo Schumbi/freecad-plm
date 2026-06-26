@@ -11,6 +11,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Admin-Oberflaeche mit ersten Projekt-/Teil-/Revision-Daten pruefen.
 - Reader-/Editor-Rollen im Browser mit Testnutzern pruefen.
 - Freigabe-Button im Browser mit Admin/Superuser testen.
+- Revisionsanmerkungen im Browser mit Editor und Reader testen.
 
 ## Als Naechstes
 
@@ -53,3 +54,5 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Einfache Freigabe-Aktion `draft` -> `released` fuer Revisionen angelegt.
 - Freigabe auf Superuser und `admin` begrenzt.
 - AuditEvent fuer freigegebene Revisionen umgesetzt.
+- Freitext-Anmerkungen fuer Revisionen angelegt.
+- Anmerkungen sind fuer eingeloggte Nutzer sichtbar und fuer Editor/Admin/Superuser editierbar.
