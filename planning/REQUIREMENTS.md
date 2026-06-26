@@ -45,7 +45,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Ein Projektstand/Snapshot speichert, welche konkreten Dateirevisionen mit welchen relativen Pfaden zusammengehoeren.
 - Projektstaende koennen wieder als ZIP mit den urspruenglichen relativen Pfaden heruntergeladen werden.
 - FreeCAD-Referenzen aus `XLink` werden ausgelesen und pro Revision als Metadaten gespeichert.
-- Einzelne Dateien aus einem Projektstand koennen als ZIP mit ihren rekursiv referenzierten Dateien aus demselben Projektstand heruntergeladen werden.
+- Einzelne Revisionen koennen heruntergeladen werden; wenn eine FCStd-Datei Referenzen enthaelt, wird sie nur als ZIP mit ihren rekursiv referenzierten Dateien aus demselben Projektstand ausgeliefert.
 - FreeCAD-Dateien koennen die Dokumenteigenschaft `PLMRevision` enthalten.
 - Das PLM bleibt fuehrend fuer Revisionscodes; `PLMRevision` muss mit dem erwarteten PLM-Revisionscode uebereinstimmen.
 - Wenn `PLMRevision` beim Revisionsupload fehlt oder abweicht, meldet die Weboberflaeche den Konflikt und bietet Verwerfen oder Speichern einer PLM-normalisierten Kopie an.

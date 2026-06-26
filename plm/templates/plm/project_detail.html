@@ -70,7 +70,6 @@
                   {% for entry in snapshot.entries.all %}
                     <li>
                       {{ entry.path }} -> {{ entry.revision.part.number }} {{ entry.revision.revision_code }}
-                      (<a href="{% url 'plm:download_snapshot_entry_with_references' entry.id %}">mit Referenzen herunterladen</a>)
                     </li>
                   {% endfor %}
                 </ul>

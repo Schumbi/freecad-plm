@@ -1,6 +1,6 @@
 from io import BytesIO, StringIO
 from tempfile import TemporaryDirectory
-from zipfile import ZipFile
+from zipfile import ZipFile, ZipInfo
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -14,6 +14,7 @@ from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
 from .models import AuditEvent, Part, Project, ProjectSnapshot, ProjectSnapshotEntry, Revision
 from .permissions import (
     can_edit_revision_notes,
+    ROLE_ADMIN,
     ROLE_EDITOR,
     ROLE_READER,
     can_release_revision,
@@ -54,6 +55,12 @@ FREECAD_DOCUMENT_XML = """
 """
 
 
+def write_zip_member(archive, name, content):
+    info = ZipInfo(name)
+    info.date_time = (2026, 1, 1, 0, 0, 0)
+    archive.writestr(info, content)
+
+
 def make_zip_upload(name="part.FCStd", members=None):
     members = members or {
         "Document.xml": FREECAD_DOCUMENT_XML,
@@ -61,7 +68,7 @@ def make_zip_upload(name="part.FCStd", members=None):
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
         for member_name, content in members.items():
-            archive.writestr(member_name, content)
+            write_zip_member(archive, member_name, content)
     return SimpleUploadedFile(name, buffer.getvalue())
 
 
@@ -99,7 +106,8 @@ def freecad_document_xml(label, freecad_id="", object_type="PartDesign::Body", x
 def make_fcstd_bytes(label, freecad_id="", object_type="PartDesign::Body", xlinks=None):
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
-        archive.writestr(
+        write_zip_member(
+            archive,
             "Document.xml",
             freecad_document_xml(label, freecad_id, object_type, xlinks),
         )
@@ -109,16 +117,23 @@ def make_fcstd_bytes(label, freecad_id="", object_type="PartDesign::Body", xlink
 def make_project_zip_upload(name="project.zip"):
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
-        archive.writestr("Chip.FCStd", make_fcstd_bytes("Chip", object_type="App::VarSet"))
-        archive.writestr(
+        write_zip_member(
+            archive,
+            "Chip.FCStd",
+            make_fcstd_bytes("Chip", object_type="App::VarSet"),
+        )
+        write_zip_member(
+            archive,
             "Box.FCStd",
             make_fcstd_bytes("Box", xlinks=[("Chip.FCStd", "VarSet")]),
         )
-        archive.writestr(
+        write_zip_member(
+            archive,
             "Deckel.FCStd",
             make_fcstd_bytes("Deckel", xlinks=[("Chip.FCStd", "VarSet")]),
         )
-        archive.writestr(
+        write_zip_member(
+            archive,
             "Druck.FCStd",
             make_fcstd_bytes(
                 "Druck",
@@ -126,7 +141,8 @@ def make_project_zip_upload(name="project.zip"):
                 xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
             ),
         )
-        archive.writestr(
+        write_zip_member(
+            archive,
             "Zusammenbau.FCStd",
             make_fcstd_bytes(
                 "Zusammenbau",
@@ -623,6 +639,62 @@ class RevisionUploadViewTests(TestCase):
             AuditEvent.Action.REVISION_DOWNLOADED,
         )
 
+    def test_referenced_revision_without_snapshot_cannot_be_downloaded_alone(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(
+                members={
+                    "Document.xml": freecad_document_xml(
+                        "Druck",
+                        xlinks=[("Box.FCStd", "Body")],
+                    ),
+                }
+            ),
+            self.user,
+            normalize_plm_revision=True,
+        )
+        AuditEvent.objects.all().delete()
+
+        response = self.client.get(reverse("plm:download_revision", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(AuditEvent.objects.exists())
+
+    def test_referenced_snapshot_revision_download_returns_zip(self):
+        self.client.force_login(self.user)
+        import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Druckstand",
+        )
+        druck_revision = Revision.objects.get(
+            part__number="Druck",
+            extracted_metadata__freecad_document__document_kind="assembly",
+        )
+        AuditEvent.objects.all().delete()
+
+        response = self.client.get(
+            reverse("plm:download_revision", args=[druck_revision.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Disposition"],
+            'attachment; filename="PRJ-Druck-with-references.zip"',
+        )
+        content = b"".join(response.streaming_content)
+        with ZipFile(BytesIO(content)) as archive:
+            self.assertEqual(
+                set(archive.namelist()),
+                {"Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"},
+        )
+        self.assertEqual(
+            AuditEvent.objects.get().metadata["download_mode"],
+            "referenced_zip",
+        )
+
     def test_release_revision_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
 
@@ -682,35 +754,6 @@ class RevisionUploadViewTests(TestCase):
                 },
             )
 
-    def test_snapshot_entry_download_includes_references_recursively(self):
-        self.client.force_login(self.user)
-        snapshot = import_project_snapshot(
-            self.project,
-            make_project_zip_upload(),
-            self.user,
-            name="Druckstand",
-        )
-        druck_entry = ProjectSnapshotEntry.objects.get(
-            snapshot=snapshot,
-            path="Druck.FCStd",
-        )
-
-        response = self.client.get(
-            reverse(
-                "plm:download_snapshot_entry_with_references",
-                args=[druck_entry.id],
-            )
-        )
-
-        self.assertEqual(response.status_code, 200)
-        content = b"".join(response.streaming_content)
-        with ZipFile(BytesIO(content)) as archive:
-            self.assertEqual(
-                set(archive.namelist()),
-                {"Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"},
-            )
-
-
 class RolePermissionTests(TestCase):
     def setUp(self):
         call_command("setup_plm_roles", stdout=StringIO())
@@ -724,6 +767,11 @@ class RolePermissionTests(TestCase):
             password="test",
         )
         self.editor.groups.add(Group.objects.get(name=ROLE_EDITOR))
+        self.admin = get_user_model().objects.create_user(
+            username="admin-role",
+            password="test",
+        )
+        self.admin.groups.add(Group.objects.get(name=ROLE_ADMIN))
         self.project = Project.objects.create(code="PRJ", name="Projekt")
         self.part = Part.objects.create(
             project=self.project,
@@ -750,6 +798,64 @@ class RolePermissionTests(TestCase):
 
         self.assertNotContains(response, "Neue Revision hochladen")
         self.assertNotContains(response, "Revision hochladen")
+
+    def test_admin_sees_project_create_link(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("plm:project_list"))
+
+        self.assertContains(response, "Neues Projekt anlegen")
+
+    def test_admin_can_create_project(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:create_project"),
+            {
+                "code": "new",
+                "name": "Neues Projekt",
+                "description": "Aus der PLM-Oberflaeche.",
+            },
+        )
+
+        project = Project.objects.get(code="NEW")
+        self.assertRedirects(response, reverse("plm:project_detail", args=[project.id]))
+        self.assertEqual(project.name, "Neues Projekt")
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.PROJECT_CREATED).count(),
+            1,
+        )
+
+    def test_editor_cannot_create_project(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_project"),
+            {
+                "code": "NEW",
+                "name": "Neues Projekt",
+                "description": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Project.objects.filter(code="NEW").exists())
+
+    def test_duplicate_project_code_shows_error(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:create_project"),
+            {
+                "code": "prj",
+                "name": "Doppelt",
+                "description": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "existiert bereits", status_code=400)
+        self.assertEqual(Project.objects.filter(code="PRJ").count(), 1)
 
     def test_editor_can_upload_revision(self):
         self.assertTrue(can_upload_revision(self.editor))

@@ -2,6 +2,9 @@
 
 {% block content %}
   <h1>Projekte</h1>
+  {% if can_create_project %}
+    <p><a href="{% url 'plm:create_project' %}">Neues Projekt anlegen</a></p>
+  {% endif %}
   {% if projects %}
     <table>
       <thead>

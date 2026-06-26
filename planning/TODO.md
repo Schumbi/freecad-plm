@@ -16,11 +16,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - PLMRevision-Konflikt im Browser testen: fehlende/abweichende Property verwerfen oder normalisiert speichern.
 - Teil-/Baugruppenanlage mit initialer `.FCStd` im Browser testen.
 - Projekt-ZIP-Import und Snapshot-Download im Browser testen.
-- Baugruppen-Download mit Referenzen im Browser testen.
 
 ## Als Naechstes
 
-- Projekt-Anlage ausserhalb des Admins pruefen.
 - Akzeptanzkriterien fuer v0 und v1 formulieren.
 
 ## Spaeter
@@ -76,3 +74,5 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Revisionscode-Format `R0001`, `R0002`, ... zentral in `plm/services.py` definiert und gegen nicht-kanonische Alt-/Testcodes abgesichert.
 - FreeCAD-Property `PLMRevision` wird extrahiert und beim Revisionsupload gegen den PLM-Revisionscode geprueft.
 - Revisionsupload kann fehlende oder abweichende `PLMRevision` als normalisierte FCStd-Kopie speichern.
+- Projekte koennen von `admin` und Superuser ausserhalb der Django-Admin-Oberflaeche angelegt werden.
+- Normaler Download einer referenzierten FCStd-Revision liefert ein ZIP mit rekursiv referenzierten Dateien oder wird ohne Snapshot-Kontext blockiert.

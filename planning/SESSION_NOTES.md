@@ -299,3 +299,23 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Original-Hash, hochgeladener Wert, erwarteter Wert und gespeicherter Hash werden in Metadaten und AuditEvent festgehalten.
 - Projekt-ZIP-Import normalisiert nicht interaktiv, damit Snapshots reproduzierbar importierbar bleiben; unveraenderte Rohdateien werden ueber den Original-Hash wiedererkannt.
 - `.venv/bin/python manage.py test plm` laeuft mit 50 Tests erfolgreich.
+
+### Fortschritt Projektanlage In Der PLM-Oberflaeche
+
+- Projektliste zeigt fuer Superuser und Rolle `admin` den Link `Neues Projekt anlegen`.
+- Route `projects/new/` und `ProjectForm` angelegt.
+- Projektanlage schreibt ein `AuditEvent` mit Aktion `project_created`.
+- `editor` und `reader` duerfen keine Projekte anlegen.
+- Test-Fixtures fuer ZIP-/FCStd-Dateien schreiben feste ZIP-Zeitstempel, damit Hash-basierte Snapshot-Reuse-Tests deterministisch bleiben.
+- `.venv/bin/python manage.py test plm` laeuft mit 54 Tests erfolgreich.
+
+### Fortschritt Referenzierter FCStd-Download
+
+- Der separate Link `mit Referenzen herunterladen` wurde wieder entfernt.
+- Der normale Revisionsdownload ist die einzige Download-Aktion fuer einzelne Revisionen.
+- Revisionen ohne FreeCAD-Referenzen bleiben beim bisherigen FCStd-Einzeldownload.
+- Revisionen mit FreeCAD-Referenzen werden nur zusammen mit ihren rekursiv referenzierten Dateien heruntergeladen.
+- Wenn ein Snapshot-Kontext vorhanden ist, liefert `download_revision` ein ZIP mit der Datei und den referenzierten Dateien aus demselben Snapshot.
+- Wenn eine Revision Referenzen hat, aber kein Snapshot-Kontext vorhanden ist, blockiert der Download mit HTTP 403 statt eine unvollstaendige Einzeldatei auszugeben.
+- AuditEvent fuer Downloads speichert `download_mode` als `single_file` oder `referenced_zip`.
+- `.venv/bin/python manage.py test plm` laeuft mit 55 Tests erfolgreich.

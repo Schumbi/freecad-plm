@@ -30,7 +30,7 @@ Die V1-Rollen werden als Django-Gruppen angelegt:
 
 ## Kurzworkflow
 
-1. Projekt im Admin oder in vorhandenen Daten oeffnen.
+1. Projekt als `admin`/Superuser in der PLM-Oberflaeche anlegen oder vorhandenes Projekt oeffnen.
 2. Teil oder Baugruppe im Projekt mit initialer `.FCStd`-Datei anlegen.
 3. FreeCAD-Metadaten pruefen. Teilenummer und Name koennen leer bleiben; dann nutzt das PLM FreeCAD-`Id`/`Label` oder automatisch `P-001`, `P-002`, ...
 4. Neue Revisionen werden automatisch kanonisch als `R0001`, `R0002`, ... vergeben; alte oder testweise abweichende Codes werden bei der naechsten Nummer ignoriert.
@@ -42,6 +42,6 @@ Die V1-Rollen werden als Django-Gruppen angelegt:
 
 FreeCAD-Projekte mit mehreren referenzierten `.FCStd`-Dateien koennen als ZIP importiert werden. Das PLM legt einen Projektstand an und speichert, welche Revisionen unter welchen relativen Pfaden zusammengehoeren. Der Projektstand kann wieder als ZIP heruntergeladen werden.
 
-Einzelne Dateien aus einem Projektstand koennen ebenfalls als ZIP mit Referenzen heruntergeladen werden. Bei einer Baugruppe wie `Druck.FCStd` nimmt das PLM die referenzierten Dateien aus demselben Projektstand mit, inklusive transitiver Referenzen wie Parameterdateien.
+Der normale Download einer Revision liefert eine einzelne `.FCStd` nur dann, wenn sie keine FreeCAD-Referenzen enthaelt. Hat eine Datei Referenzen, liefert der Download automatisch ein ZIP mit der Datei und ihren rekursiv referenzierten Dateien aus demselben Projektstand.
 
 Projektstand und naechste Schritte stehen in `planning/`.

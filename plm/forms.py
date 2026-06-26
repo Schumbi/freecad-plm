@@ -1,7 +1,24 @@
 from django import forms
 
 from .fcstd import validate_fcstd_upload
-from .models import Part, Revision
+from .models import Part, Project, Revision
+
+
+class ProjectForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ["code", "name", "description"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+        }
+        labels = {
+            "code": "Code",
+            "name": "Name",
+            "description": "Beschreibung",
+        }
+
+    def clean_code(self):
+        return self.cleaned_data["code"].strip().upper()
 
 
 class PartForm(forms.ModelForm):
