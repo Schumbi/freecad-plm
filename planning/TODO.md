@@ -12,6 +12,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Reader-/Editor-Rollen im Browser mit Testnutzern pruefen.
 - Freigabe-Button im Browser mit Admin/Superuser testen.
 - Revisionsanmerkungen im Browser mit Editor und Reader testen.
+- FreeCAD-Metadatenanzeige im Browser mit bestehenden Revisionen pruefen.
 
 ## Als Naechstes
 
@@ -56,3 +57,5 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - AuditEvent fuer freigegebene Revisionen umgesetzt.
 - Freitext-Anmerkungen fuer Revisionen angelegt.
 - Anmerkungen sind fuer eingeloggte Nutzer sichtbar und fuer Editor/Admin/Superuser editierbar.
+- FreeCAD-Dokumentmetadaten aus `Document.xml` werden beim Upload extrahiert.
+- FreeCAD-Metadaten werden pro Revision angezeigt.

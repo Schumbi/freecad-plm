@@ -22,8 +22,30 @@ from .permissions import (
 from .services import create_revision_from_upload, next_revision_code, release_revision
 
 
+FREECAD_DOCUMENT_XML = """
+    <Document SchemaVersion="4" ProgramVersion="1.1R1" FileVersion="1">
+        <Properties Count="4">
+            <Property name="Label" type="App::PropertyString">
+                <String value="Testteil aus FreeCAD"/>
+            </Property>
+            <Property name="License" type="App::PropertyString">
+                <String value="CC-BY"/>
+            </Property>
+            <Property name="CreatedBy" type="App::PropertyString">
+                <String value="Ralf Warmuth"/>
+            </Property>
+            <Property name="Uid" type="App::PropertyUUID">
+                <Uuid value="11111111-2222-3333-4444-555555555555"/>
+            </Property>
+        </Properties>
+    </Document>
+"""
+
+
 def make_zip_upload(name="part.FCStd", members=None):
-    members = members or {"Document.xml": "<Document />"}
+    members = members or {
+        "Document.xml": FREECAD_DOCUMENT_XML,
+    }
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
         for member_name, content in members.items():
@@ -35,7 +57,7 @@ class FcstdValidationTests(SimpleTestCase):
     def test_accepts_fcstd_zip_and_returns_metadata(self):
         upload = make_zip_upload(
             members={
-                "Document.xml": "<Document />",
+                "Document.xml": FREECAD_DOCUMENT_XML,
                 "GuiDocument.xml": "<GuiDocument />",
             },
         )
@@ -46,6 +68,15 @@ class FcstdValidationTests(SimpleTestCase):
         self.assertEqual(metadata["zip_member_count"], 2)
         self.assertTrue(metadata["has_document_xml"])
         self.assertTrue(metadata["has_gui_document_xml"])
+        self.assertEqual(
+            metadata["freecad_document"]["properties"]["Label"],
+            "Testteil aus FreeCAD",
+        )
+        self.assertEqual(
+            metadata["freecad_document"]["properties"]["License"],
+            "CC-BY",
+        )
+        self.assertEqual(metadata["freecad_document"]["program_version"], "1.1R1")
         self.assertEqual(len(metadata["sha256"]), 64)
         self.assertGreater(metadata["size_bytes"], 0)
 
@@ -95,7 +126,7 @@ class RevisionUploadServiceTests(TestCase):
     def test_create_revision_from_upload_stores_revision_metadata_and_audit(self):
         upload = make_zip_upload(
             members={
-                "Document.xml": "<Document />",
+                "Document.xml": FREECAD_DOCUMENT_XML,
                 "GuiDocument.xml": "<GuiDocument />",
             },
         )
@@ -109,6 +140,14 @@ class RevisionUploadServiceTests(TestCase):
         self.assertGreater(revision.size_bytes, 0)
         self.assertEqual(revision.extracted_metadata["zip_member_count"], 2)
         self.assertTrue(revision.extracted_metadata["has_document_xml"])
+        self.assertEqual(
+            revision.extracted_metadata["freecad_document"]["properties"]["Label"],
+            "Testteil aus FreeCAD",
+        )
+        self.assertEqual(
+            revision.extracted_metadata["freecad_document"]["properties"]["License"],
+            "CC-BY",
+        )
         self.assertTrue(revision.file.storage.exists(revision.file.name))
         self.assertEqual(AuditEvent.objects.count(), 1)
 
@@ -197,6 +236,16 @@ class RevisionUploadViewTests(TestCase):
 
         self.assertContains(response, "Neue Revision hochladen")
         self.assertContains(response, "Revision hochladen")
+
+    def test_part_detail_shows_freecad_metadata(self):
+        create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, "Testteil aus FreeCAD")
+        self.assertContains(response, "CC-BY")
+        self.assertContains(response, "1.1R1")
 
     def test_upload_revision_creates_revision(self):
         self.client.force_login(self.user)

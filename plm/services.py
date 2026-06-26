@@ -37,6 +37,7 @@ def create_revision_from_upload(part, uploaded_file, created_by, revision_code=N
             "zip_member_count": metadata["zip_member_count"],
             "has_document_xml": metadata["has_document_xml"],
             "has_gui_document_xml": metadata["has_gui_document_xml"],
+            "freecad_document": metadata["freecad_document"],
         },
         created_by=created_by,
     )

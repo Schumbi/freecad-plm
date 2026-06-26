@@ -194,3 +194,29 @@ Freigabe im Browser testen und danach committen. Danach wieder auf Nutzbarkeit k
 ### Naechster Kleiner Schritt Nach Revisionsanmerkungen
 
 Revisionsanmerkungen im Browser testen und danach committen.
+
+### Fortschritt FreeCAD-Metadaten
+
+- `validate_fcstd_upload()` extrahiert jetzt Metadaten aus `Document.xml`.
+- Erfasste Werte:
+  - SchemaVersion
+  - ProgramVersion
+  - FileVersion
+  - Label
+  - Comment
+  - Company
+  - CreatedBy
+  - CreationDate
+  - LastModifiedBy
+  - LastModifiedDate
+  - License
+  - LicenseURL
+  - Uid
+- Die Metadaten werden in `Revision.extracted_metadata["freecad_document"]` gespeichert.
+- Die Teildetail-Seite zeigt pro Revision einen aufklappbaren Bereich `FreeCAD` / `Metadaten`.
+- Bestehende lokale Revisionen wurden aus den gespeicherten `.FCStd`-Dateien nachgezogen.
+- `manage.py test plm` laeuft mit 28 Tests erfolgreich.
+
+### Naechster Kleiner Schritt Nach FreeCAD-Metadaten
+
+Metadatenanzeige im Browser pruefen und danach committen.
