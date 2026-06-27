@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -122,6 +123,10 @@ MEDIA_ROOT = BASE_DIR / 'storage'
 
 LOGIN_URL = 'admin:login'
 LOGIN_REDIRECT_URL = 'admin:index'
+
+FREECADCMD_COMMAND = os.environ.get('FREECADCMD_COMMAND', 'FreeCADCmd')
+FREECADCMD_PATH = FREECADCMD_COMMAND
+FREECADCMD_TIMEOUT_SECONDS = 300
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

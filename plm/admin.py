@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import AuditEvent, Part, Project, ProjectSnapshot, ProjectSnapshotEntry, Revision
+from .models import (
+    AuditEvent,
+    ExportJob,
+    Part,
+    Project,
+    ProjectSnapshot,
+    ProjectSnapshotEntry,
+    Revision,
+    RevisionArtifact,
+)
 
 
 @admin.register(Project)
@@ -36,6 +45,37 @@ class RevisionAdmin(admin.ModelAdmin):
         "notes",
         "sha256",
     )
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ExportJob)
+class ExportJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "revision",
+        "job_type",
+        "export_format",
+        "status",
+        "created_by",
+        "created_at",
+        "finished_at",
+    )
+    list_filter = ("job_type", "status", "export_format")
+    search_fields = ("revision__part__number", "revision__revision_code", "error", "log")
+    readonly_fields = ("created_at", "updated_at", "started_at", "finished_at")
+
+
+@admin.register(RevisionArtifact)
+class RevisionArtifactAdmin(admin.ModelAdmin):
+    list_display = (
+        "revision",
+        "artifact_type",
+        "view_name",
+        "original_filename",
+        "size_bytes",
+        "created_at",
+    )
+    list_filter = ("artifact_type",)
+    search_fields = ("revision__part__number", "revision__revision_code", "original_filename")
     readonly_fields = ("created_at", "updated_at")
 
 

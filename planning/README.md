@@ -32,9 +32,10 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 2. `planning/REQUIREMENTS.md`
 3. `planning/ARCHITECTURE.md`
 4. `planning/ROADMAP.md`
-5. `planning/DECISIONS.md`
-6. `planning/TODO.md`
-7. `planning/SESSION_NOTES.md`
+5. `planning/ACCEPTANCE_CRITERIA.md`
+6. `planning/DECISIONS.md`
+7. `planning/TODO.md`
+8. `planning/SESSION_NOTES.md`
 
 ## Arbeitsregel
 

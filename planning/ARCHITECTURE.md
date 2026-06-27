@@ -63,11 +63,18 @@ V1:
 - `FCStd` als Datei validieren.
 - `FCStd` als ZIP lesen.
 - Basis-Metadaten extrahieren, soweit ohne FreeCAD moeglich.
+- Optionaler FreeCADCmd-Joblauf fuer abgeleitete Artefakte:
+  - Analyse von exportierbaren Objekten und VarSet-Parametern.
+  - Export nach STEP, STL und 3MF.
+  - PNG-Ansichten fuer visuelle Vergleiche.
+- Lokale Flatpak-Installationen werden ueber `FREECADCMD_COMMAND` unterstuetzt, z.B. `flatpak run --branch=stable --arch=x86_64 --command=FreeCADCmd org.freecad.FreeCAD`.
+- STEP/STL/3MF-Exporte sind der robuste Headless-Pfad. PNG-Ansichten koennen je nach FreeCAD-/Server-Setup `FreeCADGui`, Offscreen-Rendering oder `xvfb-run` brauchen.
 
 Spaeter:
 
-- Separater Worker fuer FreeCADCmd.
-- Exporte nach STEP, STL, PDF, DXF.
+- Separater dauerhafter Worker fuer FreeCADCmd.
+- Exporte nach PDF, DXF und weiteren Formaten.
+- Bearbeitung von VarSet-Parametern und Neurendern mit Varianten.
 - Status und Logs fuer Exportjobs.
 - Worker als eigener Docker-Compose-Service denkbar.
 
@@ -77,7 +84,7 @@ Spaeter:
 web       Django-App
 db        PostgreSQL
 media     Volume fuer FCStd- und Exportdateien
-worker    optionaler FreeCADCmd-Worker
+worker    optionaler FreeCADCmd-Worker mit konfigurierbarem FREECADCMD_COMMAND
 ```
 
 Docker Compose ist kein v1-Muss, aber Architektur und Pfade sollen so gewaehlt werden, dass ein spaeterer Umzug nicht weh tut.

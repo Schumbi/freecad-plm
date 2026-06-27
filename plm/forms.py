@@ -1,7 +1,7 @@
 from django import forms
 
 from .fcstd import validate_fcstd_upload
-from .models import Part, Project, Revision
+from .models import ExportJob, Part, Project, Revision
 
 
 class ProjectForm(forms.ModelForm):
@@ -23,6 +23,12 @@ class ProjectForm(forms.ModelForm):
 
 class PartForm(forms.ModelForm):
     file = forms.FileField(label="Initiale FCStd-Datei")
+    change_summary = forms.CharField(
+        label="Aenderungen",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text="Kurz dokumentieren, was diese initiale Revision enthaelt.",
+    )
 
     class Meta:
         model = Part
@@ -97,6 +103,11 @@ class PartForm(forms.ModelForm):
 
 class RevisionUploadForm(forms.Form):
     file = forms.FileField(label="FCStd-Datei")
+    change_summary = forms.CharField(
+        label="Aenderungen",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
 
     def clean_file(self):
         uploaded_file = self.cleaned_data["file"]
@@ -128,3 +139,33 @@ class RevisionNotesForm(forms.ModelForm):
             )
         }
         labels = {"notes": "Anmerkungen"}
+
+
+class RevisionExportJobForm(forms.Form):
+    export_format = forms.ChoiceField(
+        label="Format",
+        choices=ExportJob.ExportFormat.choices,
+    )
+    selected_objects = forms.MultipleChoiceField(
+        label="Objekte",
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, revision=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        objects = (
+            (revision.extracted_metadata or {})
+            .get("freecadcmd", {})
+            .get("objects", [])
+            if revision
+            else []
+        )
+        choices = []
+        for item in objects:
+            if not item.get("exportable"):
+                continue
+            name = item.get("name", "")
+            label = item.get("label") or name
+            type_id = item.get("type", "")
+            choices.append((name, f"{label} ({name}, {type_id})"))
+        self.fields["selected_objects"].choices = choices

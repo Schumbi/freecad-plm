@@ -340,6 +340,7 @@ def create_revision_from_upload(
     created_by,
     revision_code=None,
     normalize_plm_revision=False,
+    notes="",
 ):
     metadata = validate_fcstd_upload(uploaded_file)
     file_data = read_uploaded_file(uploaded_file)
@@ -381,6 +382,7 @@ def create_revision_from_upload(
         original_filename=metadata["original_filename"],
         sha256=metadata["sha256"],
         size_bytes=metadata["size_bytes"],
+        notes=notes.strip(),
         extracted_metadata=revision_metadata_from_validation(
             metadata,
             {
@@ -408,6 +410,7 @@ def create_revision_from_upload(
             "sha256": revision.sha256,
             "original_filename": revision.original_filename,
             "plm_revision": revision.extracted_metadata["plm_revision"],
+            "change_summary": revision.notes,
         },
     )
     return revision

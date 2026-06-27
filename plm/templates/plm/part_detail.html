@@ -15,11 +15,19 @@
       {% if form.file.errors %}
         <div class="errors">{{ form.file.errors }}</div>
       {% endif %}
+      {{ form.change_summary.label_tag }}
+      {{ form.change_summary }}
+      {% if form.change_summary.errors %}
+        <div class="errors">{{ form.change_summary.errors }}</div>
+      {% endif %}
       <button type="submit">Revision hochladen</button>
     </form>
   {% endif %}
 
   <h2>Revisionen</h2>
+  {% if revisions %}
+    <p><a href="{% url 'plm:revision_compare' part.id %}">Revisionen visuell vergleichen</a></p>
+  {% endif %}
   {% if revisions %}
     <table>
       <thead>
@@ -31,6 +39,7 @@
           <th>Freigabe</th>
           <th>Anmerkungen</th>
           <th>FreeCAD</th>
+          <th>Exporte</th>
           <th>Groesse</th>
           <th>SHA-256</th>
           <th>Erstellt von</th>
@@ -120,7 +129,92 @@
                     <p>Keine FreeCAD-Metadaten extrahiert.</p>
                   {% endif %}
                 {% endwith %}
+                {% with freecadcmd=revision.extracted_metadata.freecadcmd %}
+                  {% if freecadcmd %}
+                    <h4>FreeCADCmd-Analyse</h4>
+                    {% if freecadcmd.objects %}
+                      <p>Exportierbare Objekte:</p>
+                      <ul>
+                        {% for object in freecadcmd.objects %}
+                          <li>{{ object.label }} ({{ object.name }}, {{ object.type }})</li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+                    {% if freecadcmd.varsets %}
+                      <p>VarSets:</p>
+                      <ul>
+                        {% for varset in freecadcmd.varsets %}
+                          <li>
+                            {{ varset.label }} ({{ varset.name }})
+                            <ul>
+                              {% for property in varset.properties %}
+                                <li>{{ property.name }} = {{ property.value }} ({{ property.type }})</li>
+                              {% endfor %}
+                            </ul>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+                  {% endif %}
+                {% endwith %}
               </details>
+            </td>
+            <td>
+              {% if can_upload %}
+                <div class="inline-actions">
+                  <form method="post" action="{% url 'plm:create_revision_inspect_job' revision.id %}">
+                    {% csrf_token %}
+                    <button type="submit">Analyse starten</button>
+                  </form>
+                  {% if revision.extracted_metadata.freecadcmd.objects %}
+                    <a href="{% url 'plm:create_revision_export_job' revision.id %}">Export planen</a>
+                  {% endif %}
+                  <form method="post" action="{% url 'plm:create_revision_png_job' revision.id %}">
+                    {% csrf_token %}
+                    <button type="submit">PNG-Ansichten</button>
+                  </form>
+                </div>
+              {% endif %}
+              {% if revision.export_jobs.all %}
+                <details>
+                  <summary>Jobs</summary>
+                  <ul class="job-list">
+                    {% for job in revision.export_jobs.all %}
+                      <li>
+                        {{ job.get_job_type_display }}{% if job.export_format %} {{ job.export_format|upper }}{% endif %}: {{ job.get_status_display }}
+                        {% if job.error %}<br><span class="errors">{{ job.error }}</span>{% endif %}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </details>
+              {% endif %}
+              {% if revision.artifacts.all %}
+                <details>
+                  <summary>Artefakte</summary>
+                  <ul class="artifact-list">
+                    {% for artifact in revision.artifacts.all %}
+                      <li>
+                        <a href="{% url 'plm:download_revision_artifact' artifact.id %}">
+                          {{ artifact.original_filename }}
+                        </a>
+                        {% if artifact.view_name %}({{ artifact.view_name }}){% endif %}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                  <div class="png-gallery">
+                    {% for artifact in revision.artifacts.all %}
+                      {% if artifact.artifact_type == "png" %}
+                        <figure>
+                          <a href="{% url 'plm:download_revision_artifact' artifact.id %}">
+                            <img src="{% url 'plm:download_revision_artifact' artifact.id %}?inline=1" alt="{{ artifact.view_name }}">
+                          </a>
+                          <figcaption>{{ artifact.view_name }}</figcaption>
+                        </figure>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
             </td>
             <td>{{ revision.size_bytes }}</td>
             <td>{{ revision.sha256|slice:":12" }}</td>

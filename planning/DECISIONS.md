@@ -203,3 +203,24 @@ Grund:
 - Konflikte werden nicht stillschweigend akzeptiert, sondern bewusst entschieden.
 
 Status: entschieden.
+
+## 2026-06-27: FreeCADCmd-Artefakte Bleiben Abgeleitet
+
+Entscheidung: STEP-, STL-, 3MF- und PNG-Dateien werden als abgeleitete Artefakte einer bestehenden Revision gespeichert, nicht als neue PLM-Revisionen.
+
+Regeln:
+
+- Die originale `.FCStd`-Revision bleibt unveraendert.
+- Exportjobs werden persistiert und koennen per Management-Command verarbeitet werden.
+- Reader duerfen vorhandene Artefakte herunterladen.
+- Editor, Admin und Superuser duerfen FreeCADCmd-Jobs anlegen.
+- VarSet-Parameter werden in der ersten Ausbaustufe nur ausgelesen und angezeigt.
+- Parameterbearbeitung und Neurendern mit geaenderten Parametern werden als Folgeausbau geplant.
+
+Grund:
+
+- FreeCADCmd-Laeufe koennen langsam oder lokal nicht verfuegbar sein.
+- Artefakte sind nutzbare Ableitungen, aber keine neue CAD-Quelle.
+- Ein Jobmodell laesst sich spaeter ohne Datenmodellbruch in einen Worker verschieben.
+
+Status: entschieden.

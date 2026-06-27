@@ -45,3 +45,19 @@ FreeCAD-Projekte mit mehreren referenzierten `.FCStd`-Dateien koennen als ZIP im
 Der normale Download einer Revision liefert eine einzelne `.FCStd` nur dann, wenn sie keine FreeCAD-Referenzen enthaelt. Hat eine Datei Referenzen, liefert der Download automatisch ein ZIP mit der Datei und ihren rekursiv referenzierten Dateien aus demselben Projektstand.
 
 Projektstand und naechste Schritte stehen in `planning/`.
+
+## FreeCADCmd
+
+Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf die Flatpak-Installation `org.freecad.FreeCAD` mit `--command=FreeCADCmd` zurueck, wenn `flatpak` vorhanden ist.
+
+Beispiel fuer eine explizite Flatpak-Konfiguration:
+
+```bash
+FREECADCMD_COMMAND='flatpak run --branch=stable --arch=x86_64 --command=FreeCADCmd org.freecad.FreeCAD' .venv/bin/python manage.py process_export_jobs
+```
+
+Auf einem Server mit nativer FreeCAD-Installation reicht meistens:
+
+```bash
+FREECADCMD_COMMAND=/usr/bin/FreeCADCmd .venv/bin/python manage.py process_export_jobs
+```

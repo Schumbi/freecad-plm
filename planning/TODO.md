@@ -6,20 +6,19 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Jetzt
 
-- Upload im Browser erneut testen: gleicher Datei-Hash muss blockiert werden.
-- Download-Link fuer gespeicherte Revisionen im Browser testen.
-- Admin-Oberflaeche mit ersten Projekt-/Teil-/Revision-Daten pruefen.
-- Reader-/Editor-Rollen im Browser mit Testnutzern pruefen.
-- Freigabe-Button im Browser mit Admin/Superuser testen.
-- Revisionsanmerkungen im Browser mit Editor und Reader testen.
-- FreeCAD-Metadatenanzeige im Browser mit bestehenden Revisionen pruefen.
-- PLMRevision-Konflikt im Browser testen: fehlende/abweichende Property verwerfen oder normalisiert speichern.
-- Teil-/Baugruppenanlage mit initialer `.FCStd` im Browser testen.
-- Projekt-ZIP-Import und Snapshot-Download im Browser testen.
+- V0-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` durchgehen.
+- V1-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` starten, soweit die jeweilige Funktion bereits implementiert ist.
+- Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit Flatpak-FreeCADCmd oder gesetztem `FREECADCMD_COMMAND` testen.
+- PNG-Ansichten mit echtem FreeCAD-/Offscreen-Setup pruefen; falls noetig `xvfb-run` oder separaten Preview-Worker planen.
+- Management-Command `process_export_jobs` mit echten FCStd-Testdateien ausfuehren.
+- Fehlende Suche fuer Projekte, Teile, Revisionen und Dateinamen entwerfen und umsetzen.
+- Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche entwerfen und umsetzen.
+- Folgeausbau fuer VarSet-Parameterbearbeitung und Neurendern planen.
 
 ## Als Naechstes
 
-- Akzeptanzkriterien fuer v0 und v1 formulieren.
+- Browser-Abnahme mit lokalen Testnutzern dokumentieren.
+- Danach V0-Status gegen die Akzeptanzkriterien bewerten.
 
 ## Spaeter
 
@@ -76,3 +75,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Revisionsupload kann fehlende oder abweichende `PLMRevision` als normalisierte FCStd-Kopie speichern.
 - Projekte koennen von `admin` und Superuser ausserhalb der Django-Admin-Oberflaeche angelegt werden.
 - Normaler Download einer referenzierten FCStd-Revision liefert ein ZIP mit rekursiv referenzierten Dateien oder wird ohne Snapshot-Kontext blockiert.
+- Akzeptanzkriterien fuer V0 und V1 formuliert.
+- FreeCADCmd-Jobmodell fuer Analyse, Export und PNG-Ansichten angelegt.
+- Revision-Artefakte fuer STEP, STL, 3MF und PNG angelegt.
+- Artefaktdownloads und visueller PNG-Vergleich von Revisionen angelegt.
+- Upload-Aenderungsnotiz als Revisionsnotiz und Audit-Metadatum umgesetzt.
+- Lokaler Flatpak-FreeCADCmd-Aufruf ohne Desktop-GUI mit `--command=FreeCADCmd` verifiziert.

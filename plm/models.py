@@ -61,6 +61,17 @@ def revision_upload_path(instance, filename):
     return f"projects/{project_id}/parts/{part_id}/revisions/{instance.revision_code}/{filename}"
 
 
+def revision_artifact_upload_path(instance, filename):
+    revision = instance.revision
+    project_id = revision.part.project_id or "unassigned-project"
+    part_id = revision.part_id or "unassigned-part"
+    artifact_type = instance.artifact_type or "artifact"
+    return (
+        f"projects/{project_id}/parts/{part_id}/revisions/"
+        f"{revision.revision_code}/artifacts/{artifact_type}/{filename}"
+    )
+
+
 class Revision(TimeStampedModel):
     class Status(models.TextChoices):
         DRAFT = "draft", "Entwurf"
@@ -98,6 +109,93 @@ class Revision(TimeStampedModel):
 
     def __str__(self):
         return f"{self.part.number} {self.revision_code}"
+
+
+class ExportJob(TimeStampedModel):
+    class JobType(models.TextChoices):
+        INSPECT = "inspect", "FreeCAD-Analyse"
+        EXPORT = "export", "Export"
+        PNG_VIEWS = "png_views", "PNG-Ansichten"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Wartend"
+        RUNNING = "running", "Laeuft"
+        SUCCEEDED = "succeeded", "Erfolgreich"
+        FAILED = "failed", "Fehlgeschlagen"
+
+    class ExportFormat(models.TextChoices):
+        STEP = "step", "STEP"
+        STL = "stl", "STL"
+        THREEMF = "3mf", "3MF"
+
+    revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        related_name="export_jobs",
+    )
+    job_type = models.CharField(max_length=20, choices=JobType.choices)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+    )
+    export_format = models.CharField(
+        max_length=10,
+        choices=ExportFormat.choices,
+        blank=True,
+    )
+    selected_objects = models.JSONField(default=list, blank=True)
+    parameters = models.JSONField(default=dict, blank=True)
+    log = models.TextField(blank=True)
+    error = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_export_jobs",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.revision} {self.job_type} {self.status}"
+
+
+class RevisionArtifact(TimeStampedModel):
+    class ArtifactType(models.TextChoices):
+        STEP = "step", "STEP"
+        STL = "stl", "STL"
+        THREEMF = "3mf", "3MF"
+        PNG = "png", "PNG"
+
+    revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        related_name="artifacts",
+    )
+    job = models.ForeignKey(
+        ExportJob,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="artifacts",
+    )
+    artifact_type = models.CharField(max_length=10, choices=ArtifactType.choices)
+    view_name = models.CharField(max_length=40, blank=True)
+    file = models.FileField(upload_to=revision_artifact_upload_path)
+    original_filename = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    size_bytes = models.PositiveBigIntegerField()
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["revision__part__project__code", "revision__part__number", "artifact_type", "view_name", "created_at"]
+
+    def __str__(self):
+        label = self.view_name or self.artifact_type
+        return f"{self.revision} {label}"
 
 
 class ProjectSnapshot(models.Model):
@@ -156,6 +254,9 @@ class AuditEvent(models.Model):
         REVISION_DOWNLOADED = "revision_downloaded", "Revision heruntergeladen"
         REVISION_NOTES_UPDATED = "revision_notes_updated", "Revisionsnotiz geaendert"
         PROJECT_SNAPSHOT_CREATED = "project_snapshot_created", "Projektstand angelegt"
+        EXPORT_JOB_CREATED = "export_job_created", "Exportjob angelegt"
+        EXPORT_JOB_FAILED = "export_job_failed", "Exportjob fehlgeschlagen"
+        REVISION_ARTIFACT_CREATED = "revision_artifact_created", "Revisionsartefakt angelegt"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

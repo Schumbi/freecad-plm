@@ -1,4 +1,6 @@
+import json
 from io import BytesIO, StringIO
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZipInfo
 
@@ -11,7 +13,16 @@ from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
-from .models import AuditEvent, Part, Project, ProjectSnapshot, ProjectSnapshotEntry, Revision
+from .models import (
+    AuditEvent,
+    ExportJob,
+    Part,
+    Project,
+    ProjectSnapshot,
+    ProjectSnapshotEntry,
+    Revision,
+    RevisionArtifact,
+)
 from .permissions import (
     can_edit_revision_notes,
     ROLE_ADMIN,
@@ -27,6 +38,7 @@ from .services import (
     next_revision_code,
     release_revision,
 )
+from .freecadcmd import create_export_job, process_export_job
 
 
 FREECAD_DOCUMENT_XML = """
@@ -869,6 +881,26 @@ class RolePermissionTests(TestCase):
         self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
         self.assertEqual(Revision.objects.count(), 1)
 
+    def test_upload_revision_stores_change_summary_as_notes(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {
+                "file": make_zip_upload(),
+                "change_summary": "Bohrbild auf M4 angepasst.",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision = Revision.objects.get()
+        self.assertEqual(revision.notes, "Bohrbild auf M4 angepasst.")
+        self.assertEqual(
+            AuditEvent.objects.get(action=AuditEvent.Action.REVISION_UPLOADED)
+            .metadata["change_summary"],
+            "Bohrbild auf M4 angepasst.",
+        )
+
     def test_editor_cannot_release_revision(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
         self.assertFalse(can_release_revision(self.editor))
@@ -1052,3 +1084,140 @@ class RolePermissionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Part.objects.filter(name="Ohne Datei").exists())
+
+
+class FreeCADCmdJobTests(TestCase):
+    def setUp(self):
+        self.media_root = TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.settings_override.enable()
+        self.user = get_user_model().objects.create_user(
+            username="editor",
+            password="test",
+        )
+        self.project = Project.objects.create(code="PRJ", name="Projekt")
+        self.part = Part.objects.create(
+            project=self.project,
+            number="P-001",
+            name="Testteil",
+        )
+        self.revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(),
+            self.user,
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def fake_freecadcmd(self, result_code):
+        script = Path(self.media_root.name) / "fake_freecadcmd.py"
+        script.write_text(
+            f"""#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+spec = json.loads(Path(sys.argv[2]).read_text())
+output_dir = Path(spec["output_dir"])
+artifact_path = output_dir / "artifact.step"
+artifact_path.write_bytes(b"STEP DATA")
+result = {{
+    "metadata": {{
+        "objects": [
+            {{"name": "Body", "label": "Gehaeuse", "type": "PartDesign::Body", "visible": True, "exportable": True}}
+        ],
+        "varsets": [
+            {{"name": "Parameters", "label": "Parameters", "properties": [
+                {{"name": "Width", "type": "App::PropertyFloat", "value": "42.0"}}
+            ]}}
+        ],
+    }},
+    "artifacts": {json.dumps(result_code)},
+}}
+Path(sys.argv[3]).write_text(json.dumps(result))
+""",
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        return str(script)
+
+    def test_inspect_job_stores_freecadcmd_metadata(self):
+        executable = self.fake_freecadcmd([])
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=self.user,
+        )
+
+        with override_settings(FREECADCMD_COMMAND=executable):
+            process_export_job(job)
+
+        job.refresh_from_db()
+        self.revision.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        self.assertEqual(
+            self.revision.extracted_metadata["freecadcmd"]["objects"][0]["name"],
+            "Body",
+        )
+        self.assertEqual(
+            self.revision.extracted_metadata["freecadcmd"]["varsets"][0]["properties"][0]["name"],
+            "Width",
+        )
+
+    def test_export_job_creates_revision_artifact(self):
+        executable = self.fake_freecadcmd(
+            [{"path": "", "artifact_type": "step", "view_name": ""}]
+        )
+        # The fake writes artifact.step; point the result at that file at runtime.
+        script = Path(executable)
+        text = script.read_text()
+        text = text.replace('"path": ""', '"path": str(artifact_path)')
+        script.write_text(text)
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.EXPORT,
+            export_format=ExportJob.ExportFormat.STEP,
+            selected_objects=["Body"],
+            created_by=self.user,
+        )
+
+        with override_settings(FREECADCMD_COMMAND=executable):
+            process_export_job(job)
+
+        job.refresh_from_db()
+        artifact = RevisionArtifact.objects.get()
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        self.assertEqual(artifact.artifact_type, RevisionArtifact.ArtifactType.STEP)
+        self.assertEqual(artifact.size_bytes, len(b"STEP DATA"))
+
+    def test_missing_freecadcmd_marks_job_failed(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=self.user,
+        )
+
+        with override_settings(FREECADCMD_COMMAND="/missing/FreeCADCmd"):
+            process_export_job(job)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.FAILED)
+        self.assertIn("FreeCADCmd wurde nicht gefunden", job.error)
+
+    def test_reader_cannot_create_export_job(self):
+        reader = get_user_model().objects.create_user(
+            username="reader-job",
+            password="test",
+        )
+        call_command("setup_plm_roles", stdout=StringIO())
+        reader.groups.add(Group.objects.get(name=ROLE_READER))
+        self.client.force_login(reader)
+
+        response = self.client.post(
+            reverse("plm:create_revision_inspect_job", args=[self.revision.id])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ExportJob.objects.exists())

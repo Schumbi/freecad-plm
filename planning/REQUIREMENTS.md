@@ -50,6 +50,11 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Das PLM bleibt fuehrend fuer Revisionscodes; `PLMRevision` muss mit dem erwarteten PLM-Revisionscode uebereinstimmen.
 - Wenn `PLMRevision` beim Revisionsupload fehlt oder abweicht, meldet die Weboberflaeche den Konflikt und bietet Verwerfen oder Speichern einer PLM-normalisierten Kopie an.
 - Bei einer PLM-normalisierten Kopie wird nur `Document.xml` angepasst; Original-Hash, urspruenglicher Wert und Normalisierung werden in Metadaten und Audit-Trail festgehalten.
+- FreeCADCmd-Jobs koennen pro Revision eine exportierbare Objektliste und vorhandene VarSet-Parameter auslesen.
+- STEP-, STL- und 3MF-Dateien koennen als abgeleitete Artefakte zu einer Revision erzeugt, gespeichert und heruntergeladen werden.
+- PNG-Ansichten koennen als abgeleitete Artefakte zu einer Revision erzeugt und als Galerie angezeigt werden.
+- Zwei Revisionen desselben Teils koennen anhand gleichnamiger PNG-Ansichten nebeneinander verglichen werden.
+- Beim Upload einer Revision kann eine Aenderungsnotiz erfasst werden.
 
 ## Nicht Ziel Fuer V1
 
@@ -59,6 +64,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Keine automatische STEP/STL/PDF/DXF-Erzeugung.
 - Keine vollstaendige Stuecklistenverwaltung.
 - Kein komplexer mehrstufiger Freigabeprozess.
+- Keine Bearbeitung von VarSet-Parametern in der ersten FreeCADCmd-Ausbaustufe.
 
 ## Offen
 

@@ -1,0 +1,20 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <p><a href="{% url 'plm:part_detail' revision.part.id %}">Zurueck zu {{ revision.part.number }}</a></p>
+  <h1>Export planen: {{ revision.part.number }} {{ revision.revision_code }}</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+      <p>
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.errors %}
+          <span class="errors">{{ field.errors }}</span>
+        {% endif %}
+      </p>
+    {% endfor %}
+    <button type="submit">Exportjob anlegen</button>
+  </form>
+{% endblock %}

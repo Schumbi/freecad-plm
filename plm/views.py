@@ -18,6 +18,7 @@ from .forms import (
     PartForm,
     ProjectForm,
     ProjectSnapshotUploadForm,
+    RevisionExportJobForm,
     RevisionNotesForm,
     RevisionUploadForm,
 )
@@ -28,6 +29,8 @@ from .models import (
     ProjectSnapshot,
     ProjectSnapshotEntry,
     Revision,
+    RevisionArtifact,
+    ExportJob,
 )
 from .permissions import (
     can_edit_revision_notes,
@@ -44,12 +47,13 @@ from .services import (
     revision_reference_files,
     snapshot_entries_with_references,
 )
+from .freecadcmd import create_export_job
 
 
 PENDING_REVISION_UPLOAD_SESSION_KEY = "pending_revision_upload"
 
 
-def save_pending_revision_upload(part, uploaded_file, conflict):
+def save_pending_revision_upload(part, uploaded_file, conflict, change_summary=""):
     pending_name = (
         f"pending_uploads/{uuid4().hex}-{PurePosixPath(uploaded_file.name).name}"
     )
@@ -64,6 +68,7 @@ def save_pending_revision_upload(part, uploaded_file, conflict):
         "expected": conflict.expected,
         "actual": conflict.actual,
         "original_sha256": conflict.original_sha256,
+        "change_summary": change_summary,
     }
     return pending
 
@@ -245,6 +250,7 @@ def create_part(request, project_id):
                         uploaded_file=form.cleaned_data["file"],
                         created_by=request.user,
                         normalize_plm_revision=True,
+                        notes=form.cleaned_data.get("change_summary", ""),
                     )
             except ValidationError as exc:
                 form.add_error("file", exc)
@@ -271,7 +277,11 @@ def create_part(request, project_id):
 @login_required
 def part_detail(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
-    revisions = part.revisions.select_related("created_by").order_by("-created_at")
+    revisions = (
+        part.revisions.select_related("created_by")
+        .prefetch_related("artifacts", "export_jobs")
+        .order_by("-created_at")
+    )
     return render(
         request,
         "plm/part_detail.html",
@@ -302,9 +312,15 @@ def upload_revision(request, part_id):
                 part=part,
                 uploaded_file=form.cleaned_data["file"],
                 created_by=request.user,
+                notes=form.cleaned_data.get("change_summary", ""),
             )
         except PLMRevisionConflict as exc:
-            pending = save_pending_revision_upload(part, form.cleaned_data["file"], exc)
+            pending = save_pending_revision_upload(
+                part,
+                form.cleaned_data["file"],
+                exc,
+                change_summary=form.cleaned_data.get("change_summary", ""),
+            )
             request.session[PENDING_REVISION_UPLOAD_SESSION_KEY] = pending
             request.session.modified = True
             return render(
@@ -375,6 +391,7 @@ def confirm_revision_upload(request, part_id):
             uploaded_file=uploaded_file,
             created_by=request.user,
             normalize_plm_revision=True,
+            notes=pending.get("change_summary", ""),
         )
     except ValidationError as exc:
         messages.error(request, exc.messages[0])
@@ -478,6 +495,151 @@ def update_revision_notes(request, revision_id):
             f"Anmerkungen fuer Revision {revision.revision_code} wurden gespeichert.",
         )
     return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def create_revision_inspect_job(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Starten von FreeCAD-Jobs.")
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=revision.part_id)
+
+    create_export_job(
+        revision=revision,
+        job_type=ExportJob.JobType.INSPECT,
+        created_by=request.user,
+    )
+    messages.success(
+        request,
+        f"FreeCAD-Analyse fuer {revision.revision_code} wurde eingeplant.",
+    )
+    return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def create_revision_png_job(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Starten von FreeCAD-Jobs.")
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=revision.part_id)
+
+    create_export_job(
+        revision=revision,
+        job_type=ExportJob.JobType.PNG_VIEWS,
+        created_by=request.user,
+    )
+    messages.success(
+        request,
+        f"PNG-Ansichten fuer {revision.revision_code} wurden eingeplant.",
+    )
+    return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def create_revision_export_job(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Starten von Exportjobs.")
+
+    if request.method == "POST":
+        form = RevisionExportJobForm(request.POST, revision=revision)
+        if form.is_valid():
+            create_export_job(
+                revision=revision,
+                job_type=ExportJob.JobType.EXPORT,
+                export_format=form.cleaned_data["export_format"],
+                selected_objects=form.cleaned_data["selected_objects"],
+                created_by=request.user,
+            )
+            messages.success(
+                request,
+                f"Exportjob fuer {revision.revision_code} wurde eingeplant.",
+            )
+            return redirect("plm:part_detail", part_id=revision.part_id)
+    else:
+        form = RevisionExportJobForm(revision=revision)
+
+    return render(
+        request,
+        "plm/revision_export_form.html",
+        {
+            "revision": revision,
+            "form": form,
+        },
+        status=400 if request.method == "POST" else 200,
+    )
+
+
+@login_required
+def download_revision_artifact(request, artifact_id):
+    artifact = get_object_or_404(
+        RevisionArtifact.objects.select_related("revision", "revision__part"),
+        id=artifact_id,
+    )
+    as_attachment = request.GET.get("inline") != "1"
+    return FileResponse(
+        artifact.file.open("rb"),
+        as_attachment=as_attachment,
+        filename=artifact.original_filename,
+    )
+
+
+@login_required
+def revision_compare(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    revisions = (
+        part.revisions.prefetch_related("artifacts")
+        .order_by("-created_at")
+    )
+    left_id = request.GET.get("left")
+    right_id = request.GET.get("right")
+    left_revision = revisions.filter(id=left_id).first() if left_id else None
+    right_revision = revisions.filter(id=right_id).first() if right_id else None
+    comparisons = []
+    if left_revision and right_revision:
+        left_pngs = {
+            artifact.view_name: artifact
+            for artifact in left_revision.artifacts.filter(
+                artifact_type=RevisionArtifact.ArtifactType.PNG
+            )
+        }
+        right_pngs = {
+            artifact.view_name: artifact
+            for artifact in right_revision.artifacts.filter(
+                artifact_type=RevisionArtifact.ArtifactType.PNG
+            )
+        }
+        for view_name in sorted(set(left_pngs) & set(right_pngs)):
+            comparisons.append(
+                {
+                    "view_name": view_name,
+                    "left": left_pngs[view_name],
+                    "right": right_pngs[view_name],
+                }
+            )
+
+    return render(
+        request,
+        "plm/revision_compare.html",
+        {
+            "part": part,
+            "revisions": revisions,
+            "left_revision": left_revision,
+            "right_revision": right_revision,
+            "comparisons": comparisons,
+        },
+    )
 
 
 @login_required

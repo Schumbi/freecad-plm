@@ -258,6 +258,7 @@ Browser-Test der Teilanlage, danach committen. Danach V0-Akzeptanzkriterien form
   - `assembly`, wenn `Assembly::AssemblyObject` vorhanden ist
   - `parameters`, wenn `App::VarSet` vorhanden ist
   - sonst `part`
+
 - FreeCAD-`XLink`-Referenzen werden extrahiert.
 - Echter Testimport von `test-model/Sommerrodelbahn-Chipbox.zip`:
   - `Box.FCStd`: part, referenziert u.a. `Chip.FCStd`
@@ -319,3 +320,36 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Wenn eine Revision Referenzen hat, aber kein Snapshot-Kontext vorhanden ist, blockiert der Download mit HTTP 403 statt eine unvollstaendige Einzeldatei auszugeben.
 - AuditEvent fuer Downloads speichert `download_mode` als `single_file` oder `referenced_zip`.
 - `.venv/bin/python manage.py test plm` laeuft mit 55 Tests erfolgreich.
+
+## 2026-06-27
+
+### Planung Aufgeraeumt
+
+- Die Planungsdateien wurden in der in `planning/README.md` beschriebenen Reihenfolge gelesen.
+- `planning/ACCEPTANCE_CRITERIA.md` wurde angelegt.
+- V0-Akzeptanzkriterien beschreiben jetzt den lokalen Kernpfad fuer einzelne `.FCStd`-Revisionen.
+- V1-Akzeptanzkriterien beschreiben den Zielzustand fuer ein nutzbares LAN-PLM inklusive Projektstaenden, PLMRevision-Konfliktbehandlung und Suche.
+- `planning/README.md`, `planning/ROADMAP.md` und `planning/TODO.md` wurden auf die neue Akzeptanzkriterien-Datei abgestimmt.
+- `manage.py test plm` lief mit 55 Tests erfolgreich.
+
+### Aktueller Fokus
+
+- Als naechstes die V0-Browser-Abnahme mit lokalen Testnutzern durchgehen.
+- Danach fehlende V1-Funktionen priorisieren, insbesondere Suche sowie Projektbearbeitung und Archivierung in der PLM-Oberflaeche.
+
+### Fortschritt FreeCADCmd-Artefakte
+
+- `ExportJob` und `RevisionArtifact` wurden angelegt.
+- FreeCADCmd-Aufruf ist ueber `FREECADCMD_COMMAND` konfigurierbar; Default ist `FreeCADCmd` mit Flatpak-Fallback auf `org.freecad.FreeCAD`.
+- Management-Command `process_export_jobs` verarbeitet wartende Jobs.
+- Analysejobs lesen exportierbare Objekte und VarSet-Parameter in `Revision.extracted_metadata["freecadcmd"]`.
+- Exportjobs erzeugen STEP-, STL- oder 3MF-Artefakte fuer ausgewaehlte Objekte.
+- PNG-Jobs erzeugen die Standardansichten front, back, left, right, top, bottom und isometric.
+- Revisionsseite zeigt Jobs, Artefakte, PNG-Galerie und VarSet-Anzeige.
+- Vergleichsseite zeigt gleichnamige PNG-Ansichten zweier Revisionen desselben Teils nebeneinander.
+- Uploads koennen eine Aenderungsnotiz erfassen; sie landet in `Revision.notes` und im AuditEvent.
+- Lokaler Hinweis: natives `FreeCADCmd` wurde auf dem System nicht im PATH gefunden, aber `flatpak run --branch=stable --arch=x86_64 --command=FreeCADCmd org.freecad.FreeCAD --version` liefert FreeCAD 1.1.1.
+- Der Flatpak-Aufruf mit `--command=FreeCADCmd` ist fuer CLI-/Headless-Verarbeitung geeignet; der Desktop-Launcher mit `--command=FreeCAD --file-forwarding ... --single-instance` ist dafuer nicht der passende Pfad.
+- STEP/STL/3MF sollten ueber FreeCADCmd ohne normale GUI erzeugbar sein.
+- PNG-Ansichten sind riskanter, weil sie typischerweise `FreeCADGui`/Viewport brauchen; auf dem spaeteren Heimserver muss Offscreen-Rendering separat geprueft werden.
+- `.venv/bin/python manage.py test plm` laeuft mit 60 Tests erfolgreich.

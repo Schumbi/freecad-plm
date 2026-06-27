@@ -106,6 +106,33 @@
     .metadata-list dd {
       margin-left: 0;
     }
+    .inline-actions form {
+      display: inline-block;
+      margin: 0.2rem 0.4rem 0.2rem 0;
+    }
+    .artifact-list,
+    .job-list {
+      margin: 0.5rem 0;
+      padding-left: 1.2rem;
+    }
+    .png-gallery {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-top: 0.8rem;
+    }
+    .png-gallery img,
+    .compare-grid img {
+      background: white;
+      border: 1px solid #e5e7eb;
+      max-width: 100%;
+    }
+    .compare-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      margin-bottom: 1.4rem;
+    }
   </style>
 </head>
 <body>

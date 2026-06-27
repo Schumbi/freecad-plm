@@ -1,0 +1,49 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <p><a href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a></p>
+  <h1>Revisionen vergleichen: {{ part.number }} - {{ part.name }}</h1>
+
+  <form method="get">
+    <p>
+      <label for="left">Linke Revision</label>
+      <select id="left" name="left">
+        <option value="">-</option>
+        {% for revision in revisions %}
+          <option value="{{ revision.id }}"{% if left_revision.id == revision.id %} selected{% endif %}>{{ revision.revision_code }}</option>
+        {% endfor %}
+      </select>
+    </p>
+    <p>
+      <label for="right">Rechte Revision</label>
+      <select id="right" name="right">
+        <option value="">-</option>
+        {% for revision in revisions %}
+          <option value="{{ revision.id }}"{% if right_revision.id == revision.id %} selected{% endif %}>{{ revision.revision_code }}</option>
+        {% endfor %}
+      </select>
+    </p>
+    <button type="submit">Vergleichen</button>
+  </form>
+
+  {% if left_revision and right_revision %}
+    <h2>{{ left_revision.revision_code }} gegen {{ right_revision.revision_code }}</h2>
+    {% if comparisons %}
+      {% for comparison in comparisons %}
+        <h3>{{ comparison.view_name }}</h3>
+        <div class="compare-grid">
+          <figure>
+            <img src="{% url 'plm:download_revision_artifact' comparison.left.id %}?inline=1" alt="{{ left_revision.revision_code }} {{ comparison.view_name }}">
+            <figcaption>{{ left_revision.revision_code }}</figcaption>
+          </figure>
+          <figure>
+            <img src="{% url 'plm:download_revision_artifact' comparison.right.id %}?inline=1" alt="{{ right_revision.revision_code }} {{ comparison.view_name }}">
+            <figcaption>{{ right_revision.revision_code }}</figcaption>
+          </figure>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>Keine gleichnamigen PNG-Ansichten fuer diese Revisionen gefunden.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

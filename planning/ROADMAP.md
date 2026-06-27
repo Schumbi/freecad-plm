@@ -13,6 +13,7 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 - Einfache Admin-Oberflaeche aktivieren.
 - Minimalen Upload-Prototyp fuer `FCStd` bauen.
 - Tests fuer `FCStd`-Validierung starten.
+- Akzeptanzkriterien aus `planning/ACCEPTANCE_CRITERIA.md` erfuellen.
 
 ## V1: Nutzbares LAN-PLM
 
@@ -24,8 +25,12 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 - Download geschuetzt hinter Login.
 - Audit-Trail fuer Upload, Release, Download und Admin-Aktionen.
 - Suche nach Projekten, Teilen, Revisionen und Dateinamen.
+- FreeCADCmd-Analyse fuer Revisionen.
+- Abgeleitete Artefakte fuer STEP, STL, 3MF und PNG-Ansichten.
+- Visueller Vergleich von Revisionen ueber PNG-Ansichten.
 - Schlichte, robuste Weboberflaeche.
 - Lokale Installation dokumentieren.
+- V1-Akzeptanzkriterien aus `planning/ACCEPTANCE_CRITERIA.md` erfuellen.
 
 ## V2: Deployment Und FreeCAD-Automation
 
@@ -33,7 +38,8 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 - PostgreSQL als Compose-Datenbank.
 - Medien-/Storage-Volume.
 - Optionaler FreeCADCmd-Worker.
-- Exportjobs fuer STEP, STL, PDF und DXF pruefen.
+- Exportjobs fuer PDF, DXF und weitere Formate pruefen.
+- VarSet-Parameterbearbeitung und Variantenexports pruefen.
 - Jobstatus, Logs und Fehleranzeige.
 
 ## Spaeter

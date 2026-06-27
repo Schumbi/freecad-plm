@@ -37,6 +37,31 @@ urlpatterns = [
         name="update_revision_notes",
     ),
     path(
+        "revisions/<int:revision_id>/inspect/",
+        views.create_revision_inspect_job,
+        name="create_revision_inspect_job",
+    ),
+    path(
+        "revisions/<int:revision_id>/exports/new/",
+        views.create_revision_export_job,
+        name="create_revision_export_job",
+    ),
+    path(
+        "revisions/<int:revision_id>/png-views/",
+        views.create_revision_png_job,
+        name="create_revision_png_job",
+    ),
+    path(
+        "artifacts/<int:artifact_id>/download/",
+        views.download_revision_artifact,
+        name="download_revision_artifact",
+    ),
+    path(
+        "parts/<int:part_id>/compare/",
+        views.revision_compare,
+        name="revision_compare",
+    ),
+    path(
         "snapshots/<int:snapshot_id>/download/",
         views.download_project_snapshot,
         name="download_project_snapshot",
