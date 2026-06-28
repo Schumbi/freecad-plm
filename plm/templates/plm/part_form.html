@@ -1,8 +1,13 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <p><a href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a></p>
-  <h1>Neues Teil oder Baugruppe</h1>
+  <a class="back-link" href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a>
+  <div class="page-header">
+    <div class="page-header-main">
+      <h1>Neues Teil oder Baugruppe</h1>
+      <p class="lead-text">Metadaten erfassen und direkt eine initiale FreeCAD-Revision anlegen.</p>
+    </div>
+  </div>
 
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}

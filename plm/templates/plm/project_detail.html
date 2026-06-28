@@ -1,17 +1,22 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <p><a href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a></p>
+  <a class="back-link" href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a>
   <div class="object-layout">
     <div class="object-main">
-      <h1>{{ project.code }} - {{ project.name }}</h1>
+      <div class="page-header">
+        <div class="page-header-main">
+          <h1>{{ project.code }} - {{ project.name }}</h1>
+          <p class="object-subtitle">{{ project.description }}</p>
+        </div>
+      </div>
       <p class="mobile-properties-link"><a href="{% url 'plm:project_properties' project.id %}">Eigenschaften anzeigen</a></p>
-      <p>{{ project.description }}</p>
 
-      <h2>Teile und Baugruppen</h2>
       {% if can_create_part %}
-        <p><a href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe anlegen</a></p>
-        <details>
+        <div class="section-actions">
+          <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe anlegen</a>
+        </div>
+        <details class="panel mt-3">
           <summary>Projektstand aus ZIP importieren</summary>
           <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
             {% csrf_token %}
@@ -32,65 +37,74 @@
     </aside>
   </div>
 
+  <div class="section-header">
+    <h2>Teile und Baugruppen</h2>
+  </div>
   {% if parts %}
-    <table>
-      <thead>
-        <tr>
-          <th>Nummer</th>
-          <th>Name</th>
-          <th>Typ</th>
-          <th>Revisionen</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for part in parts %}
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
-            <td>{{ part.name }}</td>
-            <td>{{ part.get_category_display }}</td>
-            <td>{{ part.revisions.count }}</td>
+            <th>Nummer</th>
+            <th>Name</th>
+            <th>Typ</th>
+            <th>Revisionen</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for part in parts %}
+            <tr>
+              <td><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
+              <td>{{ part.name }}</td>
+              <td>{{ part.get_category_display }}</td>
+              <td>{{ part.revisions.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Teile oder Baugruppen vorhanden.</p>
+    <div class="empty-state">Noch keine Teile oder Baugruppen vorhanden.</div>
   {% endif %}
 
-  <h2>Projektstaende</h2>
+  <div class="section-header">
+    <h2>Projektstaende</h2>
+  </div>
   {% if snapshots %}
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Dateien</th>
-          <th>Erstellt von</th>
-          <th>Download</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for snapshot in snapshots %}
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td>{{ snapshot.name }}</td>
-            <td>
-              <details>
-                <summary>{{ snapshot.entries.count }} Dateien</summary>
-                <ul>
-                  {% for entry in snapshot.entries.all %}
-                    <li>
-                      {{ entry.path }} -> {{ entry.revision.part.number }} {{ entry.revision.revision_code }}
-                    </li>
-                  {% endfor %}
-                </ul>
-              </details>
-            </td>
-            <td>{{ snapshot.created_by }}</td>
-            <td><a href="{% url 'plm:download_project_snapshot' snapshot.id %}">ZIP herunterladen</a></td>
+            <th>Name</th>
+            <th>Dateien</th>
+            <th>Erstellt von</th>
+            <th>Download</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for snapshot in snapshots %}
+            <tr>
+              <td>{{ snapshot.name }}</td>
+              <td>
+                <details>
+                  <summary>{{ snapshot.entries.count }} Dateien</summary>
+                  <ul>
+                    {% for entry in snapshot.entries.all %}
+                      <li>
+                        {{ entry.path }} -> {{ entry.revision.part.number }} {{ entry.revision.revision_code }}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </details>
+              </td>
+              <td>{{ snapshot.created_by }}</td>
+              <td><a href="{% url 'plm:download_project_snapshot' snapshot.id %}">ZIP herunterladen</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Projektstaende vorhanden.</p>
+    <div class="empty-state">Noch keine Projektstaende vorhanden.</div>
   {% endif %}
 {% endblock %}

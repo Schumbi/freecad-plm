@@ -1,34 +1,43 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <h1>Projekte</h1>
-  {% if can_create_project %}
-    <p><a href="{% url 'plm:create_project' %}">Neues Projekt anlegen</a></p>
-  {% endif %}
+  <div class="page-header">
+    <div class="page-header-main">
+      <h1>Projekte</h1>
+      <p class="lead-text">Projektuebersicht mit Status, Datum und Beschreibung.</p>
+    </div>
+    {% if can_create_project %}
+      <div class="page-header-actions">
+        <a class="btn btn-primary" href="{% url 'plm:create_project' %}">Neues Projekt anlegen</a>
+      </div>
+    {% endif %}
+  </div>
   {% if projects %}
-    <table>
-      <thead>
-        <tr>
-          <th>Code</th>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Datum</th>
-          <th>Beschreibung</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for project in projects %}
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></td>
-            <td>{{ project.name }}</td>
-            <td>{{ project.get_status_display }}</td>
-            <td>{{ project.project_date|date:"d.m.Y" }}</td>
-            <td>{{ project.description }}</td>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Datum</th>
+            <th>Beschreibung</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for project in projects %}
+            <tr>
+              <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></td>
+              <td>{{ project.name }}</td>
+              <td>{{ project.get_status_display }}</td>
+              <td>{{ project.project_date|date:"d.m.Y" }}</td>
+              <td>{{ project.description }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Projekte vorhanden.</p>
+    <div class="empty-state">Noch keine Projekte vorhanden.</div>
   {% endif %}
 {% endblock %}

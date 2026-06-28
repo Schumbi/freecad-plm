@@ -1,41 +1,35 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <p><a href="{% url 'plm:project_detail' part.project.id %}">Zurueck zu {{ part.project.code }}</a></p>
+  <a class="back-link" href="{% url 'plm:project_detail' part.project.id %}">Zurueck zu {{ part.project.code }}</a>
   <div class="object-layout">
     <div class="object-main">
-      <h1>{{ part.number }} - {{ part.name }}</h1>
+      <div class="page-header">
+        <div class="page-header-main">
+          <h1>{{ part.number }} - {{ part.name }}</h1>
+          <p class="object-subtitle">{{ part.get_category_display }}{% if part.description %} · {{ part.description }}{% endif %}</p>
+        </div>
+      </div>
       <p class="mobile-properties-link"><a href="{% url 'plm:part_properties' part.id %}">Eigenschaften anzeigen</a></p>
-      <p>{{ part.get_category_display }}</p>
-      {% if part.description %}<p>{{ part.description }}</p>{% endif %}
 
       {% if can_upload %}
-        <h2>Neue Revision hochladen</h2>
-        <form method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
-          {% csrf_token %}
-          {{ form.file.label_tag }}
-          {{ form.file }}
-          {% if form.file.errors %}
-            <div class="errors">{{ form.file.errors }}</div>
-          {% endif %}
-          {{ form.change_summary.label_tag }}
-          {{ form.change_summary }}
-          {% if form.change_summary.errors %}
-            <div class="errors">{{ form.change_summary.errors }}</div>
-          {% endif %}
-          <button type="submit">Revision hochladen</button>
-        </form>
-      {% endif %}
-
-      <h2>Revisionen</h2>
-      {% if can_upload %}
-        <form method="post" action="{% url 'plm:process_export_jobs_once' part.id %}">
-          {% csrf_token %}
-          <button type="submit">Wartende Jobs starten{% if queued_export_jobs_count %} ({{ queued_export_jobs_count }}){% endif %}</button>
-        </form>
-      {% endif %}
-      {% if revisions %}
-        <p><a href="{% url 'plm:revision_compare' part.id %}">Revisionen visuell vergleichen</a></p>
+        <details class="panel">
+          <summary>Neue Revision hochladen</summary>
+          <form method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.file.label_tag }}
+            {{ form.file }}
+            {% if form.file.errors %}
+              <div class="errors">{{ form.file.errors }}</div>
+            {% endif %}
+            {{ form.change_summary.label_tag }}
+            {{ form.change_summary }}
+            {% if form.change_summary.errors %}
+              <div class="errors">{{ form.change_summary.errors }}</div>
+            {% endif %}
+            <button type="submit">Revision hochladen</button>
+          </form>
+        </details>
       {% endif %}
     </div>
     <aside class="properties-panel">
@@ -48,8 +42,23 @@
     </aside>
   </div>
 
+  <div class="section-header">
+    <h2>Revisionen</h2>
+    <div class="section-actions">
+      {% if revisions %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'plm:revision_compare' part.id %}">Visuell vergleichen</a>
+      {% endif %}
+      {% if can_upload %}
+        <form method="post" action="{% url 'plm:process_export_jobs_once' part.id %}">
+          {% csrf_token %}
+          <button type="submit">Wartende Jobs starten{% if queued_export_jobs_count %} ({{ queued_export_jobs_count }}){% endif %}</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
   {% if revisions %}
-    <table>
+    <div class="table-wrap">
+      <table>
       <thead>
         <tr>
           <th>Revision</th>
@@ -247,8 +256,9 @@
           </tr>
         {% endfor %}
       </tbody>
-    </table>
+      </table>
+    </div>
   {% else %}
-    <p>Noch keine Revisionen vorhanden.</p>
+    <div class="empty-state">Noch keine Revisionen vorhanden.</div>
   {% endif %}
 {% endblock %}

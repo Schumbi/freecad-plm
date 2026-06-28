@@ -1,8 +1,13 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <p><a href="{% url 'plm:part_detail' revision.part.id %}">Zurueck zu {{ revision.part.number }}</a></p>
-  <h1>Export planen: {{ revision.part.number }} {{ revision.revision_code }}</h1>
+  <a class="back-link" href="{% url 'plm:part_detail' revision.part.id %}">Zurueck zu {{ revision.part.number }}</a>
+  <div class="page-header">
+    <div class="page-header-main">
+      <h1>Export planen</h1>
+      <p class="lead-text">{{ revision.part.number }} {{ revision.revision_code }}</p>
+    </div>
+  </div>
 
   <form method="post">
     {% csrf_token %}

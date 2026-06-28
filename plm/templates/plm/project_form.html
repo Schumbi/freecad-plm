@@ -2,11 +2,15 @@
 
 {% block content %}
   {% if project %}
-    <p><a href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a></p>
+    <a class="back-link" href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a>
   {% else %}
-    <p><a href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a></p>
+    <a class="back-link" href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a>
   {% endif %}
-  <h1>{{ title|default:"Neues Projekt" }}</h1>
+  <div class="page-header">
+    <div class="page-header-main">
+      <h1>{{ title|default:"Neues Projekt" }}</h1>
+    </div>
+  </div>
 
   <form method="post">
     {% csrf_token %}

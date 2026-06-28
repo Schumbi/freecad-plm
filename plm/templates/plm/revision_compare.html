@@ -1,8 +1,13 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <p><a href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a></p>
-  <h1>Revisionen vergleichen: {{ part.number }} - {{ part.name }}</h1>
+  <a class="back-link" href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a>
+  <div class="page-header">
+    <div class="page-header-main">
+      <h1>Revisionen vergleichen</h1>
+      <p class="lead-text">{{ part.number }} - {{ part.name }}</p>
+    </div>
+  </div>
 
   <form method="get">
     <p>
@@ -27,7 +32,9 @@
   </form>
 
   {% if left_revision and right_revision %}
-    <h2>{{ left_revision.revision_code }} gegen {{ right_revision.revision_code }}</h2>
+    <div class="section-header">
+      <h2>{{ left_revision.revision_code }} gegen {{ right_revision.revision_code }}</h2>
+    </div>
     {% if comparisons %}
       {% for comparison in comparisons %}
         <h3>{{ comparison.view_name }}</h3>
