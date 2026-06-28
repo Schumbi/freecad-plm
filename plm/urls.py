@@ -15,6 +15,11 @@ urlpatterns = [
     ),
     path("projects/<int:project_id>/parts/new/", views.create_part, name="create_part"),
     path("parts/<int:part_id>/", views.part_detail, name="part_detail"),
+    path(
+        "parts/<int:part_id>/jobs/process/",
+        views.process_export_jobs_once,
+        name="process_export_jobs_once",
+    ),
     path("parts/<int:part_id>/upload/", views.upload_revision, name="upload_revision"),
     path(
         "parts/<int:part_id>/upload/confirm/",

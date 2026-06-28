@@ -353,3 +353,32 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - STEP/STL/3MF sollten ueber FreeCADCmd ohne normale GUI erzeugbar sein.
 - PNG-Ansichten sind riskanter, weil sie typischerweise `FreeCADGui`/Viewport brauchen; auf dem spaeteren Heimserver muss Offscreen-Rendering separat geprueft werden.
 - `.venv/bin/python manage.py test plm` laeuft mit 60 Tests erfolgreich.
+
+### Fix PNG-Erzeugung Mit Flatpak-FreeCAD
+
+- Ursache 1: FreeCADCmd wurde mit Script- und JSON-Pfaden als normale Dateiargumente gestartet; FreeCAD versuchte dadurch `job_spec.json` als Dokument zu oeffnen.
+- Ursache 2: Flatpak konnte die Worker-Dateien unter `/tmp` ohne `--filesystem=/tmp` nicht lesen.
+- Ursache 3: PNG-Jobs brauchen `FreeCADGui`; mit Flatpak muss dafuer der GUI-Binary `FreeCAD` statt `FreeCADCmd` verwendet werden.
+- Ursache 4: `runpy.run_path()` verhindert in FreeCAD 1.1.1, dass `FreeCADGui.showMainWindow()` sauber ein MainWindow erzeugt; direkter `exec(compile(...))` funktioniert.
+- Ursache 5: `ActiveView.viewDirection()` existiert in FreeCAD 1.1.1 nicht; die fertigen View-Methoden wie `viewFront()`, `viewTop()` und `viewIsometric()` funktionieren.
+- Der Worker schreibt jetzt das ausgefuehrte Kommando und Display-Umgebung in den Job-Log.
+- Lokaler echter Lauf mit Flatpak FreeCAD 1.1.1 erzeugte erfolgreich sieben PNG-Artefakte fuer einen Job: front, back, left, right, top, bottom und isometric.
+- Hinweis: Flatpak-FreeCAD segfaultet lokal beim Beenden nach GUI-Nutzung, aber erst nachdem die Ergebnisdatei geschrieben ist; der Worker akzeptiert deshalb vorhandene Ergebnisdaten trotz nicht-null Exitcode.
+- `.venv/bin/python manage.py test plm` laeuft mit 61 Tests erfolgreich.
+
+### PNG-Button Verarbeitet Direkt
+
+- Nutzerbeobachtung: Klick auf `PNG-Ansichten` wirkte, als passiere nichts.
+- Ursache: Die View legte nur einen `png_views`-Job an; ohne separaten Lauf von `process_export_jobs` blieb der Job auf `queued`.
+- Fuer den lokalen Prototyp verarbeitet der Button `PNG-Ansichten` den Job jetzt direkt per `process_export_job(job)`.
+- Bei Erfolg erscheint eine Erfolgsmeldung, bei Fehlern bleibt der Job-Fehler sichtbar und die Oberflaeche meldet den Fehlschlag.
+- Echter lokaler POST auf `create_revision_png_job` erzeugte direkt einen erfolgreichen Job und sieben PNG-Artefakte.
+- `.venv/bin/python manage.py test plm` laeuft mit 63 Tests erfolgreich.
+
+### Einmaliger Worker-Knopf In Der Oberflaeche
+
+- Auf der Teildetailseite gibt es fuer Editor/Admin/Superuser jetzt den Button `Wartende Jobs starten`.
+- Der Button ruft `process_queued_export_jobs()` einmalig auf und verarbeitet alle aktuell wartenden Jobs.
+- Die Rueckmeldung nennt Anzahl, erfolgreiche Jobs und fehlgeschlagene Jobs.
+- Damit lassen sich Analyse- und Exportjobs ohne Terminal aus der Oberflaeche abarbeiten.
+- `.venv/bin/python manage.py test plm` laeuft mit 64 Tests erfolgreich.

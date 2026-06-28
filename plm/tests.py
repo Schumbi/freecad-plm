@@ -2,6 +2,7 @@ import json
 from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from zipfile import ZipFile, ZipInfo
 
 from django.core.exceptions import ValidationError
@@ -38,7 +39,12 @@ from .services import (
     next_revision_code,
     release_revision,
 )
-from .freecadcmd import create_export_job, process_export_job
+from .freecadcmd import (
+    create_export_job,
+    process_export_job,
+    with_flatpak_worker_options,
+    with_png_gui_command,
+)
 
 
 FREECAD_DOCUMENT_XML = """
@@ -651,6 +657,50 @@ class RevisionUploadViewTests(TestCase):
             AuditEvent.Action.REVISION_DOWNLOADED,
         )
 
+    def test_png_views_button_processes_job_immediately(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        def mark_succeeded(job):
+            job.status = ExportJob.Status.SUCCEEDED
+            job.save(update_fields=["status", "updated_at"])
+            return job
+
+        with patch("plm.views.process_export_job", side_effect=mark_succeeded) as process:
+            response = self.client.post(
+                reverse("plm:create_revision_png_job", args=[revision.id])
+            )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        job = ExportJob.objects.get()
+        self.assertEqual(job.job_type, ExportJob.JobType.PNG_VIEWS)
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        process.assert_called_once_with(job)
+
+    def test_process_export_jobs_button_runs_queued_jobs_once(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        job = create_export_job(
+            revision=revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=self.user,
+        )
+
+        def mark_succeeded():
+            job.status = ExportJob.Status.SUCCEEDED
+            job.save(update_fields=["status", "updated_at"])
+            return [job]
+
+        with patch("plm.views.process_queued_export_jobs", side_effect=mark_succeeded) as process:
+            response = self.client.post(
+                reverse("plm:process_export_jobs_once", args=[self.part.id])
+            )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        process.assert_called_once_with()
+
     def test_referenced_revision_without_snapshot_cannot_be_downloaded_alone(self):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(
@@ -1119,7 +1169,7 @@ import json
 import sys
 from pathlib import Path
 
-spec = json.loads(Path(sys.argv[2]).read_text())
+spec = json.loads(Path(sys.argv[-2]).read_text())
 output_dir = Path(spec["output_dir"])
 artifact_path = output_dir / "artifact.step"
 artifact_path.write_bytes(b"STEP DATA")
@@ -1136,7 +1186,7 @@ result = {{
     }},
     "artifacts": {json.dumps(result_code)},
 }}
-Path(sys.argv[3]).write_text(json.dumps(result))
+Path(sys.argv[-1]).write_text(json.dumps(result))
 """,
             encoding="utf-8",
         )
@@ -1205,6 +1255,41 @@ Path(sys.argv[3]).write_text(json.dumps(result))
         job.refresh_from_db()
         self.assertEqual(job.status, ExportJob.Status.FAILED)
         self.assertIn("FreeCADCmd wurde nicht gefunden", job.error)
+
+    def test_flatpak_command_gets_tmp_access_for_worker_files(self):
+        command = with_flatpak_worker_options(
+            [
+                "flatpak",
+                "run",
+                "--branch=stable",
+                "--command=FreeCADCmd",
+                "org.freecad.FreeCAD",
+            ]
+        )
+
+        self.assertIn("--filesystem=/tmp", command)
+        self.assertLess(command.index("--filesystem=/tmp"), command.index("org.freecad.FreeCAD"))
+
+    def test_png_flatpak_command_uses_gui_binary(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        command = with_png_gui_command(
+            [
+                "flatpak",
+                "run",
+                "--filesystem=/tmp",
+                "--command=FreeCADCmd",
+                "org.freecad.FreeCAD",
+            ],
+            job,
+        )
+
+        self.assertIn("--command=FreeCAD", command)
+        self.assertNotIn("--command=FreeCADCmd", command)
 
     def test_reader_cannot_create_export_job(self):
         reader = get_user_model().objects.create_user(

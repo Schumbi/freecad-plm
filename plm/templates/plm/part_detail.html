@@ -25,6 +25,12 @@
   {% endif %}
 
   <h2>Revisionen</h2>
+  {% if can_upload %}
+    <form method="post" action="{% url 'plm:process_export_jobs_once' part.id %}">
+      {% csrf_token %}
+      <button type="submit">Wartende Jobs starten{% if queued_export_jobs_count %} ({{ queued_export_jobs_count }}){% endif %}</button>
+    </form>
+  {% endif %}
   {% if revisions %}
     <p><a href="{% url 'plm:revision_compare' part.id %}">Revisionen visuell vergleichen</a></p>
   {% endif %}

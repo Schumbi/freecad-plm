@@ -9,7 +9,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - V0-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` durchgehen.
 - V1-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` starten, soweit die jeweilige Funktion bereits implementiert ist.
 - Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit Flatpak-FreeCADCmd oder gesetztem `FREECADCMD_COMMAND` testen.
-- PNG-Ansichten mit echtem FreeCAD-/Offscreen-Setup pruefen; falls noetig `xvfb-run` oder separaten Preview-Worker planen.
+- PNG-Ansichten auf einem spaeteren Server ohne Desktop mit `xvfb-run` oder separatem Preview-Worker pruefen.
 - Management-Command `process_export_jobs` mit echten FCStd-Testdateien ausfuehren.
 - Fehlende Suche fuer Projekte, Teile, Revisionen und Dateinamen entwerfen und umsetzen.
 - Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche entwerfen und umsetzen.
@@ -81,3 +81,4 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Artefaktdownloads und visueller PNG-Vergleich von Revisionen angelegt.
 - Upload-Aenderungsnotiz als Revisionsnotiz und Audit-Metadatum umgesetzt.
 - Lokaler Flatpak-FreeCADCmd-Aufruf ohne Desktop-GUI mit `--command=FreeCADCmd` verifiziert.
+- Lokale PNG-Erzeugung mit Flatpak-FreeCAD-GUI-Binary verifiziert; Worker nutzt fuer PNG-Jobs automatisch `--command=FreeCAD`.

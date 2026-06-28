@@ -48,13 +48,17 @@ Projektstand und naechste Schritte stehen in `planning/`.
 
 ## FreeCADCmd
 
-Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf die Flatpak-Installation `org.freecad.FreeCAD` mit `--command=FreeCADCmd` zurueck, wenn `flatpak` vorhanden ist.
+Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf die Flatpak-Installation `org.freecad.FreeCAD` mit `--command=FreeCADCmd` und `/tmp`-Freigabe zurueck, wenn `flatpak` vorhanden ist. PNG-Jobs nutzen bei Flatpak automatisch den GUI-Binary `FreeCAD`, weil dafuer ein FreeCADGui-Viewport gebraucht wird.
 
 Beispiel fuer eine explizite Flatpak-Konfiguration:
 
 ```bash
-FREECADCMD_COMMAND='flatpak run --branch=stable --arch=x86_64 --command=FreeCADCmd org.freecad.FreeCAD' .venv/bin/python manage.py process_export_jobs
+FREECADCMD_COMMAND='flatpak run --filesystem=/tmp --branch=stable --arch=x86_64 --command=FreeCADCmd org.freecad.FreeCAD' .venv/bin/python manage.py process_export_jobs
 ```
+
+PNG-Ansichten brauchen ein funktionierendes GUI-/Display-Setup. Der Button `PNG-Ansichten` erzeugt die Bilder im lokalen Prototyp direkt waehrend der Anfrage. Auf einem Server ohne Desktop sollte dieser Pfad spaeter unter `xvfb-run` oder in einen separaten Preview-Worker wandern.
+
+Wartende Analyse- und Exportjobs koennen auf der Teildetailseite mit `Wartende Jobs starten` einmalig verarbeitet werden.
 
 Auf einem Server mit nativer FreeCAD-Installation reicht meistens:
 

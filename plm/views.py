@@ -47,7 +47,7 @@ from .services import (
     revision_reference_files,
     snapshot_entries_with_references,
 )
-from .freecadcmd import create_export_job
+from .freecadcmd import create_export_job, process_export_job, process_queued_export_jobs
 
 
 PENDING_REVISION_UPLOAD_SESSION_KEY = "pending_revision_upload"
@@ -292,8 +292,32 @@ def part_detail(request, part_id):
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),
+            "queued_export_jobs_count": ExportJob.objects.filter(
+                status=ExportJob.Status.QUEUED
+            ).count(),
         },
     )
+
+
+@login_required
+def process_export_jobs_once(request, part_id):
+    part = get_object_or_404(Part, id=part_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Starten von FreeCAD-Jobs.")
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=part.id)
+
+    jobs = process_queued_export_jobs()
+    succeeded = sum(1 for job in jobs if job.status == ExportJob.Status.SUCCEEDED)
+    failed = sum(1 for job in jobs if job.status == ExportJob.Status.FAILED)
+    if jobs:
+        messages.success(
+            request,
+            f"{len(jobs)} Job(s) verarbeitet: {succeeded} erfolgreich, {failed} fehlgeschlagen.",
+        )
+    else:
+        messages.info(request, "Keine wartenden Jobs vorhanden.")
+    return redirect("plm:part_detail", part_id=part.id)
 
 
 @login_required
@@ -352,6 +376,9 @@ def upload_revision(request, part_id):
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),
+            "queued_export_jobs_count": ExportJob.objects.filter(
+                status=ExportJob.Status.QUEUED
+            ).count(),
         },
         status=400,
     )
@@ -531,15 +558,23 @@ def create_revision_png_job(request, revision_id):
     if request.method != "POST":
         return redirect("plm:part_detail", part_id=revision.part_id)
 
-    create_export_job(
+    job = create_export_job(
         revision=revision,
         job_type=ExportJob.JobType.PNG_VIEWS,
         created_by=request.user,
     )
-    messages.success(
-        request,
-        f"PNG-Ansichten fuer {revision.revision_code} wurden eingeplant.",
-    )
+    process_export_job(job)
+    job.refresh_from_db()
+    if job.status == ExportJob.Status.SUCCEEDED:
+        messages.success(
+            request,
+            f"PNG-Ansichten fuer {revision.revision_code} wurden erzeugt.",
+        )
+    else:
+        messages.error(
+            request,
+            f"PNG-Ansichten fuer {revision.revision_code} konnten nicht erzeugt werden.",
+        )
     return redirect("plm:part_detail", part_id=revision.part_id)
 
 

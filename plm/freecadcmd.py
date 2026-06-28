@@ -1,4 +1,5 @@
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -123,25 +124,21 @@ def export_objects(doc, spec, output_dir):
 
 
 def create_png_views(doc, spec, output_dir):
-    try:
-        import FreeCADGui as Gui
-    except Exception as exc:
-        raise RuntimeError("PNG-Ansichten benoetigen FreeCADGui-Unterstuetzung.") from exc
+    import FreeCADGui as Gui
 
-    Gui.showMainWindow()
     view = Gui.ActiveDocument.ActiveView
-    directions = {
-        "front": (0, -1, 0),
-        "back": (0, 1, 0),
-        "left": (-1, 0, 0),
-        "right": (1, 0, 0),
-        "top": (0, 0, 1),
-        "bottom": (0, 0, -1),
-        "isometric": (1, -1, 1),
+    view_methods = {
+        "front": "viewFront",
+        "back": "viewRear",
+        "left": "viewLeft",
+        "right": "viewRight",
+        "top": "viewTop",
+        "bottom": "viewBottom",
+        "isometric": "viewIsometric",
     }
     artifacts = []
-    for name, direction in directions.items():
-        view.viewDirection(FreeCAD.Vector(*direction))
+    for name, method_name in view_methods.items():
+        getattr(view, method_name)()
         view.fitAll()
         path = output_dir / f"{spec['revision_code']}-{name}.png"
         view.saveImage(str(path), 1600, 1200, "White")
@@ -154,7 +151,22 @@ def main():
     result_path = Path(sys.argv[2])
     spec = json.loads(spec_path.read_text())
     output_dir = Path(spec["output_dir"])
-    doc = FreeCAD.openDocument(spec["fcstd_path"])
+    if spec["job_type"] == "png_views":
+        try:
+            import FreeCADGui as Gui
+        except Exception as exc:
+            raise RuntimeError("PNG-Ansichten benoetigen FreeCADGui-Unterstuetzung.") from exc
+        Gui.showMainWindow()
+        doc = FreeCAD.openDocument(spec["fcstd_path"])
+        try:
+            Gui.activateWorkbench("PartWorkbench")
+        except Exception:
+            pass
+        Gui.updateGui()
+        if Gui.ActiveDocument is None:
+            Gui.getDocument(doc.Name)
+    else:
+        doc = FreeCAD.openDocument(spec["fcstd_path"])
     doc.recompute()
 
     result = {"metadata": inspect_document(doc), "artifacts": []}
@@ -171,6 +183,15 @@ def main():
 if __name__ == "__main__":
     main()
 '''
+
+
+FREECADCMD_BOOTSTRAP = (
+    "import sys; "
+    "sys.argv = [sys.argv[-3], sys.argv[-2], sys.argv[-1]]; "
+    "path = sys.argv[0]; "
+    "exec(compile(open(path, 'rb').read(), path, 'exec'), "
+    "{'__name__': '__main__', '__file__': path})"
+)
 
 
 def create_export_job(
@@ -250,7 +271,6 @@ def process_export_job(job):
 
 
 def run_freecadcmd_job(job):
-    command = freecadcmd_command()
     timeout = getattr(settings, "FREECADCMD_TIMEOUT_SECONDS", 300)
 
     with TemporaryDirectory() as temp_dir:
@@ -282,24 +302,40 @@ def run_freecadcmd_job(job):
             encoding="utf-8",
         )
 
+        command = freecadcmd_command(job)
         completed = subprocess.run(
-            [*command, str(script_path), str(spec_path), str(result_path)],
+            [
+                *command,
+                "-c",
+                FREECADCMD_BOOTSTRAP,
+                "--pass",
+                str(script_path),
+                str(spec_path),
+                str(result_path),
+            ],
             cwd=workdir,
             capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
         )
+        log_header = "\n".join(
+            [
+                "Command: " + shlex.join(command),
+                "DISPLAY: " + str(os.environ.get("DISPLAY", "")),
+                "XAUTHORITY: " + str(os.environ.get("XAUTHORITY", "")),
+            ]
+        )
         job.log = "\n".join(
-            item for item in (completed.stdout, completed.stderr) if item
+            item for item in (log_header, completed.stdout, completed.stderr) if item
         )
         job.save(update_fields=["log", "updated_at"])
 
-        if completed.returncode != 0:
-            raise RuntimeError(
-                f"FreeCADCmd endete mit Code {completed.returncode}."
-            )
         if not result_path.exists():
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    f"FreeCADCmd endete mit Code {completed.returncode}."
+                )
             raise RuntimeError("FreeCADCmd hat kein Ergebnis geschrieben.")
 
         result = json.loads(result_path.read_text(encoding="utf-8"))
@@ -310,7 +346,7 @@ def run_freecadcmd_job(job):
         return result
 
 
-def freecadcmd_command():
+def freecadcmd_command(job=None):
     configured = getattr(
         settings,
         "FREECADCMD_COMMAND",
@@ -324,12 +360,15 @@ def freecadcmd_command():
         raise RuntimeError("FreeCADCmd ist nicht konfiguriert.")
 
     executable = command[0]
+    command = with_flatpak_worker_options(command)
+    command = with_png_gui_command(command, job)
     if shutil.which(executable) or Path(executable).exists():
         return command
 
     flatpak_command = [
         "flatpak",
         "run",
+        "--filesystem=/tmp",
         "--branch=stable",
         "--arch=x86_64",
         "--command=FreeCADCmd",
@@ -339,6 +378,40 @@ def freecadcmd_command():
         return flatpak_command
 
     raise RuntimeError(f"FreeCADCmd wurde nicht gefunden: {configured}")
+
+
+def with_flatpak_worker_options(command):
+    if len(command) < 2 or command[0] != "flatpak" or command[1] != "run":
+        return command
+    options = []
+    if not any(item.startswith("--filesystem=") or item == "--filesystem" for item in command):
+        options.append("--filesystem=/tmp")
+    if not options:
+        return command
+    return [command[0], command[1], *options, *command[2:]]
+
+
+def with_png_gui_command(command, job):
+    if not job or job.job_type != ExportJob.JobType.PNG_VIEWS:
+        return command
+
+    updated = list(command)
+    for index, item in enumerate(updated):
+        if item == "--command=FreeCADCmd":
+            updated[index] = "--command=FreeCAD"
+            return updated
+        if item == "--command" and index + 1 < len(updated) and updated[index + 1] == "FreeCADCmd":
+            updated[index + 1] = "FreeCAD"
+            return updated
+
+    executable = Path(updated[0])
+    if executable.name == "FreeCADCmd":
+        sibling = executable.with_name("FreeCAD")
+        if sibling.exists():
+            updated[0] = str(sibling)
+        elif shutil.which("FreeCAD"):
+            updated[0] = "FreeCAD"
+    return updated
 
 
 @transaction.atomic
