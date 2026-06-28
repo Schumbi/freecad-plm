@@ -198,6 +198,104 @@ class RevisionArtifact(TimeStampedModel):
         return f"{self.revision} {label}"
 
 
+class Checkout(TimeStampedModel):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Aktiv"
+        COMPLETED = "completed", "Eingecheckt"
+        CANCELED = "canceled", "Abgebrochen"
+
+    part = models.ForeignKey(Part, on_delete=models.PROTECT, related_name="checkouts")
+    base_revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        related_name="checkouts",
+    )
+    snapshot = models.ForeignKey(
+        "ProjectSnapshot",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="checkouts",
+    )
+    checked_out_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="checkouts",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    workspace_hint = models.CharField(max_length=500, blank=True)
+    completed_revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="completed_checkouts",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["part"],
+                condition=models.Q(status="active"),
+                name="unique_active_checkout_per_part",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.part.number} {self.base_revision.revision_code} {self.status}"
+
+
+class Annotation(TimeStampedModel):
+    class Status(models.TextChoices):
+        OPEN = "open", "Offen"
+        RESOLVED = "resolved", "Erledigt"
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.PROTECT,
+        related_name="annotations",
+    )
+    part = models.ForeignKey(
+        Part,
+        on_delete=models.PROTECT,
+        related_name="annotations",
+    )
+    revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="annotations",
+    )
+    object_name = models.CharField(max_length=200, blank=True)
+    subelement = models.CharField(max_length=200, blank=True)
+    text = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_annotations",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        target = self.object_name or self.part.number
+        return f"{target}: {self.text[:60]}"
+
+
 class ProjectSnapshot(models.Model):
     project = models.ForeignKey(
         Project,
@@ -257,6 +355,11 @@ class AuditEvent(models.Model):
         EXPORT_JOB_CREATED = "export_job_created", "Exportjob angelegt"
         EXPORT_JOB_FAILED = "export_job_failed", "Exportjob fehlgeschlagen"
         REVISION_ARTIFACT_CREATED = "revision_artifact_created", "Revisionsartefakt angelegt"
+        CHECKOUT_CREATED = "checkout_created", "Checkout angelegt"
+        CHECKOUT_CANCELED = "checkout_canceled", "Checkout abgebrochen"
+        CHECKOUT_COMPLETED = "checkout_completed", "Checkout eingecheckt"
+        ANNOTATION_CREATED = "annotation_created", "Anmerkung angelegt"
+        ANNOTATION_UPDATED = "annotation_updated", "Anmerkung geaendert"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

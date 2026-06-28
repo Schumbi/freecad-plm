@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: freecad_plm
+      POSTGRES_USER: freecad_plm
+      POSTGRES_PASSWORD: freecad_plm
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freecad_plm -d freecad_plm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      args:
+        INSTALL_FREECAD: "0"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn freecad_plm.wsgi:application --bind 0.0.0.0:8000"
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_SECRET_KEY: "change-me-before-production"
+      POSTGRES_DB: freecad_plm
+      POSTGRES_USER: freecad_plm
+      POSTGRES_PASSWORD: freecad_plm
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    volumes:
+      - media-data:/app/storage
+      - static-data:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      args:
+        INSTALL_FREECAD: "1"
+    command: >
+      sh -c "while true; do
+             python manage.py process_export_jobs --limit 1;
+             sleep 10;
+             done"
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_SECRET_KEY: "change-me-before-production"
+      POSTGRES_DB: freecad_plm
+      POSTGRES_USER: freecad_plm
+      POSTGRES_PASSWORD: freecad_plm
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      FREECADCMD_COMMAND: "xvfb-run -a FreeCADCmd"
+    volumes:
+      - media-data:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  media-data:
+  static-data:

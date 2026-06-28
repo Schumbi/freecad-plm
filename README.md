@@ -16,6 +16,16 @@ python3 -m venv .venv
 Die Admin-Oberflaeche liegt unter <http://127.0.0.1:8000/admin/>.
 Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/>.
 
+## Serverbetrieb Mit Docker Compose
+
+Der erste Serverpfad nutzt Docker Compose mit PostgreSQL, persistentem Media-Volume und separatem Worker:
+
+```bash
+docker compose up --build
+```
+
+Vor produktiver Nutzung muessen mindestens `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` und die PostgreSQL-Passwoerter in `docker-compose.yml` angepasst werden. Der Worker wird mit FreeCAD im Image gebaut und verarbeitet Exportjobs in einer Schleife. Fuer PNG/GUI-nahe Jobs nutzt er standardmaessig `xvfb-run -a FreeCADCmd`.
+
 ## Rollen
 
 Die V1-Rollen werden als Django-Gruppen angelegt:
@@ -45,6 +55,24 @@ FreeCAD-Projekte mit mehreren referenzierten `.FCStd`-Dateien koennen als ZIP im
 Der normale Download einer Revision liefert eine einzelne `.FCStd` nur dann, wenn sie keine FreeCAD-Referenzen enthaelt. Hat eine Datei Referenzen, liefert der Download automatisch ein ZIP mit der Datei und ihren rekursiv referenzierten Dateien aus demselben Projektstand.
 
 Projektstand und naechste Schritte stehen in `planning/`.
+
+## FreeCAD-Addon-API
+
+Das PLM stellt erste JSON-Endpunkte unter `/api/` bereit. Sie sind fuer ein vanilla-FreeCAD-Addon gedacht und nutzen zunaechst die bestehende Django-Anmeldung:
+
+- `GET/POST /api/projects/`
+- `GET/POST /api/projects/<id>/`
+- `GET/POST /api/projects/<id>/parts/`
+- `GET/POST /api/parts/<id>/`
+- `GET /api/revisions/<id>/`
+- `GET /api/revisions/<id>/file/`
+- `POST /api/revisions/<id>/checkout/`
+- `GET /api/checkouts/<id>/manifest/`
+- `POST /api/checkouts/<id>/checkin/`
+- `POST /api/checkouts/<id>/cancel/`
+- `GET/POST /api/parts/<id>/annotations/`
+
+Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt immer eine neue unveraenderliche Revision.
 
 ## FreeCADCmd
 

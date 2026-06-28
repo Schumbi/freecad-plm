@@ -382,3 +382,24 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Die Rueckmeldung nennt Anzahl, erfolgreiche Jobs und fehlgeschlagene Jobs.
 - Damit lassen sich Analyse- und Exportjobs ohne Terminal aus der Oberflaeche abarbeiten.
 - `.venv/bin/python manage.py test plm` laeuft mit 64 Tests erfolgreich.
+
+## 2026-06-28
+
+### Server- Und Addon-Grundlage
+
+- Dockerfile und `docker-compose.yml` fuer einen Serverbetrieb mit `web`, PostgreSQL, persistentem Media-Volume und separatem FreeCAD-Worker angelegt.
+- Django-Settings lesen jetzt `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS` und PostgreSQL-Umgebungsvariablen, bleiben ohne PostgreSQL aber SQLite-kompatibel.
+- `Checkout` als exklusiver Lock pro Teil/Baugruppe angelegt.
+- Checkouts speichern Basisrevision, optionalen Projektstand/Snapshot, Bearbeiter, Status und abgeschlossene Revision.
+- Checkout-Manifeste liefern Root-Datei, snapshot-genaue Abhaengigkeiten, relative Pfade, Revisionen, Hashes und Dateigroessen.
+- Check-in erzeugt immer eine neue unveraenderliche Revision und beendet den Checkout.
+- `Annotation` fuer Anmerkungen an Teil, optional Revision, FreeCAD-Objektname und Subelement angelegt.
+- Erste JSON-API unter `/api/` fuer Projekte, Teile, Revisionen, Dateien, Checkout, Check-in, Cancel und Anmerkungen angelegt.
+- Die API nutzt zunaechst bestehende Django-Logins; Addon-spezifische Token-Authentifizierung bleibt ein spaeterer Schritt.
+- `.venv/bin/python manage.py test plm` laeuft mit 69 Tests erfolgreich.
+
+### FreeCAD-Addon-Uebergabeplan
+
+- `planning/FREECAD_ADDON_PLAN.md` angelegt.
+- Das Dokument beschreibt Zielbild, Addon-Repo-Struktur, Konfiguration, API-Vertrag, Checkout-/Check-in-Workflow, lokale Workspace-Regeln, UI-Anforderungen, Implementierungsbausteine und Tests.
+- Zweck: Eine neue Codex-Instanz kann daraus ein separates FreeCAD-Addon fuer die vorhandene Server-API bauen.

@@ -1,6 +1,8 @@
 from django.contrib import admin
 from .models import (
+    Annotation,
     AuditEvent,
+    Checkout,
     ExportJob,
     Part,
     Project,
@@ -76,6 +78,43 @@ class RevisionArtifactAdmin(admin.ModelAdmin):
     )
     list_filter = ("artifact_type",)
     search_fields = ("revision__part__number", "revision__revision_code", "original_filename")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Checkout)
+class CheckoutAdmin(admin.ModelAdmin):
+    list_display = (
+        "part",
+        "base_revision",
+        "snapshot",
+        "status",
+        "checked_out_by",
+        "created_at",
+        "completed_at",
+    )
+    list_filter = ("status", "part__project")
+    search_fields = ("part__number", "part__name", "checked_out_by__username")
+    readonly_fields = ("created_at", "updated_at", "completed_at", "canceled_at")
+
+
+@admin.register(Annotation)
+class AnnotationAdmin(admin.ModelAdmin):
+    list_display = (
+        "part",
+        "revision",
+        "object_name",
+        "status",
+        "created_by",
+        "created_at",
+    )
+    list_filter = ("status", "project")
+    search_fields = (
+        "part__number",
+        "part__name",
+        "revision__revision_code",
+        "object_name",
+        "text",
+    )
     readonly_fields = ("created_at", "updated_at")
 
 

@@ -16,7 +16,15 @@ from .fcstd import (
     read_uploaded_file,
     validate_fcstd_upload,
 )
-from .models import AuditEvent, Part, ProjectSnapshot, ProjectSnapshotEntry, Revision
+from .models import (
+    Annotation,
+    AuditEvent,
+    Checkout,
+    Part,
+    ProjectSnapshot,
+    ProjectSnapshotEntry,
+    Revision,
+)
 
 
 REVISION_CODE_PREFIX = "R"
@@ -331,6 +339,209 @@ def snapshot_entries_with_references(root_entry):
                 queue.append(referenced_entry)
 
     return [selected[path] for path in sorted(selected)]
+
+
+def snapshot_entry_for_revision(revision, snapshot=None):
+    entries = revision.snapshot_entries.select_related(
+        "snapshot",
+        "snapshot__project",
+        "revision",
+        "revision__part",
+    )
+    if snapshot is not None:
+        entries = entries.filter(snapshot=snapshot)
+    return entries.order_by("-snapshot__created_at", "path").first()
+
+
+def manifest_entries_for_revision(revision, snapshot=None):
+    root_entry = snapshot_entry_for_revision(revision, snapshot=snapshot)
+    references = revision_reference_files(revision)
+    if references and root_entry is None:
+        raise ValidationError(
+            "Referenzierte Revisionen koennen nur mit Projektstand ausgecheckt werden."
+        )
+    if root_entry is None:
+        return [
+            {
+                "path": revision.original_filename,
+                "revision": revision,
+                "is_root": True,
+            }
+        ]
+    return [
+        {
+            "path": entry.path,
+            "revision": entry.revision,
+            "is_root": entry.id == root_entry.id,
+        }
+        for entry in snapshot_entries_with_references(root_entry)
+    ]
+
+
+def checkout_manifest(checkout):
+    entries = manifest_entries_for_revision(
+        checkout.base_revision,
+        snapshot=checkout.snapshot,
+    )
+    return {
+        "checkout_id": checkout.id,
+        "status": checkout.status,
+        "project": {
+            "id": checkout.part.project_id,
+            "code": checkout.part.project.code,
+            "name": checkout.part.project.name,
+        },
+        "part": {
+            "id": checkout.part_id,
+            "number": checkout.part.number,
+            "name": checkout.part.name,
+            "category": checkout.part.category,
+        },
+        "base_revision": {
+            "id": checkout.base_revision_id,
+            "revision_code": checkout.base_revision.revision_code,
+            "sha256": checkout.base_revision.sha256,
+        },
+        "snapshot": (
+            {
+                "id": checkout.snapshot_id,
+                "name": checkout.snapshot.name,
+            }
+            if checkout.snapshot_id
+            else None
+        ),
+        "files": [
+            {
+                "path": entry["path"],
+                "is_root": entry["is_root"],
+                "revision_id": entry["revision"].id,
+                "part_id": entry["revision"].part_id,
+                "part_number": entry["revision"].part.number,
+                "revision_code": entry["revision"].revision_code,
+                "filename": entry["revision"].original_filename,
+                "sha256": entry["revision"].sha256,
+                "size_bytes": entry["revision"].size_bytes,
+            }
+            for entry in entries
+        ],
+    }
+
+
+@transaction.atomic
+def create_checkout(base_revision, checked_out_by, snapshot=None, workspace_hint=""):
+    part = base_revision.part
+    if Checkout.objects.filter(part=part, status=Checkout.Status.ACTIVE).exists():
+        raise ValidationError("Dieses Teil ist bereits ausgecheckt.")
+    manifest_entries_for_revision(base_revision, snapshot=snapshot)
+    checkout = Checkout.objects.create(
+        part=part,
+        base_revision=base_revision,
+        snapshot=snapshot,
+        checked_out_by=checked_out_by,
+        workspace_hint=workspace_hint.strip(),
+    )
+    AuditEvent.objects.create(
+        actor=checked_out_by,
+        action=AuditEvent.Action.CHECKOUT_CREATED,
+        object_repr=str(checkout),
+        metadata={
+            "checkout_id": checkout.id,
+            "part_id": part.id,
+            "base_revision_id": base_revision.id,
+            "base_revision_code": base_revision.revision_code,
+            "snapshot_id": snapshot.id if snapshot else None,
+        },
+    )
+    return checkout
+
+
+@transaction.atomic
+def cancel_checkout(checkout, actor):
+    if checkout.status != Checkout.Status.ACTIVE:
+        raise ValidationError("Nur aktive Checkouts koennen abgebrochen werden.")
+    checkout.status = Checkout.Status.CANCELED
+    checkout.canceled_at = timezone.now()
+    checkout.save(update_fields=["status", "canceled_at", "updated_at"])
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.CHECKOUT_CANCELED,
+        object_repr=str(checkout),
+        metadata={
+            "checkout_id": checkout.id,
+            "part_id": checkout.part_id,
+            "base_revision_id": checkout.base_revision_id,
+        },
+    )
+    return checkout
+
+
+@transaction.atomic
+def checkin_checkout(checkout, uploaded_file, actor, notes=""):
+    if checkout.status != Checkout.Status.ACTIVE:
+        raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
+    revision = create_revision_from_upload(
+        part=checkout.part,
+        uploaded_file=uploaded_file,
+        created_by=actor,
+        notes=notes,
+    )
+    checkout.status = Checkout.Status.COMPLETED
+    checkout.completed_revision = revision
+    checkout.completed_at = timezone.now()
+    checkout.save(
+        update_fields=[
+            "status",
+            "completed_revision",
+            "completed_at",
+            "updated_at",
+        ]
+    )
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.CHECKOUT_COMPLETED,
+        object_repr=str(checkout),
+        metadata={
+            "checkout_id": checkout.id,
+            "part_id": checkout.part_id,
+            "base_revision_id": checkout.base_revision_id,
+            "completed_revision_id": revision.id,
+            "completed_revision_code": revision.revision_code,
+        },
+    )
+    return revision
+
+
+def create_annotation(
+    *,
+    part,
+    created_by,
+    text,
+    revision=None,
+    object_name="",
+    subelement="",
+):
+    annotation = Annotation.objects.create(
+        project=part.project,
+        part=part,
+        revision=revision,
+        object_name=object_name.strip(),
+        subelement=subelement.strip(),
+        text=text.strip(),
+        created_by=created_by,
+    )
+    AuditEvent.objects.create(
+        actor=created_by,
+        action=AuditEvent.Action.ANNOTATION_CREATED,
+        object_repr=str(annotation),
+        metadata={
+            "annotation_id": annotation.id,
+            "part_id": part.id,
+            "revision_id": revision.id if revision else None,
+            "object_name": annotation.object_name,
+            "subelement": annotation.subelement,
+        },
+    )
+    return annotation
 
 
 @transaction.atomic

@@ -15,7 +15,9 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
 from .models import (
+    Annotation,
     AuditEvent,
+    Checkout,
     ExportJob,
     Part,
     Project,
@@ -1306,3 +1308,150 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(ExportJob.objects.exists())
+
+
+class AddonApiWorkflowTests(TestCase):
+    def setUp(self):
+        self.media_root = TemporaryDirectory()
+        self.settings_override = override_settings(
+            MEDIA_ROOT=self.media_root.name,
+            ALLOWED_HOSTS=["testserver"],
+        )
+        self.settings_override.enable()
+
+        self.user = get_user_model().objects.create_user(
+            username="addon-user",
+            password="test",
+            is_superuser=True,
+        )
+        self.project = Project.objects.create(code="PRJ", name="Projekt")
+        self.part = Part.objects.create(
+            project=self.project,
+            number="P-001",
+            name="Testteil",
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def login(self):
+        self.client.force_login(self.user)
+
+    def post_json(self, url, payload):
+        return self.client.post(
+            url,
+            json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def test_api_lists_projects_and_creates_parts(self):
+        self.login()
+
+        response = self.client.get(reverse("plm:api_projects"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["projects"][0]["code"], "PRJ")
+
+        response = self.post_json(
+            reverse("plm:api_project_parts", args=[self.project.id]),
+            {
+                "number": "P-002",
+                "name": "Addon-Teil",
+                "category": Part.Category.PART,
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["part"]["number"], "P-002")
+        self.assertTrue(Part.objects.filter(number="P-002").exists())
+
+    def test_checkout_manifest_contains_snapshot_exact_dependencies(self):
+        self.login()
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__number="Druck")
+
+        response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id, "workspace_hint": "~/FreeCAD-PLM/PRJ"},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        manifest = response.json()["manifest"]
+        self.assertEqual(manifest["snapshot"]["id"], snapshot.id)
+        self.assertEqual(manifest["part"]["number"], "Druck")
+        self.assertEqual(
+            sorted(item["path"] for item in manifest["files"]),
+            ["Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"],
+        )
+        self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
+
+    def test_second_active_checkout_for_same_part_is_rejected(self):
+        self.login()
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        url = reverse("plm:api_revision_checkout", args=[revision.id])
+
+        first = self.post_json(url, {})
+        second = self.post_json(url, {})
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(Checkout.objects.count(), 1)
+
+    def test_checkin_creates_new_revision_and_completes_checkout(self):
+        self.login()
+        create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        base_revision = Revision.objects.get(revision_code="R0001")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[base_revision.id]),
+            {},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        updated_data = fcstd_with_plm_revision(
+            make_fcstd_bytes("Updated Part"),
+            "R0002",
+        )
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "file": SimpleUploadedFile("updated.FCStd", updated_data),
+                "change_summary": "Geometrie angepasst.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        checkout = Checkout.objects.get(id=checkout_id)
+        revision = Revision.objects.get(revision_code="R0002")
+        self.assertEqual(checkout.status, Checkout.Status.COMPLETED)
+        self.assertEqual(checkout.completed_revision, revision)
+        self.assertEqual(revision.notes, "Geometrie angepasst.")
+
+    def test_annotations_can_target_freecad_objects(self):
+        self.login()
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        response = self.post_json(
+            reverse("plm:api_part_annotations", args=[self.part.id]),
+            {
+                "revision_id": revision.id,
+                "object_name": "Body",
+                "subelement": "Face12",
+                "text": "Kante beim naechsten Check-in abrunden.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        annotation = Annotation.objects.get()
+        self.assertEqual(annotation.object_name, "Body")
+        self.assertEqual(annotation.subelement, "Face12")
+        self.assertEqual(annotation.revision, revision)
+
+        response = self.client.get(
+            reverse("plm:api_part_annotations", args=[self.part.id])
+        )
+        self.assertEqual(response.json()["annotations"][0]["object_name"], "Body")

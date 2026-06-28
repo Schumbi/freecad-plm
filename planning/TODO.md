@@ -11,6 +11,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit Flatpak-FreeCADCmd oder gesetztem `FREECADCMD_COMMAND` testen.
 - PNG-Ansichten auf einem spaeteren Server ohne Desktop mit `xvfb-run` oder separatem Preview-Worker pruefen.
 - Management-Command `process_export_jobs` mit echten FCStd-Testdateien ausfuehren.
+- Docker-Compose-Stack auf dem Zielserver mit echtem Media-Volume und PostgreSQL testen.
+- FreeCAD-Addon-Prototyp gegen die neue `/api/`-Schnittstelle anhand `planning/FREECAD_ADDON_PLAN.md` bauen.
+- API-Authentifizierung fuer Addon-Nutzung spaeter von Session/CSRF-Ausnahme auf Token oder Personal Access Tokens umstellen.
 - Fehlende Suche fuer Projekte, Teile, Revisionen und Dateinamen entwerfen und umsetzen.
 - Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche entwerfen und umsetzen.
 - Folgeausbau fuer VarSet-Parameterbearbeitung und Neurendern planen.
@@ -22,8 +25,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Spaeter
 
-- Docker-Compose-Zielbild konkretisieren.
-- FreeCADCmd-Worker fuer v2 evaluieren.
 - Exportformate und Jobmodell planen.
 - Bestehende FreeCAD-Ordnerimport-Funktion pruefen.
 
@@ -82,3 +83,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Upload-Aenderungsnotiz als Revisionsnotiz und Audit-Metadatum umgesetzt.
 - Lokaler Flatpak-FreeCADCmd-Aufruf ohne Desktop-GUI mit `--command=FreeCADCmd` verifiziert.
 - Lokale PNG-Erzeugung mit Flatpak-FreeCAD-GUI-Binary verifiziert; Worker nutzt fuer PNG-Jobs automatisch `--command=FreeCAD`.
+- Docker-Compose-Grundlage mit Web, PostgreSQL, Media-Volume und FreeCAD-Worker angelegt.
+- JSON-API fuer FreeCAD-Addon-Grundworkflows angelegt.
+- Exklusiver Checkout mit Manifest, Check-in und Cancel angelegt.
+- Objektbezogene Anmerkungen fuer Teile/Revisionen angelegt.
+- Addon-Uebergabeplan mit API-Vertrag und Implementierungsvorgaben in `planning/FREECAD_ADDON_PLAN.md` angelegt.

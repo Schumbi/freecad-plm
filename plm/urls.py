@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import api, views
 
 app_name = "plm"
 
@@ -70,5 +70,53 @@ urlpatterns = [
         "snapshots/<int:snapshot_id>/download/",
         views.download_project_snapshot,
         name="download_project_snapshot",
+    ),
+    path("api/projects/", api.projects_api, name="api_projects"),
+    path("api/projects/<int:project_id>/", api.project_api, name="api_project"),
+    path(
+        "api/projects/<int:project_id>/parts/",
+        api.project_parts_api,
+        name="api_project_parts",
+    ),
+    path("api/parts/<int:part_id>/", api.part_api, name="api_part"),
+    path(
+        "api/parts/<int:part_id>/annotations/",
+        api.part_annotations_api,
+        name="api_part_annotations",
+    ),
+    path(
+        "api/revisions/<int:revision_id>/",
+        api.revision_api,
+        name="api_revision",
+    ),
+    path(
+        "api/revisions/<int:revision_id>/file/",
+        api.revision_file_api,
+        name="api_revision_file",
+    ),
+    path(
+        "api/revisions/<int:revision_id>/checkout/",
+        api.revision_checkout_api,
+        name="api_revision_checkout",
+    ),
+    path(
+        "api/checkouts/<int:checkout_id>/manifest/",
+        api.checkout_manifest_api,
+        name="api_checkout_manifest",
+    ),
+    path(
+        "api/checkouts/<int:checkout_id>/cancel/",
+        api.checkout_cancel_api,
+        name="api_checkout_cancel",
+    ),
+    path(
+        "api/checkouts/<int:checkout_id>/checkin/",
+        api.checkout_checkin_api,
+        name="api_checkout_checkin",
+    ),
+    path(
+        "api/annotations/<int:annotation_id>/",
+        api.annotation_api,
+        name="api_annotation",
     ),
 ]
