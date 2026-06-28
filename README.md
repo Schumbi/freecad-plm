@@ -21,10 +21,30 @@ Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/>.
 Der erste Serverpfad nutzt Docker Compose mit PostgreSQL, persistentem Media-Volume und separatem Worker:
 
 ```bash
-docker compose up --build
+git clone ssh://home.schumbi.de/ralf/freecad-plm.git /opt/freecad-plm
+cd /opt/freecad-plm
+cp .env.example .env
+$EDITOR .env
+docker compose up -d --build
 ```
 
-Vor produktiver Nutzung muessen mindestens `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` und die PostgreSQL-Passwoerter in `docker-compose.yml` angepasst werden. Der Worker wird mit FreeCAD im Image gebaut und verarbeitet Exportjobs in einer Schleife. Fuer PNG/GUI-nahe Jobs nutzt er standardmaessig `xvfb-run -a FreeCADCmd`.
+Vor produktiver Nutzung muessen in `.env` mindestens `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` und `POSTGRES_PASSWORD` angepasst werden. Die echte `.env` wird nicht committed. Der Worker wird mit FreeCAD im Image gebaut und verarbeitet Exportjobs in einer Schleife. Fuer PNG/GUI-nahe Jobs nutzt er standardmaessig `xvfb-run -a FreeCADCmd`.
+
+Nach dem ersten Start:
+
+```bash
+docker compose exec web python manage.py setup_plm_roles
+docker compose exec web python manage.py createsuperuser
+```
+
+Updates auf dem Server:
+
+```bash
+cd /opt/freecad-plm
+git pull
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+```
 
 ## Rollen
 
