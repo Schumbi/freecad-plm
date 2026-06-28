@@ -9,12 +9,23 @@ urlpatterns = [
     path("projects/new/", views.create_project, name="create_project"),
     path("projects/<int:project_id>/", views.project_detail, name="project_detail"),
     path(
+        "projects/<int:project_id>/properties/",
+        views.project_properties,
+        name="project_properties",
+    ),
+    path("projects/<int:project_id>/edit/", views.edit_project, name="edit_project"),
+    path(
         "projects/<int:project_id>/snapshots/upload/",
         views.upload_project_snapshot,
         name="upload_project_snapshot",
     ),
     path("projects/<int:project_id>/parts/new/", views.create_part, name="create_part"),
     path("parts/<int:part_id>/", views.part_detail, name="part_detail"),
+    path(
+        "parts/<int:part_id>/properties/",
+        views.part_properties,
+        name="part_properties",
+    ),
     path(
         "parts/<int:part_id>/jobs/process/",
         views.process_export_jobs_once,
@@ -30,6 +41,11 @@ urlpatterns = [
         "revisions/<int:revision_id>/download/",
         views.download_revision,
         name="download_revision",
+    ),
+    path(
+        "revisions/<int:revision_id>/properties/",
+        views.revision_properties,
+        name="revision_properties",
     ),
     path(
         "revisions/<int:revision_id>/release/",

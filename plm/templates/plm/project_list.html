@@ -11,6 +11,8 @@
         <tr>
           <th>Code</th>
           <th>Name</th>
+          <th>Status</th>
+          <th>Datum</th>
           <th>Beschreibung</th>
         </tr>
       </thead>
@@ -19,6 +21,8 @@
           <tr>
             <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></td>
             <td>{{ project.name }}</td>
+            <td>{{ project.get_status_display }}</td>
+            <td>{{ project.project_date|date:"d.m.Y" }}</td>
             <td>{{ project.description }}</td>
           </tr>
         {% endfor %}

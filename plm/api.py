@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -37,6 +39,8 @@ def project_payload(project):
         "code": project.code,
         "name": project.name,
         "description": project.description,
+        "status": project.status,
+        "project_date": project.project_date.isoformat(),
         "is_archived": project.is_archived,
     }
 
@@ -127,6 +131,8 @@ def projects_api(request):
         code=data.get("code", "").strip().upper(),
         name=data.get("name", "").strip(),
         description=data.get("description", "").strip(),
+        status=data.get("status", Project.Status.RUNNING),
+        project_date=parse_date(data.get("project_date", "")) or timezone.localdate(),
     )
     AuditEvent.objects.create(
         actor=request.user,
@@ -148,9 +154,11 @@ def project_api(request, project_id):
     if not is_plm_admin(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Bearbeiten von Projekten."}, status=403)
     data = json_body(request)
-    for field in ("name", "description"):
+    for field in ("name", "description", "status"):
         if field in data:
             setattr(project, field, data[field].strip())
+    if "project_date" in data:
+        project.project_date = parse_date(data["project_date"]) or project.project_date
     if "is_archived" in data:
         project.is_archived = bool(data["is_archived"])
     project.save()

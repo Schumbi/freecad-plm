@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,6 +13,7 @@ from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 
 from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
 from .models import (
@@ -878,6 +880,8 @@ class RolePermissionTests(TestCase):
             {
                 "code": "new",
                 "name": "Neues Projekt",
+                "status": Project.Status.IDEA,
+                "project_date": "2026-06-28",
                 "description": "Aus der PLM-Oberflaeche.",
             },
         )
@@ -885,10 +889,85 @@ class RolePermissionTests(TestCase):
         project = Project.objects.get(code="NEW")
         self.assertRedirects(response, reverse("plm:project_detail", args=[project.id]))
         self.assertEqual(project.name, "Neues Projekt")
+        self.assertEqual(project.status, Project.Status.IDEA)
+        self.assertEqual(project.project_date.isoformat(), "2026-06-28")
         self.assertEqual(
             AuditEvent.objects.filter(action=AuditEvent.Action.PROJECT_CREATED).count(),
             1,
         )
+
+    def test_project_defaults_to_running_and_today(self):
+        project = Project.objects.create(code="DEF", name="Default")
+
+        self.assertEqual(project.status, Project.Status.RUNNING)
+        self.assertEqual(project.project_date, timezone.localdate())
+
+    def test_project_list_shows_status_and_date(self):
+        self.project.status = Project.Status.ORDER
+        self.project.project_date = date(2026, 6, 28)
+        self.project.save(update_fields=["status", "project_date", "updated_at"])
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("plm:project_list"))
+
+        self.assertContains(response, "Auftrag")
+        self.assertContains(response, "28.06.2026")
+
+    def test_project_detail_uses_properties_sidebar_and_fallback_page(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+
+        self.assertContains(response, 'class="properties-panel"')
+        self.assertContains(response, "Eigenschaften anzeigen")
+        self.assertContains(response, "Laufend")
+
+        response = self.client.get(reverse("plm:project_properties", args=[self.project.id]))
+        self.assertContains(response, "Eigenschaften")
+        self.assertContains(response, "Laufend")
+
+    def test_admin_can_edit_project_properties(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:edit_project", args=[self.project.id]),
+            {
+                "code": "prj",
+                "name": "Projekt aktualisiert",
+                "status": Project.Status.COMPLETED,
+                "project_date": "2026-07-01",
+                "description": "Neue Eigenschaften.",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:project_detail", args=[self.project.id]))
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Projekt aktualisiert")
+        self.assertEqual(self.project.status, Project.Status.COMPLETED)
+        self.assertEqual(self.project.project_date.isoformat(), "2026-07-01")
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.PROJECT_UPDATED).count(),
+            1,
+        )
+
+    def test_editor_cannot_edit_project_properties(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:edit_project", args=[self.project.id]),
+            {
+                "code": "prj",
+                "name": "Nicht erlaubt",
+                "status": Project.Status.IMPORTANT,
+                "project_date": "2026-07-01",
+                "description": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Projekt")
+        self.assertEqual(self.project.status, Project.Status.RUNNING)
 
     def test_editor_cannot_create_project(self):
         self.client.force_login(self.editor)
@@ -898,6 +977,8 @@ class RolePermissionTests(TestCase):
             {
                 "code": "NEW",
                 "name": "Neues Projekt",
+                "status": Project.Status.RUNNING,
+                "project_date": "2026-06-28",
                 "description": "",
             },
         )
@@ -913,6 +994,8 @@ class RolePermissionTests(TestCase):
             {
                 "code": "prj",
                 "name": "Doppelt",
+                "status": Project.Status.RUNNING,
+                "project_date": "2026-06-28",
                 "description": "",
             },
         )
@@ -1136,6 +1219,47 @@ class RolePermissionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Part.objects.filter(name="Ohne Datei").exists())
+
+    def test_part_detail_uses_properties_sidebar_and_fallback_page(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, 'class="properties-panel"')
+        self.assertContains(response, "Eigenschaften anzeigen")
+        self.assertContains(response, self.part.number)
+
+        response = self.client.get(reverse("plm:part_properties", args=[self.part.id]))
+        self.assertContains(response, "Eigenschaften")
+        self.assertContains(response, self.part.number)
+
+    def test_create_part_form_does_not_show_supplier(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.get(reverse("plm:create_part", args=[self.project.id]))
+
+        self.assertContains(response, "Neues Teil oder Baugruppe")
+        self.assertNotContains(response, "Lieferant")
+
+    def test_revision_properties_can_be_shown_in_sidebar_or_page(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        self.client.force_login(self.reader)
+
+        response = self.client.get(
+            reverse("plm:part_detail", args=[self.part.id]),
+            {"properties_revision": revision.id},
+        )
+
+        self.assertContains(response, f"Revision {revision.revision_code}")
+        self.assertContains(response, "Teileigenschaften anzeigen")
+
+        response = self.client.get(reverse("plm:revision_properties", args=[revision.id]))
+        self.assertContains(response, f"Revision {revision.revision_code}")
+        self.assertContains(response, "Erstellungsdatum")
+        self.assertContains(response, "Testteil aus FreeCAD")
+        self.assertContains(response, "PLMRevision")
+        self.assertNotContains(response, revision.sha256)
+        self.assertNotContains(response, "FreeCAD-Version")
 
 
 class FreeCADCmdJobTests(TestCase):

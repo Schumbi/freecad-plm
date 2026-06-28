@@ -145,7 +145,51 @@ def create_project(request):
     return render(
         request,
         "plm/project_form.html",
-        {"form": form},
+        {
+            "form": form,
+            "title": "Neues Projekt",
+            "submit_label": "Anlegen",
+            "back_url": "plm:project_list",
+        },
+        status=400 if request.method == "POST" else 200,
+    )
+
+
+@login_required
+def edit_project(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if not is_plm_admin(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Bearbeiten von Projekten.")
+
+    if request.method == "POST":
+        form = ProjectForm(request.POST, instance=project)
+        if form.is_valid():
+            project = form.save()
+            AuditEvent.objects.create(
+                actor=request.user,
+                action=AuditEvent.Action.PROJECT_UPDATED,
+                object_repr=str(project),
+                metadata={
+                    "project_id": project.id,
+                    "project_code": project.code,
+                    "status": project.status,
+                    "project_date": project.project_date.isoformat(),
+                },
+            )
+            messages.success(request, f"Projekt {project.code} wurde gespeichert.")
+            return redirect("plm:project_detail", project_id=project.id)
+    else:
+        form = ProjectForm(instance=project)
+
+    return render(
+        request,
+        "plm/project_form.html",
+        {
+            "form": form,
+            "project": project,
+            "title": f"Eigenschaften: {project.code}",
+            "submit_label": "Speichern",
+        },
         status=400 if request.method == "POST" else 200,
     )
 
@@ -168,6 +212,20 @@ def project_detail(request, project_id):
             "snapshots": snapshots,
             "snapshot_form": ProjectSnapshotUploadForm(),
             "can_create_part": can_upload_revision(request.user),
+            "can_edit_project": is_plm_admin(request.user),
+        },
+    )
+
+
+@login_required
+def project_properties(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    return render(
+        request,
+        "plm/project_properties.html",
+        {
+            "project": project,
+            "can_edit_project": is_plm_admin(request.user),
         },
     )
 
@@ -282,12 +340,17 @@ def part_detail(request, part_id):
         .prefetch_related("artifacts", "export_jobs")
         .order_by("-created_at")
     )
+    selected_revision = None
+    selected_revision_id = request.GET.get("properties_revision")
+    if selected_revision_id:
+        selected_revision = revisions.filter(id=selected_revision_id).first()
     return render(
         request,
         "plm/part_detail.html",
         {
             "part": part,
             "revisions": revisions,
+            "selected_revision": selected_revision,
             "form": RevisionUploadForm(),
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
@@ -295,6 +358,33 @@ def part_detail(request, part_id):
             "queued_export_jobs_count": ExportJob.objects.filter(
                 status=ExportJob.Status.QUEUED
             ).count(),
+        },
+    )
+
+
+@login_required
+def part_properties(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    return render(
+        request,
+        "plm/part_properties.html",
+        {
+            "part": part,
+        },
+    )
+
+
+@login_required
+def revision_properties(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "part__project", "created_by"),
+        id=revision_id,
+    )
+    return render(
+        request,
+        "plm/revision_properties.html",
+        {
+            "revision": revision,
         },
     )
 

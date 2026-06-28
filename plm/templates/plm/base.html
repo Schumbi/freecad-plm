@@ -1,83 +1,189 @@
 <!doctype html>
+{% load static %}
 <html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FreeCAD-PLM</title>
+  <link rel="stylesheet" href="{% static 'plm/vendor/bootstrap4/css/bootstrap.min.css' %}">
   <style>
+    :root {
+      --page-bg: #f4f6f8;
+      --surface: #ffffff;
+      --surface-soft: #f8fafb;
+      --surface-muted: #eef3f4;
+      --border: #d8e0e4;
+      --border-soft: #e7ecef;
+      --text: #1f2933;
+      --muted: #64717d;
+      --accent: #146c63;
+      --accent-dark: #0f514b;
+      --accent-soft: #e4f2ef;
+      --danger: #a33a3a;
+      --danger-soft: #f8e8e8;
+      --shadow: 0 10px 28px rgba(32, 46, 54, 0.08);
+      --radius: 8px;
+    }
+    * {
+      box-sizing: border-box;
+    }
     body {
-      color: #1f2933;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      background: #f7f7f4;
+      color: var(--text);
+      background: var(--page-bg);
     }
     header {
-      background: #263238;
+      background: #243238;
+      border-bottom: 1px solid #1b282e;
       color: white;
-      padding: 0.8rem 1.2rem;
     }
-    header a {
+    header .navbar {
+      min-height: 3.4rem;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+    header a,
+    header .navbar-brand {
       color: white;
       font-weight: 700;
       text-decoration: none;
     }
     main {
       margin: 0 auto;
-      max-width: 1100px;
-      padding: 1.5rem;
+      max-width: 1280px;
+      padding: 1.6rem;
+    }
+    h1,
+    h2,
+    h3,
+    h4 {
+      color: #18242b;
+      line-height: 1.2;
+    }
+    h1 {
+      font-size: 1.85rem;
+      margin: 0 0 0.9rem;
+    }
+    h2 {
+      font-size: 1.2rem;
+      margin: 1.6rem 0 0.75rem;
+    }
+    h3,
+    h4 {
+      margin-bottom: 0.5rem;
+    }
+    p {
+      margin: 0.55rem 0;
     }
     a {
-      color: #0f766e;
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
     }
     table {
-      border-collapse: collapse;
-      width: 100%;
-      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      background: var(--surface);
     }
     th,
     td {
-      border-bottom: 1px solid #e5e7eb;
-      padding: 0.65rem;
+      border-bottom: 1px solid var(--border-soft);
+      padding: 0.7rem 0.75rem;
       text-align: left;
       vertical-align: top;
     }
     th {
-      background: #eef2f0;
+      background: var(--surface-muted);
+      color: #334149;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+    tr:last-child td {
+      border-bottom: 0;
+    }
+    tr:hover td {
+      background: #fbfcfd;
     }
     .actions,
     form {
       margin-top: 1rem;
     }
     button {
-      background: #0f766e;
-      border: 0;
+      background: var(--accent);
+      border: 1px solid var(--accent-dark);
+      border-radius: 6px;
       color: white;
       cursor: pointer;
       font-weight: 700;
-      padding: 0.55rem 0.9rem;
+      padding: 0.55rem 0.85rem;
+      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    button:hover {
+      background: var(--accent-dark);
     }
     button.secondary {
-      background: #4b5563;
+      background: #52616b;
+      border-color: #43515a;
+    }
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font: inherit;
+      padding: 0.45rem 0.55rem;
+      max-width: 42rem;
+      width: 100%;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+      outline: none;
+    }
+    label {
+      color: #35444c;
+      display: block;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    small {
+      color: var(--muted);
+      display: block;
+      margin-top: 0.2rem;
     }
     input[type="file"] {
       display: block;
       margin: 0.4rem 0;
     }
+    input[type="checkbox"],
+    input[type="radio"] {
+      margin-right: 0.35rem;
+    }
     .message {
-      background: #ecfdf5;
-      border: 1px solid #99f6e4;
+      background: var(--accent-soft);
+      border: 1px solid #b9dcd5;
+      border-radius: var(--radius);
       margin-bottom: 1rem;
       padding: 0.75rem;
     }
     .errors {
-      color: #b91c1c;
+      background: var(--danger-soft);
+      border-left: 3px solid var(--danger);
+      color: var(--danger);
+      display: block;
       margin: 0.4rem 0;
+      padding: 0.35rem 0.5rem;
     }
     details {
       margin-top: 0.25rem;
     }
     summary {
-      color: #0f766e;
+      color: var(--accent);
       cursor: pointer;
       font-weight: 700;
     }
@@ -89,8 +195,9 @@
       width: 100%;
     }
     .notes-text {
-      background: #fafaf8;
-      border: 1px solid #e5e7eb;
+      background: var(--surface-soft);
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
       margin: 0.5rem 0;
       padding: 0.6rem;
       white-space: pre-wrap;
@@ -123,8 +230,9 @@
     }
     .png-gallery img,
     .compare-grid img {
-      background: white;
-      border: 1px solid #e5e7eb;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       max-width: 100%;
     }
     .compare-grid {
@@ -133,15 +241,92 @@
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       margin-bottom: 1.4rem;
     }
+    .object-layout {
+      align-items: stretch;
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: minmax(0, 1fr);
+      margin-bottom: 1.25rem;
+    }
+    .object-main {
+      min-width: 0;
+    }
+    .properties-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+    .properties-panel h2,
+    .properties-panel h3 {
+      margin-top: 0;
+    }
+    .properties-list {
+      margin: 0;
+    }
+    .properties-list dt {
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-top: 0.8rem;
+    }
+    .properties-list dd {
+      margin: 0.15rem 0 0;
+      overflow-wrap: anywhere;
+    }
+    .desktop-only {
+      display: none;
+    }
+    form p {
+      max-width: 42rem;
+    }
+    form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+    .inline-actions form,
+    td form,
+    details form {
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+    }
+    @media (min-width: 980px) {
+      .object-layout {
+        grid-template-columns: minmax(0, 1fr) 19rem;
+      }
+      .mobile-properties-link,
+      .mobile-only {
+        display: none;
+      }
+      .desktop-only {
+        display: inline;
+      }
+    }
+    @media (max-width: 979px) {
+      .properties-panel {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
-  <header><a href="{% url 'plm:project_list' %}">FreeCAD-PLM</a></header>
+  <header>
+    <nav class="navbar navbar-dark">
+      <a class="navbar-brand" href="{% url 'plm:project_list' %}">FreeCAD-PLM</a>
+    </nav>
+  </header>
   <main>
     {% for message in messages %}
-      <div class="message">{{ message }}</div>
+      <div class="message alert mb-3">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
+  <script src="{% static 'plm/vendor/bootstrap4/js/bootstrap.bundle.min.js' %}"></script>
 </body>
 </html>

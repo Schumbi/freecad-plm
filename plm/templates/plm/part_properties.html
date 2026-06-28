@@ -1,0 +1,6 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <p><a href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a></p>
+  {% include "plm/includes/part_properties.html" %}
+{% endblock %}

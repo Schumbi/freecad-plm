@@ -2,44 +2,59 @@
 
 {% block content %}
   <p><a href="{% url 'plm:project_detail' part.project.id %}">Zurueck zu {{ part.project.code }}</a></p>
-  <h1>{{ part.number }} - {{ part.name }}</h1>
-  <p>{{ part.get_category_display }}</p>
-  {% if part.description %}<p>{{ part.description }}</p>{% endif %}
+  <div class="object-layout">
+    <div class="object-main">
+      <h1>{{ part.number }} - {{ part.name }}</h1>
+      <p class="mobile-properties-link"><a href="{% url 'plm:part_properties' part.id %}">Eigenschaften anzeigen</a></p>
+      <p>{{ part.get_category_display }}</p>
+      {% if part.description %}<p>{{ part.description }}</p>{% endif %}
 
-  {% if can_upload %}
-    <h2>Neue Revision hochladen</h2>
-    <form method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
-      {% csrf_token %}
-      {{ form.file.label_tag }}
-      {{ form.file }}
-      {% if form.file.errors %}
-        <div class="errors">{{ form.file.errors }}</div>
+      {% if can_upload %}
+        <h2>Neue Revision hochladen</h2>
+        <form method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          {{ form.file.label_tag }}
+          {{ form.file }}
+          {% if form.file.errors %}
+            <div class="errors">{{ form.file.errors }}</div>
+          {% endif %}
+          {{ form.change_summary.label_tag }}
+          {{ form.change_summary }}
+          {% if form.change_summary.errors %}
+            <div class="errors">{{ form.change_summary.errors }}</div>
+          {% endif %}
+          <button type="submit">Revision hochladen</button>
+        </form>
       {% endif %}
-      {{ form.change_summary.label_tag }}
-      {{ form.change_summary }}
-      {% if form.change_summary.errors %}
-        <div class="errors">{{ form.change_summary.errors }}</div>
-      {% endif %}
-      <button type="submit">Revision hochladen</button>
-    </form>
-  {% endif %}
 
-  <h2>Revisionen</h2>
-  {% if can_upload %}
-    <form method="post" action="{% url 'plm:process_export_jobs_once' part.id %}">
-      {% csrf_token %}
-      <button type="submit">Wartende Jobs starten{% if queued_export_jobs_count %} ({{ queued_export_jobs_count }}){% endif %}</button>
-    </form>
-  {% endif %}
-  {% if revisions %}
-    <p><a href="{% url 'plm:revision_compare' part.id %}">Revisionen visuell vergleichen</a></p>
-  {% endif %}
+      <h2>Revisionen</h2>
+      {% if can_upload %}
+        <form method="post" action="{% url 'plm:process_export_jobs_once' part.id %}">
+          {% csrf_token %}
+          <button type="submit">Wartende Jobs starten{% if queued_export_jobs_count %} ({{ queued_export_jobs_count }}){% endif %}</button>
+        </form>
+      {% endif %}
+      {% if revisions %}
+        <p><a href="{% url 'plm:revision_compare' part.id %}">Revisionen visuell vergleichen</a></p>
+      {% endif %}
+    </div>
+    <aside class="properties-panel">
+      {% if selected_revision %}
+        {% include "plm/includes/revision_properties.html" with revision=selected_revision %}
+        <p><a href="{% url 'plm:part_detail' part.id %}">Teileigenschaften anzeigen</a></p>
+      {% else %}
+        {% include "plm/includes/part_properties.html" %}
+      {% endif %}
+    </aside>
+  </div>
+
   {% if revisions %}
     <table>
       <thead>
         <tr>
           <th>Revision</th>
           <th>Status</th>
+          <th>Eigenschaften</th>
           <th>Datei</th>
           <th>Download</th>
           <th>Freigabe</th>
@@ -56,6 +71,10 @@
           <tr>
             <td>{{ revision.revision_code }}</td>
             <td>{{ revision.get_status_display }}</td>
+            <td>
+              <a class="desktop-only" href="{% url 'plm:part_detail' part.id %}?properties_revision={{ revision.id }}">Anzeigen</a>
+              <a class="mobile-only" href="{% url 'plm:revision_properties' revision.id %}">Anzeigen</a>
+            </td>
             <td>{{ revision.original_filename }}</td>
             <td><a href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a></td>
             <td>

@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 
 class TimeStampedModel(models.Model):
@@ -11,9 +12,22 @@ class TimeStampedModel(models.Model):
 
 
 class Project(TimeStampedModel):
+    class Status(models.TextChoices):
+        RUNNING = "running", "Laufend"
+        COMPLETED = "completed", "Abgeschlossen"
+        IDEA = "idea", "Idee"
+        IMPORTANT = "important", "Wichtig"
+        ORDER = "order", "Auftrag"
+
     code = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.RUNNING,
+    )
+    project_date = models.DateField(default=timezone.localdate)
     is_archived = models.BooleanField(default=False)
 
     class Meta:
@@ -346,6 +360,7 @@ class ProjectSnapshotEntry(models.Model):
 class AuditEvent(models.Model):
     class Action(models.TextChoices):
         PROJECT_CREATED = "project_created", "Projekt angelegt"
+        PROJECT_UPDATED = "project_updated", "Projekt geaendert"
         PART_CREATED = "part_created", "Teil angelegt"
         REVISION_UPLOADED = "revision_uploaded", "Revision hochgeladen"
         REVISION_RELEASED = "revision_released", "Revision freigegeben"

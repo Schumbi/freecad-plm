@@ -15,8 +15,8 @@ from .models import (
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "is_archived", "created_at", "updated_at")
-    list_filter = ("is_archived",)
+    list_display = ("code", "name", "status", "project_date", "is_archived", "created_at", "updated_at")
+    list_filter = ("status", "is_archived")
     search_fields = ("code", "name", "description")
 
 

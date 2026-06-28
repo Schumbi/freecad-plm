@@ -1,0 +1,23 @@
+<h2>Revision {{ revision.revision_code }}</h2>
+<dl class="properties-list">
+  <dt>Teil</dt>
+  <dd>{{ revision.part.number }} - {{ revision.part.name }}</dd>
+  <dt>Status</dt>
+  <dd>{{ revision.get_status_display }}</dd>
+  <dt>Datei</dt>
+  <dd>{{ revision.original_filename }}</dd>
+  <dt>Erstellt von</dt>
+  <dd>{{ revision.created_by }}</dd>
+  <dt>Erstellungsdatum</dt>
+  <dd>{{ revision.created_at|date:"d.m.Y H:i" }}</dd>
+  {% with document=revision.extracted_metadata.freecad_document %}
+    {% if document.properties.Label %}
+      <dt>Label</dt>
+      <dd>{{ document.properties.Label }}</dd>
+    {% endif %}
+    {% if document.properties.PLMRevision %}
+      <dt>PLMRevision</dt>
+      <dd>{{ document.properties.PLMRevision }}</dd>
+    {% endif %}
+  {% endwith %}
+</dl>

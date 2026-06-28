@@ -1,0 +1,35 @@
+<h2>Eigenschaften</h2>
+<dl class="properties-list">
+  <dt>Nummer</dt>
+  <dd>{{ part.number }}</dd>
+  <dt>Name</dt>
+  <dd>{{ part.name }}</dd>
+  <dt>Projekt</dt>
+  <dd>{{ part.project.code }}</dd>
+  <dt>Typ</dt>
+  <dd>{{ part.get_category_display }}</dd>
+  <dt>Revisionen</dt>
+  <dd>{{ part.revisions.count }}</dd>
+  <dt>Archiviert</dt>
+  <dd>{% if part.is_archived %}Ja{% else %}Nein{% endif %}</dd>
+  <dt>Erstellt</dt>
+  <dd>{{ part.created_at|date:"d.m.Y H:i" }}</dd>
+  <dt>Geaendert</dt>
+  <dd>{{ part.updated_at|date:"d.m.Y H:i" }}</dd>
+  {% if part.material %}
+    <dt>Material</dt>
+    <dd>{{ part.material }}</dd>
+  {% endif %}
+  {% if part.supplier %}
+    <dt>Lieferant</dt>
+    <dd>{{ part.supplier }}</dd>
+  {% endif %}
+  {% if part.tags %}
+    <dt>Tags</dt>
+    <dd>{{ part.tags }}</dd>
+  {% endif %}
+  {% if part.description %}
+    <dt>Beschreibung</dt>
+    <dd>{{ part.description }}</dd>
+  {% endif %}
+</dl>

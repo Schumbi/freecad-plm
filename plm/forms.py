@@ -7,13 +7,19 @@ from .models import ExportJob, Part, Project, Revision
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ["code", "name", "description"]
+        fields = ["code", "name", "status", "project_date", "description"]
         widgets = {
+            "project_date": forms.DateInput(
+                attrs={"type": "date"},
+                format="%Y-%m-%d",
+            ),
             "description": forms.Textarea(attrs={"rows": 4}),
         }
         labels = {
             "code": "Code",
             "name": "Name",
+            "status": "Status",
+            "project_date": "Datum",
             "description": "Beschreibung",
         }
 
@@ -38,7 +44,6 @@ class PartForm(forms.ModelForm):
             "category",
             "description",
             "material",
-            "supplier",
             "tags",
         ]
         widgets = {
@@ -50,7 +55,6 @@ class PartForm(forms.ModelForm):
             "category": "Typ",
             "description": "Beschreibung",
             "material": "Material",
-            "supplier": "Lieferant",
             "tags": "Tags",
         }
 

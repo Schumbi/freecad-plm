@@ -1,8 +1,12 @@
 {% extends "plm/base.html" %}
 
 {% block content %}
-  <p><a href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a></p>
-  <h1>Neues Projekt</h1>
+  {% if project %}
+    <p><a href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a></p>
+  {% else %}
+    <p><a href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a></p>
+  {% endif %}
+  <h1>{{ title|default:"Neues Projekt" }}</h1>
 
   <form method="post">
     {% csrf_token %}
@@ -15,6 +19,6 @@
         {% endif %}
       </p>
     {% endfor %}
-    <button type="submit">Anlegen</button>
+    <button type="submit">{{ submit_label|default:"Anlegen" }}</button>
   </form>
 {% endblock %}

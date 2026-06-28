@@ -2,27 +2,36 @@
 
 {% block content %}
   <p><a href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a></p>
-  <h1>{{ project.code }} - {{ project.name }}</h1>
-  <p>{{ project.description }}</p>
+  <div class="object-layout">
+    <div class="object-main">
+      <h1>{{ project.code }} - {{ project.name }}</h1>
+      <p class="mobile-properties-link"><a href="{% url 'plm:project_properties' project.id %}">Eigenschaften anzeigen</a></p>
+      <p>{{ project.description }}</p>
 
-  <h2>Teile und Baugruppen</h2>
-  {% if can_create_part %}
-    <p><a href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe anlegen</a></p>
-    <details>
-      <summary>Projektstand aus ZIP importieren</summary>
-      <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ snapshot_form.name.label_tag }}
-        {{ snapshot_form.name }}
-        {{ snapshot_form.file.label_tag }}
-        {{ snapshot_form.file }}
-        {% if snapshot_form.file.errors %}
-          <div class="errors">{{ snapshot_form.file.errors }}</div>
-        {% endif %}
-        <button type="submit">Projektstand importieren</button>
-      </form>
-    </details>
-  {% endif %}
+      <h2>Teile und Baugruppen</h2>
+      {% if can_create_part %}
+        <p><a href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe anlegen</a></p>
+        <details>
+          <summary>Projektstand aus ZIP importieren</summary>
+          <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ snapshot_form.name.label_tag }}
+            {{ snapshot_form.name }}
+            {{ snapshot_form.file.label_tag }}
+            {{ snapshot_form.file }}
+            {% if snapshot_form.file.errors %}
+              <div class="errors">{{ snapshot_form.file.errors }}</div>
+            {% endif %}
+            <button type="submit">Projektstand importieren</button>
+          </form>
+        </details>
+      {% endif %}
+    </div>
+    <aside class="properties-panel">
+      {% include "plm/includes/project_properties.html" %}
+    </aside>
+  </div>
+
   {% if parts %}
     <table>
       <thead>
