@@ -12,7 +12,8 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from .models import AuditEvent, ExportJob, RevisionArtifact
+from .mesh_preview import render_stl_views
+from .models import AuditEvent, ExportJob, Revision, RevisionArtifact
 
 
 PNG_VIEW_NAMES = (
@@ -28,7 +29,6 @@ PNG_VIEW_NAMES = (
 
 FREECADCMD_SCRIPT = r'''
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -123,54 +123,31 @@ def export_objects(doc, spec, output_dir):
     return [{"path": str(path), "artifact_type": export_format, "view_name": ""}]
 
 
-def create_png_views(doc, spec, output_dir):
-    import FreeCADGui as Gui
-
-    shape_objects = []
+def preview_objects(doc):
+    objects = []
     for obj in doc.Objects:
         shape = getattr(obj, "Shape", None)
-        has_shape = shape is not None and not getattr(shape, "isNull", lambda: True)()
-        view_object = getattr(obj, "ViewObject", None)
-        if view_object is not None:
-            try:
-                view_object.Visibility = bool(has_shape)
-                if has_shape:
-                    if hasattr(view_object, "DisplayMode"):
-                        view_object.DisplayMode = "Flat Lines"
-                    if hasattr(view_object, "ShapeColor"):
-                        view_object.ShapeColor = (0.72, 0.76, 0.80, 0.0)
-                    if hasattr(view_object, "LineColor"):
-                        view_object.LineColor = (0.12, 0.16, 0.18, 0.0)
-                    if hasattr(view_object, "LineWidth"):
-                        view_object.LineWidth = 2.0
-            except Exception:
-                pass
-        if has_shape:
-            shape_objects.append(obj)
-    if not shape_objects:
-        raise RuntimeError("Keine sichtbaren Shape-Objekte fuer PNG-Ansichten gefunden.")
+        if shape is not None and not getattr(shape, "isNull", lambda: True)():
+            objects.append(obj)
+    if not objects:
+        raise RuntimeError("Keine Shape-Objekte fuer Vorschau-Ansichten gefunden.")
+    return objects
 
-    Gui.updateGui()
-    view = Gui.ActiveDocument.ActiveView
-    view_methods = {
-        "front": "viewFront",
-        "back": "viewRear",
-        "left": "viewLeft",
-        "right": "viewRight",
-        "top": "viewTop",
-        "bottom": "viewBottom",
-        "isometric": "viewIsometric",
+
+def create_preview_sources(doc, spec, output_dir):
+    objects = preview_objects(doc)
+
+    import Import
+    import Mesh
+
+    step_path = output_dir / f"{spec['revision_code']}-preview.step"
+    stl_path = output_dir / f"{spec['revision_code']}-preview.stl"
+    Import.export(objects, str(step_path))
+    Mesh.export(objects, str(stl_path))
+    return {
+        "artifacts": [{"path": str(step_path), "artifact_type": "step", "view_name": "preview"}],
+        "preview_mesh_path": str(stl_path),
     }
-    artifacts = []
-    for name, method_name in view_methods.items():
-        getattr(view, method_name)()
-        Gui.updateGui()
-        view.fitAll()
-        Gui.updateGui()
-        path = output_dir / f"{spec['revision_code']}-{name}.png"
-        view.saveImage(str(path), 1600, 1200, "White")
-        artifacts.append({"path": str(path), "artifact_type": "png", "view_name": name})
-    return artifacts
 
 
 def main():
@@ -178,29 +155,14 @@ def main():
     result_path = Path(sys.argv[2])
     spec = json.loads(spec_path.read_text())
     output_dir = Path(spec["output_dir"])
-    if spec["job_type"] == "png_views":
-        try:
-            import FreeCADGui as Gui
-        except Exception as exc:
-            raise RuntimeError("PNG-Ansichten benoetigen FreeCADGui-Unterstuetzung.") from exc
-        Gui.showMainWindow()
-        doc = FreeCAD.openDocument(spec["fcstd_path"])
-        try:
-            Gui.activateWorkbench("PartWorkbench")
-        except Exception:
-            pass
-        Gui.updateGui()
-        if Gui.ActiveDocument is None:
-            Gui.getDocument(doc.Name)
-    else:
-        doc = FreeCAD.openDocument(spec["fcstd_path"])
+    doc = FreeCAD.openDocument(spec["fcstd_path"])
     doc.recompute()
 
     result = {"metadata": inspect_document(doc), "artifacts": []}
     if spec["job_type"] == "export":
         result["artifacts"] = export_objects(doc, spec, output_dir)
     elif spec["job_type"] == "png_views":
-        result["artifacts"] = create_png_views(doc, spec, output_dir)
+        result.update(create_preview_sources(doc, spec, output_dir))
     elif spec["job_type"] != "inspect":
         raise RuntimeError(f"Unbekannter Job-Typ: {spec['job_type']}")
 
@@ -302,9 +264,7 @@ def run_freecadcmd_job(job):
 
     with TemporaryDirectory() as temp_dir:
         workdir = Path(temp_dir)
-        fcstd_path = workdir / job.revision.original_filename
-        with job.revision.file.open("rb") as source:
-            fcstd_path.write_bytes(source.read())
+        fcstd_path = stage_revision_inputs(job, workdir)
 
         script_path = workdir / "plm_freecadcmd_job.py"
         spec_path = workdir / "job_spec.json"
@@ -366,6 +326,17 @@ def run_freecadcmd_job(job):
             raise RuntimeError("FreeCADCmd hat kein Ergebnis geschrieben.")
 
         result = json.loads(result_path.read_text(encoding="utf-8"))
+        preview_mesh_path = result.pop("preview_mesh_path", "")
+        if preview_mesh_path:
+            result.setdefault("artifacts", []).extend(
+                render_stl_views(
+                    preview_mesh_path,
+                    output_dir,
+                    job.revision.revision_code,
+                    width=getattr(settings, "PREVIEW_PNG_WIDTH", 400),
+                    height=getattr(settings, "PREVIEW_PNG_HEIGHT", 300),
+                )
+            )
         for artifact in result.get("artifacts", []):
             path = Path(artifact["path"])
             artifact["filename"] = path.name
@@ -373,12 +344,71 @@ def run_freecadcmd_job(job):
         return result
 
 
-def freecadcmd_command(job=None):
-    if job and job.job_type == ExportJob.JobType.PNG_VIEWS:
-        png_command = getattr(settings, "FREECADPNG_COMMAND", "")
-        if png_command:
-            return configured_command(png_command, "FreeCAD PNG command", job)
+def stage_revision_inputs(job, workdir):
+    root_revision = job.revision
+    root_filename = Path(root_revision.original_filename).name
+    root_path = workdir / root_filename
+    copy_revision_file(root_revision, root_path)
 
+    project_revisions = Revision.objects.filter(
+        part__project=root_revision.part.project
+    ).exclude(pk=root_revision.pk).select_related("part").order_by(
+        "part_id",
+        "-created_at",
+        "-id",
+    )
+    candidates = {}
+    for revision in project_revisions:
+        filename = Path(revision.original_filename).name
+        candidates.setdefault(filename.lower(), revision)
+
+    staged = {root_filename.lower()}
+    queue = list(referenced_fcstd_files(root_revision))
+    while queue:
+        reference = queue.pop(0)
+        reference_path = safe_relative_fcstd_path(reference)
+        if reference_path is None:
+            continue
+        key = reference_path.name.lower()
+        if key in staged:
+            continue
+        dependency = candidates.get(key)
+        if dependency is None:
+            continue
+
+        target_path = workdir / reference_path
+        copy_revision_file(dependency, target_path)
+        staged.add(key)
+        queue.extend(referenced_fcstd_files(dependency))
+
+    return root_path
+
+
+def copy_revision_file(revision, target_path):
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with revision.file.open("rb") as source:
+        target_path.write_bytes(source.read())
+
+
+def referenced_fcstd_files(revision):
+    document = (revision.extracted_metadata or {}).get("freecad_document") or {}
+    references = document.get("references") or []
+    files = []
+    for reference in references:
+        filename = reference.get("file") if isinstance(reference, dict) else ""
+        if filename and filename.lower().endswith(".fcstd"):
+            files.append(filename)
+    return files
+
+
+def safe_relative_fcstd_path(filename):
+    path = Path(filename)
+    if path.is_absolute() or ".." in path.parts:
+        return None
+    return path
+
+
+def freecadcmd_command(job=None):
     configured = getattr(
         settings,
         "FREECADCMD_COMMAND",
@@ -397,7 +427,6 @@ def configured_command(configured, label, job=None):
 
     executable = command[0]
     command = with_flatpak_worker_options(command)
-    command = with_png_gui_command(command, job)
     if shutil.which(executable) or Path(executable).exists():
         return command
 
@@ -411,7 +440,7 @@ def configured_command(configured, label, job=None):
         "org.freecad.FreeCAD",
     ]
     if configured == "FreeCADCmd" and shutil.which("flatpak"):
-        return with_png_gui_command(flatpak_command, job)
+        return flatpak_command
 
     raise RuntimeError(f"{label} wurde nicht gefunden: {configured}")
 
@@ -425,29 +454,6 @@ def with_flatpak_worker_options(command):
     if not options:
         return command
     return [command[0], command[1], *options, *command[2:]]
-
-
-def with_png_gui_command(command, job):
-    if not job or job.job_type != ExportJob.JobType.PNG_VIEWS:
-        return command
-
-    updated = list(command)
-    for index, item in enumerate(updated):
-        if item == "--command=FreeCADCmd":
-            updated[index] = "--command=FreeCAD"
-            return updated
-        if item == "--command" and index + 1 < len(updated) and updated[index + 1] == "FreeCADCmd":
-            updated[index + 1] = "FreeCAD"
-            return updated
-
-    executable = Path(updated[0])
-    if executable.name == "FreeCADCmd":
-        sibling = executable.with_name("FreeCAD")
-        if sibling.exists():
-            updated[0] = str(sibling)
-        elif shutil.which("FreeCAD"):
-            updated[0] = "FreeCAD"
-    return updated
 
 
 @transaction.atomic

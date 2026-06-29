@@ -366,6 +366,15 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Hinweis: Flatpak-FreeCAD segfaultet lokal beim Beenden nach GUI-Nutzung, aber erst nachdem die Ergebnisdatei geschrieben ist; der Worker akzeptiert deshalb vorhandene Ergebnisdaten trotz nicht-null Exitcode.
 - `.venv/bin/python manage.py test plm` laeuft mit 61 Tests erfolgreich.
 
+### Neuer Headless-Pfad Fuer PNG-Ansichten
+
+- PNG-Jobs nutzen keinen `FreeCADGui`-/Viewport-Pfad mehr.
+- FreeCADCmd oeffnet die FCStd-Datei, exportiert ein STEP-Artefakt und ein temporaeres STL-Vorschau-Mesh.
+- Das PLM rendert daraus selbst feste PNG-Ansichten fuer front, back, left, right, top, bottom und isometric.
+- Referenzierte FCStd-Dateien aus demselben Projekt werden vor dem FreeCADCmd-Aufruf in den temporaeren Arbeitsordner kopiert.
+- Lokaler echter Lauf mit Flatpak FreeCAD 1.1.1 erzeugte erfolgreich ein STEP-Artefakt plus sieben PNG-Artefakte ohne fehlende Link-Warnungen.
+- `.venv/bin/python manage.py test` laeuft mit 83 Tests erfolgreich.
+
 ### PNG-Button Verarbeitet Direkt
 
 - Nutzerbeobachtung: Klick auf `PNG-Ansichten` wirkte, als passiere nichts.

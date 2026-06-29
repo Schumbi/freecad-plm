@@ -10,7 +10,7 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && if [ "$INSTALL_FREECAD" = "1" ]; then \
-        apt-get install -y --no-install-recommends freecad xvfb; \
+        apt-get install -y --no-install-recommends freecad; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 

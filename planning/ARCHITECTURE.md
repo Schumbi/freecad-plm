@@ -68,7 +68,9 @@ V1:
   - Export nach STEP, STL und 3MF.
   - PNG-Ansichten fuer visuelle Vergleiche.
 - Lokale Flatpak-Installationen werden ueber `FREECADCMD_COMMAND` unterstuetzt, z.B. `flatpak run --branch=stable --arch=x86_64 --command=FreeCADCmd org.freecad.FreeCAD`.
-- STEP/STL/3MF-Exporte sind der robuste Headless-Pfad. PNG-Ansichten koennen je nach FreeCAD-/Server-Setup `FreeCADGui`, Offscreen-Rendering oder `xvfb-run` brauchen.
+- STEP/STL/3MF-Exporte sind der robuste Headless-Pfad.
+- PNG-Ansichten nutzen ebenfalls keinen FreeCAD-GUI-Viewport mehr: FreeCADCmd exportiert ein STEP-Artefakt und ein temporaeres STL-Vorschau-Mesh, danach rendert das PLM deterministische PNG-Ansichten aus dem STL.
+- Vor dem FreeCADCmd-Aufruf werden referenzierte FCStd-Dateien aus demselben Projekt in den temporaeren Arbeitsordner kopiert, damit einfache Baugruppenlinks aufgeloest werden koennen.
 
 Spaeter:
 

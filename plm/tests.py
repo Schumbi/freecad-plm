@@ -48,8 +48,8 @@ from .freecadcmd import (
     freecadcmd_command,
     process_export_job,
     with_flatpak_worker_options,
-    with_png_gui_command,
 )
+from .mesh_preview import render_stl_views
 
 
 FREECAD_DOCUMENT_XML = """
@@ -1380,6 +1380,49 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
         script.chmod(0o755)
         return str(script)
 
+    def fake_preview_freecadcmd(self, required_files=None):
+        required_files = required_files or []
+        script = Path(self.media_root.name) / "fake_preview_freecadcmd.py"
+        script.write_text(
+            """#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+spec = json.loads(Path(sys.argv[-2]).read_text())
+output_dir = Path(spec["output_dir"])
+workdir = Path(spec["fcstd_path"]).parent
+missing = [name for name in __REQUIRED_FILES__ if not (workdir / name).exists()]
+if missing:
+    raise SystemExit("Missing staged files: " + ", ".join(missing))
+step_path = output_dir / "preview.step"
+stl_path = output_dir / "preview.stl"
+step_path.write_bytes(b"STEP DATA")
+stl_path.write_text(
+    "solid triangle\\n"
+    "facet normal 0 0 1\\n"
+    "outer loop\\n"
+    "vertex 0 0 0\\n"
+    "vertex 10 0 0\\n"
+    "vertex 0 10 0\\n"
+    "endloop\\n"
+    "endfacet\\n"
+    "endsolid triangle\\n"
+)
+result = {
+    "metadata": {"objects": [], "varsets": []},
+    "preview_mesh_path": str(stl_path),
+    "artifacts": [
+        {"path": str(step_path), "artifact_type": "step", "view_name": "preview"}
+    ],
+}
+Path(sys.argv[-1]).write_text(json.dumps(result))
+""".replace("__REQUIRED_FILES__", json.dumps(required_files)),
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        return str(script)
+
     def test_inspect_job_stores_freecadcmd_metadata(self):
         executable = self.fake_freecadcmd([])
         job = create_export_job(
@@ -1429,6 +1472,63 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
         self.assertEqual(artifact.artifact_type, RevisionArtifact.ArtifactType.STEP)
         self.assertEqual(artifact.size_bytes, len(b"STEP DATA"))
 
+    def test_png_job_renders_preview_mesh_without_freecad_gui(self):
+        executable = self.fake_preview_freecadcmd()
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        with override_settings(FREECADCMD_COMMAND=executable):
+            process_export_job(job)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        self.assertEqual(
+            RevisionArtifact.objects.filter(
+                artifact_type=RevisionArtifact.ArtifactType.STEP,
+                view_name="preview",
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            RevisionArtifact.objects.filter(
+                artifact_type=RevisionArtifact.ArtifactType.PNG,
+            ).count(),
+            7,
+        )
+
+    def test_png_job_stages_referenced_project_files_for_freecadcmd(self):
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        revision = snapshot.entries.get(path="Druck.FCStd").revision
+        executable = self.fake_preview_freecadcmd(
+            ["Box.FCStd", "Deckel.FCStd", "Chip.FCStd"]
+        )
+        job = create_export_job(
+            revision=revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        with override_settings(FREECADCMD_COMMAND=executable):
+            process_export_job(job)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        self.assertEqual(
+            RevisionArtifact.objects.filter(
+                job=job,
+                artifact_type=RevisionArtifact.ArtifactType.PNG,
+            ).count(),
+            7,
+        )
+
     def test_missing_freecadcmd_marks_job_failed(self):
         job = create_export_job(
             revision=self.revision,
@@ -1457,28 +1557,7 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
         self.assertIn("--filesystem=/tmp", command)
         self.assertLess(command.index("--filesystem=/tmp"), command.index("org.freecad.FreeCAD"))
 
-    def test_png_flatpak_command_uses_gui_binary(self):
-        job = create_export_job(
-            revision=self.revision,
-            job_type=ExportJob.JobType.PNG_VIEWS,
-            created_by=self.user,
-        )
-
-        command = with_png_gui_command(
-            [
-                "flatpak",
-                "run",
-                "--filesystem=/tmp",
-                "--command=FreeCADCmd",
-                "org.freecad.FreeCAD",
-            ],
-            job,
-        )
-
-        self.assertIn("--command=FreeCAD", command)
-        self.assertNotIn("--command=FreeCADCmd", command)
-
-    def test_png_default_flatpak_fallback_uses_gui_binary(self):
+    def test_png_default_flatpak_fallback_stays_headless(self):
         job = create_export_job(
             revision=self.revision,
             job_type=ExportJob.JobType.PNG_VIEWS,
@@ -1492,48 +1571,35 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
             which.side_effect = lambda name: "/usr/bin/flatpak" if name == "flatpak" else None
             command = freecadcmd_command(job)
 
-        self.assertIn("--command=FreeCAD", command)
-        self.assertNotIn("--command=FreeCADCmd", command)
+        self.assertIn("--command=FreeCADCmd", command)
+        self.assertNotIn("--command=FreeCAD", command)
 
-    def test_png_job_uses_dedicated_png_command_when_configured(self):
-        job = create_export_job(
-            revision=self.revision,
-            job_type=ExportJob.JobType.PNG_VIEWS,
-            created_by=self.user,
+    def test_mesh_preview_renderer_creates_png_views(self):
+        stl_path = Path(self.media_root.name) / "triangle.stl"
+        output_dir = Path(self.media_root.name) / "preview"
+        output_dir.mkdir()
+        stl_path.write_text(
+            """solid triangle
+facet normal 0 0 1
+outer loop
+vertex 0 0 0
+vertex 10 0 0
+vertex 0 10 0
+endloop
+endfacet
+endsolid triangle
+""",
+            encoding="utf-8",
         )
 
-        with (
-            patch("plm.freecadcmd.shutil.which") as which,
-            override_settings(
-                FREECADCMD_COMMAND="/usr/bin/FreeCADCmd",
-                FREECADPNG_COMMAND='xvfb-run -a -s "-screen 0 1920x1440x24" FreeCAD',
-            ),
-        ):
-            which.side_effect = lambda name: f"/usr/bin/{name}" if name in {"xvfb-run", "FreeCADCmd"} else None
-            command = freecadcmd_command(job)
+        artifacts = render_stl_views(stl_path, output_dir, "R0001", width=80, height=60)
 
-        self.assertEqual(command[0], "xvfb-run")
-        self.assertIn("FreeCAD", command)
-        self.assertNotIn("FreeCADCmd", command)
-
-    def test_non_png_job_ignores_dedicated_png_command(self):
-        job = create_export_job(
-            revision=self.revision,
-            job_type=ExportJob.JobType.INSPECT,
-            created_by=self.user,
-        )
-
-        with (
-            patch("plm.freecadcmd.shutil.which") as which,
-            override_settings(
-                FREECADCMD_COMMAND="FreeCADCmd",
-                FREECADPNG_COMMAND='xvfb-run -a -s "-screen 0 1920x1440x24" FreeCAD',
-            ),
-        ):
-            which.side_effect = lambda name: f"/usr/bin/{name}" if name == "FreeCADCmd" else None
-            command = freecadcmd_command(job)
-
-        self.assertEqual(command, ["FreeCADCmd"])
+        self.assertEqual(len(artifacts), 7)
+        for artifact in artifacts:
+            path = Path(artifact["path"])
+            self.assertEqual(artifact["artifact_type"], "png")
+            self.assertTrue(path.exists())
+            self.assertEqual(path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
 
     def test_reader_cannot_create_export_job(self):
         reader = get_user_model().objects.create_user(
