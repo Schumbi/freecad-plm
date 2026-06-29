@@ -7,6 +7,7 @@ from unittest.mock import patch
 from zipfile import ZipFile, ZipInfo
 
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -44,6 +45,7 @@ from .services import (
     release_revision,
 )
 from .freecadcmd import (
+    PNG_VIEW_NAMES,
     create_export_job,
     freecadcmd_command,
     process_export_job,
@@ -137,42 +139,29 @@ def make_fcstd_bytes(label, freecad_id="", object_type="PartDesign::Body", xlink
     return buffer.getvalue()
 
 
-def make_project_zip_upload(name="project.zip"):
+def make_project_zip_upload(name="project.zip", members=None):
+    members = members or {
+        "Chip.FCStd": make_fcstd_bytes("Chip", object_type="App::VarSet"),
+        "Box.FCStd": make_fcstd_bytes("Box", xlinks=[("Chip.FCStd", "VarSet")]),
+        "Deckel.FCStd": make_fcstd_bytes(
+            "Deckel",
+            xlinks=[("Chip.FCStd", "VarSet")],
+        ),
+        "Druck.FCStd": make_fcstd_bytes(
+            "Druck",
+            object_type="Assembly::AssemblyObject",
+            xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+        ),
+        "Zusammenbau.FCStd": make_fcstd_bytes(
+            "Zusammenbau",
+            object_type="Assembly::AssemblyObject",
+            xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+        ),
+    }
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
-        write_zip_member(
-            archive,
-            "Chip.FCStd",
-            make_fcstd_bytes("Chip", object_type="App::VarSet"),
-        )
-        write_zip_member(
-            archive,
-            "Box.FCStd",
-            make_fcstd_bytes("Box", xlinks=[("Chip.FCStd", "VarSet")]),
-        )
-        write_zip_member(
-            archive,
-            "Deckel.FCStd",
-            make_fcstd_bytes("Deckel", xlinks=[("Chip.FCStd", "VarSet")]),
-        )
-        write_zip_member(
-            archive,
-            "Druck.FCStd",
-            make_fcstd_bytes(
-                "Druck",
-                object_type="Assembly::AssemblyObject",
-                xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
-            ),
-        )
-        write_zip_member(
-            archive,
-            "Zusammenbau.FCStd",
-            make_fcstd_bytes(
-                "Zusammenbau",
-                object_type="Assembly::AssemblyObject",
-                xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
-            ),
-        )
+        for member_name, content in members.items():
+            write_zip_member(archive, member_name, content)
     return SimpleUploadedFile(name, buffer.getvalue())
 
 
@@ -475,6 +464,55 @@ class RevisionUploadServiceTests(TestCase):
         self.assertEqual(first.entries.count(), 5)
         self.assertEqual(second.entries.count(), 5)
         self.assertEqual(Revision.objects.count(), 5)
+        self.assertEqual(second.import_summary["created_revisions"], 0)
+        self.assertEqual(second.import_summary["reused_revisions"], 5)
+
+    def test_import_project_snapshot_creates_revision_for_changed_member_only(self):
+        import_project_snapshot(
+            self.project,
+            make_project_zip_upload("first.zip"),
+            self.user,
+        )
+        changed_box = make_fcstd_bytes("Box geaendert")
+
+        second = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(
+                "second.zip",
+                members={
+                    "Chip.FCStd": make_fcstd_bytes("Chip", object_type="App::VarSet"),
+                    "Box.FCStd": changed_box,
+                    "Deckel.FCStd": make_fcstd_bytes(
+                        "Deckel",
+                        xlinks=[("Chip.FCStd", "VarSet")],
+                    ),
+                    "Druck.FCStd": make_fcstd_bytes(
+                        "Druck",
+                        object_type="Assembly::AssemblyObject",
+                        xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+                    ),
+                    "Zusammenbau.FCStd": make_fcstd_bytes(
+                        "Zusammenbau",
+                        object_type="Assembly::AssemblyObject",
+                        xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+                    ),
+                },
+            ),
+            self.user,
+        )
+
+        self.assertEqual(Revision.objects.count(), 6)
+        self.assertEqual(Part.objects.get(number="Box").revisions.count(), 2)
+        self.assertEqual(
+            second.entries.get(path="Box.FCStd").revision.revision_code,
+            "R0002",
+        )
+        self.assertEqual(
+            second.entries.get(path="Chip.FCStd").revision.revision_code,
+            "R0001",
+        )
+        self.assertEqual(second.import_summary["created_revisions"], 1)
+        self.assertEqual(second.import_summary["reused_revisions"], 4)
 
     def test_release_revision_sets_status_timestamp_and_audit(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -519,6 +557,34 @@ class RevisionUploadViewTests(TestCase):
     def tearDown(self):
         self.settings_override.disable()
         self.media_root.cleanup()
+
+    def create_second_revision(self):
+        return create_revision_from_upload(
+            self.part,
+            make_zip_upload(
+                members={
+                    "Document.xml": FREECAD_DOCUMENT_XML.replace(
+                        "Testteil aus FreeCAD",
+                        "Testteil geaendert",
+                    )
+                }
+            ),
+            self.user,
+            normalize_plm_revision=True,
+        )
+
+    def create_png_artifacts(self, revision):
+        for view_name in PNG_VIEW_NAMES:
+            content = b"\x89PNG\r\n\x1a\n"
+            RevisionArtifact.objects.create(
+                revision=revision,
+                artifact_type=RevisionArtifact.ArtifactType.PNG,
+                view_name=view_name,
+                file=ContentFile(content, name=f"{revision.revision_code}-{view_name}.png"),
+                original_filename=f"{revision.revision_code}-{view_name}.png",
+                sha256=f"{revision.id:032d}{len(view_name):032d}",
+                size_bytes=len(content),
+            )
 
     def test_project_list_requires_login(self):
         response = self.client.get(reverse("plm:project_list"))
@@ -700,6 +766,53 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(job.status, ExportJob.Status.QUEUED)
         process.assert_not_called()
 
+    def test_revision_compare_queues_missing_png_views_for_selected_revisions(self):
+        self.client.force_login(self.user)
+        left = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        right = self.create_second_revision()
+
+        with (
+            override_settings(PROCESS_EXPORT_JOBS_INLINE=False),
+            patch("plm.views.process_export_job") as process,
+        ):
+            response = self.client.get(
+                reverse("plm:revision_compare", args=[self.part.id]),
+                {"left": left.id, "right": right.id},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(
+                ExportJob.objects.order_by("revision_id").values_list(
+                    "revision_id",
+                    "job_type",
+                    "status",
+                )
+            ),
+            [
+                (left.id, ExportJob.JobType.PNG_VIEWS, ExportJob.Status.QUEUED),
+                (right.id, ExportJob.JobType.PNG_VIEWS, ExportJob.Status.QUEUED),
+            ],
+        )
+        process.assert_not_called()
+
+    def test_revision_compare_uses_existing_png_views_without_new_jobs(self):
+        self.client.force_login(self.user)
+        left = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        right = self.create_second_revision()
+        self.create_png_artifacts(left)
+        self.create_png_artifacts(right)
+
+        with override_settings(PROCESS_EXPORT_JOBS_INLINE=False):
+            response = self.client.get(
+                reverse("plm:revision_compare", args=[self.part.id]),
+                {"left": left.id, "right": right.id},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ExportJob.objects.exists())
+        self.assertContains(response, "front")
+
     def test_process_export_jobs_button_runs_queued_jobs_once(self):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -842,6 +955,9 @@ class RevisionUploadViewTests(TestCase):
             reverse("plm:project_detail", args=[self.project.id]),
         )
         self.assertEqual(snapshot.entries.count(), 5)
+        messages = list(response.wsgi_request._messages)
+        self.assertIn("5 neue Revisionen", str(messages[0]))
+        self.assertIn("0 unveraenderte Dateien", str(messages[0]))
 
         response = self.client.get(
             reverse("plm:download_project_snapshot", args=[snapshot.id])

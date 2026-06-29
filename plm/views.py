@@ -48,7 +48,12 @@ from .services import (
     revision_reference_files,
     snapshot_entries_with_references,
 )
-from .freecadcmd import create_export_job, process_export_job, process_queued_export_jobs
+from .freecadcmd import (
+    PNG_VIEW_NAMES,
+    create_export_job,
+    process_export_job,
+    process_queued_export_jobs,
+)
 
 
 PENDING_REVISION_UPLOAD_SESSION_KEY = "pending_revision_upload"
@@ -251,10 +256,18 @@ def upload_project_snapshot(request, project_id):
         except ValidationError as exc:
             form.add_error("file", exc)
         else:
-            messages.success(
-                request,
-                f"Projektstand {snapshot.name} wurde importiert.",
+            summary = getattr(snapshot, "import_summary", {})
+            created_revisions = summary.get("created_revisions", 0)
+            reused_revisions = summary.get("reused_revisions", 0)
+            message = (
+                f"Projektstand {snapshot.name} wurde importiert: "
+                f"{created_revisions} neue Revisionen, "
+                f"{reused_revisions} unveraenderte Dateien wiederverwendet."
             )
+            if created_revisions:
+                messages.success(request, message)
+            else:
+                messages.warning(request, message)
             return redirect("plm:project_detail", project_id=project.id)
 
     parts = project.parts.filter(is_archived=False).order_by("number")
@@ -681,6 +694,44 @@ def create_revision_png_job(request, revision_id):
     return redirect("plm:part_detail", part_id=revision.part_id)
 
 
+def revision_png_view_names(revision):
+    return set(
+        revision.artifacts.filter(
+            artifact_type=RevisionArtifact.ArtifactType.PNG,
+            view_name__in=PNG_VIEW_NAMES,
+        ).values_list("view_name", flat=True)
+    )
+
+
+def revision_has_complete_png_views(revision):
+    return revision_png_view_names(revision) >= set(PNG_VIEW_NAMES)
+
+
+def revision_has_pending_png_job(revision):
+    return revision.export_jobs.filter(
+        job_type=ExportJob.JobType.PNG_VIEWS,
+        status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING],
+    ).exists()
+
+
+def ensure_revision_png_views(revision, user):
+    if revision_has_complete_png_views(revision):
+        return "ready"
+    if revision_has_pending_png_job(revision):
+        return "pending"
+
+    job = create_export_job(
+        revision=revision,
+        job_type=ExportJob.JobType.PNG_VIEWS,
+        created_by=user,
+    )
+    if settings.PROCESS_EXPORT_JOBS_INLINE:
+        process_export_job(job)
+        job.refresh_from_db()
+        return "ready" if job.status == ExportJob.Status.SUCCEEDED else "failed"
+    return "queued"
+
+
 @login_required
 def create_revision_export_job(request, revision_id):
     revision = get_object_or_404(
@@ -737,7 +788,7 @@ def download_revision_artifact(request, artifact_id):
 def revision_compare(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
     revisions = (
-        part.revisions.prefetch_related("artifacts")
+        part.revisions.prefetch_related("artifacts", "export_jobs")
         .order_by("-created_at")
     )
     left_id = request.GET.get("left")
@@ -745,7 +796,20 @@ def revision_compare(request, part_id):
     left_revision = revisions.filter(id=left_id).first() if left_id else None
     right_revision = revisions.filter(id=right_id).first() if right_id else None
     comparisons = []
+    png_statuses = {}
     if left_revision and right_revision:
+        if can_upload_revision(request.user):
+            png_statuses[left_revision.id] = ensure_revision_png_views(
+                left_revision,
+                request.user,
+            )
+            png_statuses[right_revision.id] = ensure_revision_png_views(
+                right_revision,
+                request.user,
+            )
+            left_revision.refresh_from_db()
+            right_revision.refresh_from_db()
+
         left_pngs = {
             artifact.view_name: artifact
             for artifact in left_revision.artifacts.filter(
@@ -766,6 +830,16 @@ def revision_compare(request, part_id):
                     "right": right_pngs[view_name],
                 }
             )
+        if any(status in {"queued", "pending"} for status in png_statuses.values()):
+            messages.info(
+                request,
+                "Fehlende PNG-Ansichten wurden eingeplant. Starte den Worker oder warte, bis er die Jobs verarbeitet hat.",
+            )
+        elif any(status == "failed" for status in png_statuses.values()):
+            messages.error(
+                request,
+                "PNG-Ansichten konnten fuer mindestens eine Revision nicht erzeugt werden.",
+            )
 
     return render(
         request,
@@ -776,6 +850,7 @@ def revision_compare(request, part_id):
             "left_revision": left_revision,
             "right_revision": right_revision,
             "comparisons": comparisons,
+            "png_statuses": png_statuses,
         },
     )
 

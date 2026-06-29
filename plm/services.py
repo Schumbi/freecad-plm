@@ -241,12 +241,20 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
         name=name.strip() or PurePosixPath(uploaded_zip.name).stem,
         created_by=created_by,
     )
+    import_summary = {
+        "created_parts": 0,
+        "created_revisions": 0,
+        "reused_revisions": 0,
+        "files": [],
+    }
 
     for member in members:
         metadata = validate_fcstd_upload(
             SimpleUploadedFile(PurePosixPath(member.path).name, member.data)
         )
         part, created_part = part_identity_from_metadata(project, member.path, metadata)
+        if created_part:
+            import_summary["created_parts"] += 1
         if created_part:
             AuditEvent.objects.create(
                 actor=created_by,
@@ -265,6 +273,21 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
             member.path,
             member.data,
             created_by,
+        )
+        if created_revision:
+            import_summary["created_revisions"] += 1
+        else:
+            import_summary["reused_revisions"] += 1
+        import_summary["files"].append(
+            {
+                "path": member.path,
+                "part_id": part.id,
+                "part_number": part.number,
+                "revision_id": revision.id,
+                "revision_code": revision.revision_code,
+                "created_part": created_part,
+                "created_revision": created_revision,
+            }
         )
         if created_revision:
             AuditEvent.objects.create(
@@ -295,8 +318,10 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
             "project_id": project.id,
             "snapshot_id": snapshot.id,
             "entry_count": snapshot.entries.count(),
+            "import_summary": import_summary,
         },
     )
+    snapshot.import_summary = import_summary
     return snapshot
 
 
