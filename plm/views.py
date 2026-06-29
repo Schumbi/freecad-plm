@@ -5,6 +5,7 @@ from zipfile import ZipFile
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -396,6 +397,12 @@ def process_export_jobs_once(request, part_id):
         return HttpResponseForbidden("Keine Berechtigung zum Starten von FreeCAD-Jobs.")
     if request.method != "POST":
         return redirect("plm:part_detail", part_id=part.id)
+    if not settings.PROCESS_EXPORT_JOBS_INLINE:
+        messages.info(
+            request,
+            "Wartende Jobs werden vom Worker im Hintergrund verarbeitet.",
+        )
+        return redirect("plm:part_detail", part_id=part.id)
 
     jobs = process_queued_export_jobs()
     succeeded = sum(1 for job in jobs if job.status == ExportJob.Status.SUCCEEDED)
@@ -653,17 +660,23 @@ def create_revision_png_job(request, revision_id):
         job_type=ExportJob.JobType.PNG_VIEWS,
         created_by=request.user,
     )
-    process_export_job(job)
-    job.refresh_from_db()
-    if job.status == ExportJob.Status.SUCCEEDED:
+    if settings.PROCESS_EXPORT_JOBS_INLINE:
+        process_export_job(job)
+        job.refresh_from_db()
+        if job.status == ExportJob.Status.SUCCEEDED:
+            messages.success(
+                request,
+                f"PNG-Ansichten fuer {revision.revision_code} wurden erzeugt.",
+            )
+        else:
+            messages.error(
+                request,
+                f"PNG-Ansichten fuer {revision.revision_code} konnten nicht erzeugt werden.",
+            )
+    else:
         messages.success(
             request,
-            f"PNG-Ansichten fuer {revision.revision_code} wurden erzeugt.",
-        )
-    else:
-        messages.error(
-            request,
-            f"PNG-Ansichten fuer {revision.revision_code} konnten nicht erzeugt werden.",
+            f"PNG-Ansichten fuer {revision.revision_code} wurden eingeplant.",
         )
     return redirect("plm:part_detail", part_id=revision.part_id)
 

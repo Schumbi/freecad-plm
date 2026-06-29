@@ -682,6 +682,24 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
         process.assert_called_once_with(job)
 
+    def test_png_views_button_only_queues_job_when_inline_processing_is_disabled(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        with (
+            override_settings(PROCESS_EXPORT_JOBS_INLINE=False),
+            patch("plm.views.process_export_job") as process,
+        ):
+            response = self.client.post(
+                reverse("plm:create_revision_png_job", args=[revision.id])
+            )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        job = ExportJob.objects.get()
+        self.assertEqual(job.job_type, ExportJob.JobType.PNG_VIEWS)
+        self.assertEqual(job.status, ExportJob.Status.QUEUED)
+        process.assert_not_called()
+
     def test_process_export_jobs_button_runs_queued_jobs_once(self):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -705,6 +723,28 @@ class RevisionUploadViewTests(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
         process.assert_called_once_with()
+
+    def test_process_export_jobs_button_does_not_run_in_server_mode(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        job = create_export_job(
+            revision=revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=self.user,
+        )
+
+        with (
+            override_settings(PROCESS_EXPORT_JOBS_INLINE=False),
+            patch("plm.views.process_queued_export_jobs") as process,
+        ):
+            response = self.client.post(
+                reverse("plm:process_export_jobs_once", args=[self.part.id])
+            )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.QUEUED)
+        process.assert_not_called()
 
     def test_referenced_revision_without_snapshot_cannot_be_downloaded_alone(self):
         self.client.force_login(self.user)
@@ -1454,6 +1494,46 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
 
         self.assertIn("--command=FreeCAD", command)
         self.assertNotIn("--command=FreeCADCmd", command)
+
+    def test_png_job_uses_dedicated_png_command_when_configured(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        with (
+            patch("plm.freecadcmd.shutil.which") as which,
+            override_settings(
+                FREECADCMD_COMMAND="/usr/bin/FreeCADCmd",
+                FREECADPNG_COMMAND='xvfb-run -a -s "-screen 0 1920x1440x24" FreeCAD',
+            ),
+        ):
+            which.side_effect = lambda name: f"/usr/bin/{name}" if name in {"xvfb-run", "FreeCADCmd"} else None
+            command = freecadcmd_command(job)
+
+        self.assertEqual(command[0], "xvfb-run")
+        self.assertIn("FreeCAD", command)
+        self.assertNotIn("FreeCADCmd", command)
+
+    def test_non_png_job_ignores_dedicated_png_command(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=self.user,
+        )
+
+        with (
+            patch("plm.freecadcmd.shutil.which") as which,
+            override_settings(
+                FREECADCMD_COMMAND="FreeCADCmd",
+                FREECADPNG_COMMAND='xvfb-run -a -s "-screen 0 1920x1440x24" FreeCAD',
+            ),
+        ):
+            which.side_effect = lambda name: f"/usr/bin/{name}" if name == "FreeCADCmd" else None
+            command = freecadcmd_command(job)
+
+        self.assertEqual(command, ["FreeCADCmd"])
 
     def test_reader_cannot_create_export_job(self):
         reader = get_user_model().objects.create_user(

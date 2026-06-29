@@ -31,6 +31,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss in .env gesetzt sein}
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      PROCESS_EXPORT_JOBS_INLINE: "0"
     volumes:
       - media-data:/app/storage
       - static-data:/app/staticfiles
@@ -60,6 +61,7 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       FREECADCMD_COMMAND: ${FREECADCMD_COMMAND:-xvfb-run -a FreeCADCmd}
+      FREECADPNG_COMMAND: ${FREECADPNG_COMMAND:-xvfb-run -a -s "-screen 0 1920x1440x24" FreeCAD}
     volumes:
       - media-data:/app/storage
     depends_on:

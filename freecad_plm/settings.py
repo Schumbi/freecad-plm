@@ -145,8 +145,13 @@ LOGIN_URL = 'admin:login'
 LOGIN_REDIRECT_URL = 'admin:index'
 
 FREECADCMD_COMMAND = os.environ.get('FREECADCMD_COMMAND', 'FreeCADCmd')
+FREECADPNG_COMMAND = os.environ.get('FREECADPNG_COMMAND', '')
 FREECADCMD_PATH = FREECADCMD_COMMAND
 FREECADCMD_TIMEOUT_SECONDS = 300
+PROCESS_EXPORT_JOBS_INLINE = os.environ.get(
+    'PROCESS_EXPORT_JOBS_INLINE',
+    '1',
+).lower() in {'1', 'true', 'yes', 'on'}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

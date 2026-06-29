@@ -374,17 +374,26 @@ def run_freecadcmd_job(job):
 
 
 def freecadcmd_command(job=None):
+    if job and job.job_type == ExportJob.JobType.PNG_VIEWS:
+        png_command = getattr(settings, "FREECADPNG_COMMAND", "")
+        if png_command:
+            return configured_command(png_command, "FreeCAD PNG command", job)
+
     configured = getattr(
         settings,
         "FREECADCMD_COMMAND",
         getattr(settings, "FREECADCMD_PATH", "FreeCADCmd"),
     )
+    return configured_command(configured, "FreeCADCmd", job)
+
+
+def configured_command(configured, label, job=None):
     if isinstance(configured, (list, tuple)):
         command = [str(item) for item in configured]
     else:
         command = shlex.split(str(configured))
     if not command:
-        raise RuntimeError("FreeCADCmd ist nicht konfiguriert.")
+        raise RuntimeError(f"{label} ist nicht konfiguriert.")
 
     executable = command[0]
     command = with_flatpak_worker_options(command)
@@ -404,7 +413,7 @@ def freecadcmd_command(job=None):
     if configured == "FreeCADCmd" and shutil.which("flatpak"):
         return with_png_gui_command(flatpak_command, job)
 
-    raise RuntimeError(f"FreeCADCmd wurde nicht gefunden: {configured}")
+    raise RuntimeError(f"{label} wurde nicht gefunden: {configured}")
 
 
 def with_flatpak_worker_options(command):

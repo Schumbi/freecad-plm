@@ -96,7 +96,7 @@ Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Da
 
 ## FreeCADCmd
 
-Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf die Flatpak-Installation `org.freecad.FreeCAD` mit `--command=FreeCADCmd` und `/tmp`-Freigabe zurueck, wenn `flatpak` vorhanden ist. PNG-Jobs nutzen bei Flatpak automatisch den GUI-Binary `FreeCAD`, weil dafuer ein FreeCADGui-Viewport gebraucht wird.
+Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf die Flatpak-Installation `org.freecad.FreeCAD` mit `--command=FreeCADCmd` und `/tmp`-Freigabe zurueck, wenn `flatpak` vorhanden ist. PNG-Jobs koennen mit `FREECADPNG_COMMAND` einen eigenen Befehl nutzen, weil dafuer ein FreeCADGui-Viewport gebraucht wird.
 
 Beispiel fuer eine explizite Flatpak-Konfiguration:
 
@@ -105,6 +105,16 @@ FREECADCMD_COMMAND='flatpak run --filesystem=/tmp --branch=stable --arch=x86_64 
 ```
 
 PNG-Ansichten brauchen ein funktionierendes GUI-/Display-Setup. Der Button `PNG-Ansichten` erzeugt die Bilder im lokalen Prototyp direkt waehrend der Anfrage. Auf einem Server ohne Desktop sollte dieser Pfad spaeter unter `xvfb-run` oder in einen separaten Preview-Worker wandern.
+
+Empfohlene Server-Konfiguration:
+
+```bash
+FREECADCMD_COMMAND='FreeCADCmd'
+FREECADPNG_COMMAND='xvfb-run -a -s "-screen 0 1920x1440x24" FreeCAD'
+PROCESS_EXPORT_JOBS_INLINE=0
+```
+
+Mit `PROCESS_EXPORT_JOBS_INLINE=0` legt die Weboberflaeche Export- und PNG-Jobs nur an. Der Docker-Worker verarbeitet sie im Hintergrund. So muss der Webprozess kein FreeCAD-Fenster und keinen virtuellen Display-Server starten.
 
 Wartende Analyse- und Exportjobs koennen auf der Teildetailseite mit `Wartende Jobs starten` einmalig verarbeitet werden.
 
