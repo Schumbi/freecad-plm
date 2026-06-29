@@ -917,10 +917,15 @@ class RolePermissionTests(TestCase):
         self.client.force_login(self.reader)
 
         response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+        content = response.content.decode()
 
         self.assertContains(response, 'class="properties-panel"')
         self.assertContains(response, "Eigenschaften anzeigen")
         self.assertContains(response, "Laufend")
+        self.assertLess(
+            content.index("Teile und Baugruppen"),
+            content.index("Projektstaende"),
+        )
 
         response = self.client.get(reverse("plm:project_properties", args=[self.project.id]))
         self.assertContains(response, "Eigenschaften")
@@ -1076,6 +1081,19 @@ class RolePermissionTests(TestCase):
 
         self.assertContains(response, "Einbau mit zwei Schrauben.")
         self.assertNotContains(response, "Speichern")
+
+    def test_revision_notes_and_metadata_open_in_modals(self):
+        create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+
+        self.client.force_login(self.reader)
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, 'data-dialog-target="#notes-')
+        self.assertContains(response, 'data-dialog-target="#freecad-')
+        self.assertContains(response, 'class="plm-dialog"')
+        self.assertContains(response, "hidden")
+        self.assertNotContains(response, "<summary>Anmerkungen</summary>")
+        self.assertNotContains(response, "<summary>Metadaten</summary>")
 
     def test_reader_cannot_update_revision_notes(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)

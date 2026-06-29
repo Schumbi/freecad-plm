@@ -99,106 +99,126 @@
               {% endif %}
             </td>
             <td>
-              <details>
-                <summary>Anmerkungen</summary>
-                {% if revision.notes %}
-                  <div class="notes-text">{{ revision.notes }}</div>
-                {% else %}
-                  <p>Noch keine Anmerkungen.</p>
-                {% endif %}
-                {% if can_edit_notes %}
-                  <form method="post" action="{% url 'plm:update_revision_notes' revision.id %}">
-                    {% csrf_token %}
-                    <label for="notes-{{ revision.id }}">Anmerkungen</label>
-                    <textarea id="notes-{{ revision.id }}" name="notes" rows="5">{{ revision.notes }}</textarea>
-                    <button type="submit">Speichern</button>
-                  </form>
-                {% endif %}
-              </details>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">
+                Oeffnen
+              </button>
+              <div class="plm-dialog" id="notes-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="notes-title-{{ revision.id }}" hidden>
+                <div class="plm-dialog-panel">
+                  <div class="plm-dialog-header">
+                    <h5 class="plm-dialog-title" id="notes-title-{{ revision.id }}">Anmerkungen {{ revision.revision_code }}</h5>
+                    <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  </div>
+                  <div class="plm-dialog-body">
+                      {% if revision.notes %}
+                        <div class="notes-text">{{ revision.notes }}</div>
+                      {% else %}
+                        <div class="empty-state">Noch keine Anmerkungen.</div>
+                      {% endif %}
+                      {% if can_edit_notes %}
+                        <form method="post" action="{% url 'plm:update_revision_notes' revision.id %}">
+                          {% csrf_token %}
+                          <label for="notes-text-{{ revision.id }}">Anmerkungen</label>
+                          <textarea id="notes-text-{{ revision.id }}" name="notes" rows="6">{{ revision.notes }}</textarea>
+                          <button type="submit">Speichern</button>
+                        </form>
+                      {% endif %}
+                  </div>
+                </div>
+              </div>
             </td>
             <td>
-              <details>
-                <summary>Metadaten</summary>
-                {% with document=revision.extracted_metadata.freecad_document %}
-                  {% if document %}
-                    <dl class="metadata-list">
-                      {% if document.properties.Label %}
-                        <dt>Label</dt>
-                        <dd>{{ document.properties.Label }}</dd>
-                      {% endif %}
-                      {% if document.properties.Comment %}
-                        <dt>Kommentar</dt>
-                        <dd>{{ document.properties.Comment }}</dd>
-                      {% endif %}
-                      {% if document.properties.Company %}
-                        <dt>Firma</dt>
-                        <dd>{{ document.properties.Company }}</dd>
-                      {% endif %}
-                      {% if document.properties.CreatedBy %}
-                        <dt>Erstellt von</dt>
-                        <dd>{{ document.properties.CreatedBy }}</dd>
-                      {% endif %}
-                      {% if document.properties.CreationDate %}
-                        <dt>Erstellt am</dt>
-                        <dd>{{ document.properties.CreationDate }}</dd>
-                      {% endif %}
-                      {% if document.properties.LastModifiedBy %}
-                        <dt>Geaendert von</dt>
-                        <dd>{{ document.properties.LastModifiedBy }}</dd>
-                      {% endif %}
-                      {% if document.properties.LastModifiedDate %}
-                        <dt>Geaendert am</dt>
-                        <dd>{{ document.properties.LastModifiedDate }}</dd>
-                      {% endif %}
-                      {% if document.properties.License %}
-                        <dt>Lizenz</dt>
-                        <dd>{{ document.properties.License }}</dd>
-                      {% endif %}
-                      {% if document.program_version %}
-                        <dt>FreeCAD-Version</dt>
-                        <dd>{{ document.program_version }}</dd>
-                      {% endif %}
-                    </dl>
-                  {% else %}
-                    <p>Keine FreeCAD-Metadaten extrahiert.</p>
-                  {% endif %}
-                {% endwith %}
-                {% with freecadcmd=revision.extracted_metadata.freecadcmd %}
-                  {% if freecadcmd %}
-                    <h4>FreeCADCmd-Analyse</h4>
-                    {% if freecadcmd.objects %}
-                      <p>Exportierbare Objekte:</p>
-                      <ul>
-                        {% for object in freecadcmd.objects %}
-                          <li>{{ object.label }} ({{ object.name }}, {{ object.type }})</li>
-                        {% endfor %}
-                      </ul>
-                    {% endif %}
-                    {% if freecadcmd.varsets %}
-                      <p>VarSets:</p>
-                      <ul>
-                        {% for varset in freecadcmd.varsets %}
-                          <li>
-                            {{ varset.label }} ({{ varset.name }})
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#freecad-{{ revision.id }}">
+                Metadaten
+              </button>
+              <div class="plm-dialog" id="freecad-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="freecad-title-{{ revision.id }}" hidden>
+                <div class="plm-dialog-panel wide">
+                  <div class="plm-dialog-header">
+                    <h5 class="plm-dialog-title" id="freecad-title-{{ revision.id }}">FreeCAD-Metadaten {{ revision.revision_code }}</h5>
+                    <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  </div>
+                  <div class="plm-dialog-body">
+                      {% with document=revision.extracted_metadata.freecad_document %}
+                        {% if document %}
+                          <dl class="metadata-list">
+                            {% if document.properties.Label %}
+                              <dt>Label</dt>
+                              <dd>{{ document.properties.Label }}</dd>
+                            {% endif %}
+                            {% if document.properties.Comment %}
+                              <dt>Kommentar</dt>
+                              <dd>{{ document.properties.Comment }}</dd>
+                            {% endif %}
+                            {% if document.properties.Company %}
+                              <dt>Firma</dt>
+                              <dd>{{ document.properties.Company }}</dd>
+                            {% endif %}
+                            {% if document.properties.CreatedBy %}
+                              <dt>Erstellt von</dt>
+                              <dd>{{ document.properties.CreatedBy }}</dd>
+                            {% endif %}
+                            {% if document.properties.CreationDate %}
+                              <dt>Erstellt am</dt>
+                              <dd>{{ document.properties.CreationDate }}</dd>
+                            {% endif %}
+                            {% if document.properties.LastModifiedBy %}
+                              <dt>Geaendert von</dt>
+                              <dd>{{ document.properties.LastModifiedBy }}</dd>
+                            {% endif %}
+                            {% if document.properties.LastModifiedDate %}
+                              <dt>Geaendert am</dt>
+                              <dd>{{ document.properties.LastModifiedDate }}</dd>
+                            {% endif %}
+                            {% if document.properties.License %}
+                              <dt>Lizenz</dt>
+                              <dd>{{ document.properties.License }}</dd>
+                            {% endif %}
+                            {% if document.program_version %}
+                              <dt>FreeCAD-Version</dt>
+                              <dd>{{ document.program_version }}</dd>
+                            {% endif %}
+                          </dl>
+                        {% else %}
+                          <div class="empty-state">Keine FreeCAD-Metadaten extrahiert.</div>
+                        {% endif %}
+                      {% endwith %}
+                      {% with freecadcmd=revision.extracted_metadata.freecadcmd %}
+                        {% if freecadcmd %}
+                          <h5>Ausgelesene Objekte</h5>
+                          {% if freecadcmd.objects %}
+                            <p>Exportierbare Objekte:</p>
                             <ul>
-                              {% for property in varset.properties %}
-                                <li>{{ property.name }} = {{ property.value }} ({{ property.type }})</li>
+                              {% for object in freecadcmd.objects %}
+                                <li>{{ object.label }} ({{ object.name }}, {{ object.type }})</li>
                               {% endfor %}
                             </ul>
-                          </li>
-                        {% endfor %}
-                      </ul>
-                    {% endif %}
-                  {% endif %}
-                {% endwith %}
-              </details>
+                          {% endif %}
+                          {% if freecadcmd.varsets %}
+                            <p>VarSets:</p>
+                            <ul>
+                              {% for varset in freecadcmd.varsets %}
+                                <li>
+                                  {{ varset.label }} ({{ varset.name }})
+                                  <ul>
+                                    {% for property in varset.properties %}
+                                      <li>{{ property.name }} = {{ property.value }} ({{ property.type }})</li>
+                                    {% endfor %}
+                                  </ul>
+                                </li>
+                              {% endfor %}
+                            </ul>
+                          {% endif %}
+                        {% endif %}
+                      {% endwith %}
+                  </div>
+                </div>
+              </div>
             </td>
             <td>
               {% if can_upload %}
                 <div class="inline-actions">
                   <form method="post" action="{% url 'plm:create_revision_inspect_job' revision.id %}">
                     {% csrf_token %}
-                    <button type="submit">Analyse starten</button>
+                    <button type="submit" title="Liest exportierbare Objekte und VarSets mit FreeCADCmd aus.">Objekte auslesen</button>
                   </form>
                   {% if revision.extracted_metadata.freecadcmd.objects %}
                     <a href="{% url 'plm:create_revision_export_job' revision.id %}">Export planen</a>

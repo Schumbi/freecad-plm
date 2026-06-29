@@ -115,7 +115,7 @@
     form {
       margin-top: var(--space-3);
     }
-    button {
+    button:not(.close):not(.plm-dialog-close) {
       background: var(--accent);
       border: 1px solid var(--accent-dark);
       border-radius: 6px;
@@ -125,7 +125,7 @@
       padding: 0.44rem 0.72rem;
       transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    button:hover {
+    button:not(.close):not(.plm-dialog-close):hover {
       background: var(--accent-dark);
     }
     button.secondary {
@@ -207,6 +207,63 @@
       margin: 0.5rem 0;
       padding: 0.55rem 0.65rem;
       white-space: pre-wrap;
+    }
+    .plm-dialog[hidden] {
+      display: none !important;
+    }
+    .plm-dialog {
+      align-items: flex-start;
+      background: rgba(24, 36, 43, 0.45);
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      left: 0;
+      overflow: auto;
+      padding: 6vh var(--space-4);
+      position: fixed;
+      right: 0;
+      top: 0;
+      z-index: 1050;
+    }
+    .plm-dialog-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 60px rgba(24, 36, 43, 0.24);
+      max-width: 58rem;
+      width: min(100%, 58rem);
+    }
+    .plm-dialog-panel.wide {
+      max-width: 72rem;
+      width: min(100%, 72rem);
+    }
+    .plm-dialog-header {
+      align-items: center;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+    }
+    .plm-dialog-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .plm-dialog-body {
+      max-height: 72vh;
+      overflow: auto;
+      padding: var(--space-4);
+    }
+    .plm-dialog-close {
+      background: transparent;
+      border: 0;
+      color: var(--muted);
+      font-size: 1.5rem;
+      line-height: 1;
+      padding: 0.1rem 0.3rem;
+    }
+    .plm-dialog-close:hover {
+      color: var(--text);
     }
     .metadata-list {
       margin: 0.5rem 0;
@@ -370,6 +427,7 @@
     .inline-actions form,
     .section-actions form,
     .page-header-actions form,
+    .plm-dialog form,
     td form,
     details form {
       background: transparent;
@@ -423,6 +481,41 @@
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
-  <script src="{% static 'plm/vendor/bootstrap4/js/bootstrap.bundle.min.js' %}"></script>
+  <script>
+    (function () {
+      function closeDialog(dialog) {
+        if (!dialog) return;
+        dialog.hidden = true;
+        document.body.classList.remove("modal-open");
+      }
+
+      document.addEventListener("click", function (event) {
+        var trigger = event.target.closest("[data-dialog-target]");
+        if (trigger) {
+          var dialog = document.querySelector(trigger.getAttribute("data-dialog-target"));
+          if (dialog) {
+            dialog.hidden = false;
+            document.body.classList.add("modal-open");
+          }
+          return;
+        }
+
+        if (event.target.matches("[data-dialog-close]")) {
+          closeDialog(event.target.closest(".plm-dialog"));
+          return;
+        }
+
+        if (event.target.classList.contains("plm-dialog")) {
+          closeDialog(event.target);
+        }
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          closeDialog(document.querySelector(".plm-dialog:not([hidden])"));
+        }
+      });
+    }());
+  </script>
 </body>
 </html>

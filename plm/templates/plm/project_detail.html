@@ -16,20 +16,36 @@
         <div class="section-actions">
           <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe anlegen</a>
         </div>
-        <details class="panel mt-3">
-          <summary>Projektstand aus ZIP importieren</summary>
-          <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
-            {% csrf_token %}
-            {{ snapshot_form.name.label_tag }}
-            {{ snapshot_form.name }}
-            {{ snapshot_form.file.label_tag }}
-            {{ snapshot_form.file }}
-            {% if snapshot_form.file.errors %}
-              <div class="errors">{{ snapshot_form.file.errors }}</div>
-            {% endif %}
-            <button type="submit">Projektstand importieren</button>
-          </form>
-        </details>
+      {% endif %}
+
+      <div class="section-header">
+        <h2>Teile und Baugruppen</h2>
+      </div>
+      {% if parts %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nummer</th>
+                <th>Name</th>
+                <th>Typ</th>
+                <th>Revisionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for part in parts %}
+                <tr>
+                  <td><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
+                  <td>{{ part.name }}</td>
+                  <td>{{ part.get_category_display }}</td>
+                  <td>{{ part.revisions.count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state">Noch keine Teile oder Baugruppen vorhanden.</div>
       {% endif %}
     </div>
     <aside class="properties-panel">
@@ -38,38 +54,24 @@
   </div>
 
   <div class="section-header">
-    <h2>Teile und Baugruppen</h2>
-  </div>
-  {% if parts %}
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Nummer</th>
-            <th>Name</th>
-            <th>Typ</th>
-            <th>Revisionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for part in parts %}
-            <tr>
-              <td><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
-              <td>{{ part.name }}</td>
-              <td>{{ part.get_category_display }}</td>
-              <td>{{ part.revisions.count }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <div class="empty-state">Noch keine Teile oder Baugruppen vorhanden.</div>
-  {% endif %}
-
-  <div class="section-header">
     <h2>Projektstaende</h2>
   </div>
+  {% if can_create_part %}
+    <details class="panel">
+      <summary>Projektstand aus ZIP importieren</summary>
+      <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ snapshot_form.name.label_tag }}
+        {{ snapshot_form.name }}
+        {{ snapshot_form.file.label_tag }}
+        {{ snapshot_form.file }}
+        {% if snapshot_form.file.errors %}
+          <div class="errors">{{ snapshot_form.file.errors }}</div>
+        {% endif %}
+        <button type="submit">Projektstand importieren</button>
+      </form>
+    </details>
+  {% endif %}
   {% if snapshots %}
     <div class="table-wrap">
       <table>
