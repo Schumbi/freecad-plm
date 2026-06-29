@@ -45,6 +45,7 @@ from .services import (
 )
 from .freecadcmd import (
     create_export_job,
+    freecadcmd_command,
     process_export_job,
     with_flatpak_worker_options,
     with_png_gui_command,
@@ -1433,6 +1434,23 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
             ],
             job,
         )
+
+        self.assertIn("--command=FreeCAD", command)
+        self.assertNotIn("--command=FreeCADCmd", command)
+
+    def test_png_default_flatpak_fallback_uses_gui_binary(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        with (
+            patch("plm.freecadcmd.shutil.which") as which,
+            override_settings(FREECADCMD_COMMAND="FreeCADCmd"),
+        ):
+            which.side_effect = lambda name: "/usr/bin/flatpak" if name == "flatpak" else None
+            command = freecadcmd_command(job)
 
         self.assertIn("--command=FreeCAD", command)
         self.assertNotIn("--command=FreeCADCmd", command)

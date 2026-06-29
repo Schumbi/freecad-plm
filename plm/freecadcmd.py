@@ -126,6 +126,31 @@ def export_objects(doc, spec, output_dir):
 def create_png_views(doc, spec, output_dir):
     import FreeCADGui as Gui
 
+    shape_objects = []
+    for obj in doc.Objects:
+        shape = getattr(obj, "Shape", None)
+        has_shape = shape is not None and not getattr(shape, "isNull", lambda: True)()
+        view_object = getattr(obj, "ViewObject", None)
+        if view_object is not None:
+            try:
+                view_object.Visibility = bool(has_shape)
+                if has_shape:
+                    if hasattr(view_object, "DisplayMode"):
+                        view_object.DisplayMode = "Flat Lines"
+                    if hasattr(view_object, "ShapeColor"):
+                        view_object.ShapeColor = (0.72, 0.76, 0.80, 0.0)
+                    if hasattr(view_object, "LineColor"):
+                        view_object.LineColor = (0.12, 0.16, 0.18, 0.0)
+                    if hasattr(view_object, "LineWidth"):
+                        view_object.LineWidth = 2.0
+            except Exception:
+                pass
+        if has_shape:
+            shape_objects.append(obj)
+    if not shape_objects:
+        raise RuntimeError("Keine sichtbaren Shape-Objekte fuer PNG-Ansichten gefunden.")
+
+    Gui.updateGui()
     view = Gui.ActiveDocument.ActiveView
     view_methods = {
         "front": "viewFront",
@@ -139,7 +164,9 @@ def create_png_views(doc, spec, output_dir):
     artifacts = []
     for name, method_name in view_methods.items():
         getattr(view, method_name)()
+        Gui.updateGui()
         view.fitAll()
+        Gui.updateGui()
         path = output_dir / f"{spec['revision_code']}-{name}.png"
         view.saveImage(str(path), 1600, 1200, "White")
         artifacts.append({"path": str(path), "artifact_type": "png", "view_name": name})
@@ -375,7 +402,7 @@ def freecadcmd_command(job=None):
         "org.freecad.FreeCAD",
     ]
     if configured == "FreeCADCmd" and shutil.which("flatpak"):
-        return flatpak_command
+        return with_png_gui_command(flatpak_command, job)
 
     raise RuntimeError(f"FreeCADCmd wurde nicht gefunden: {configured}")
 
