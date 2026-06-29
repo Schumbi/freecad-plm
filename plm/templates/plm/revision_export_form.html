@@ -4,22 +4,28 @@
   <a class="back-link" href="{% url 'plm:part_detail' revision.part.id %}">Zurueck zu {{ revision.part.number }}</a>
   <div class="page-header">
     <div class="page-header-main">
+      <span class="page-kicker">{{ revision.part.number }} - {{ revision.revision_code }}</span>
       <h1>Export planen</h1>
-      <p class="lead-text">{{ revision.part.number }} {{ revision.revision_code }}</p>
+      <p class="lead-text">Exportformat und ausgelesene FreeCAD-Objekte fuer den naechsten Worker-Lauf auswaehlen.</p>
     </div>
   </div>
 
-  <form method="post">
-    {% csrf_token %}
-    {% for field in form %}
-      <p>
-        {{ field.label_tag }}
-        {{ field }}
-        {% if field.errors %}
-          <span class="errors">{{ field.errors }}</span>
-        {% endif %}
-      </p>
-    {% endfor %}
-    <button type="submit">Exportjob anlegen</button>
-  </form>
+  <div class="data-card">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <p>
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}
+            <span class="errors">{{ field.errors }}</span>
+          {% endif %}
+        </p>
+      {% endfor %}
+      <div class="toolbar-group">
+        <button type="submit">Exportjob anlegen</button>
+        <a class="btn btn-outline-secondary" href="{% url 'plm:part_detail' revision.part.id %}">Abbrechen</a>
+      </div>
+    </form>
+  </div>
 {% endblock %}

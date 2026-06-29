@@ -4,32 +4,37 @@
   <a class="back-link" href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a>
   <div class="page-header">
     <div class="page-header-main">
+      <span class="page-kicker">{{ part.project.code }} - {{ part.number }}</span>
       <h1>Revisionen vergleichen</h1>
-      <p class="lead-text">{{ part.number }} - {{ part.name }}</p>
+      <p class="lead-text">{{ part.name }}</p>
     </div>
   </div>
 
-  <form method="get">
-    <p>
-      <label for="left">Linke Revision</label>
-      <select id="left" name="left">
-        <option value="">-</option>
-        {% for revision in revisions %}
-          <option value="{{ revision.id }}"{% if left_revision.id == revision.id %} selected{% endif %}>{{ revision.revision_code }}</option>
-        {% endfor %}
-      </select>
-    </p>
-    <p>
-      <label for="right">Rechte Revision</label>
-      <select id="right" name="right">
-        <option value="">-</option>
-        {% for revision in revisions %}
-          <option value="{{ revision.id }}"{% if right_revision.id == revision.id %} selected{% endif %}>{{ revision.revision_code }}</option>
-        {% endfor %}
-      </select>
-    </p>
-    <button type="submit">Vergleichen</button>
-  </form>
+  <div class="toolbar">
+    <form method="get">
+      <div class="toolbar-group">
+        <p>
+          <label for="left">Linke Revision</label>
+          <select id="left" name="left">
+            <option value="">-</option>
+            {% for revision in revisions %}
+              <option value="{{ revision.id }}"{% if left_revision.id == revision.id %} selected{% endif %}>{{ revision.revision_code }}</option>
+            {% endfor %}
+          </select>
+        </p>
+        <p>
+          <label for="right">Rechte Revision</label>
+          <select id="right" name="right">
+            <option value="">-</option>
+            {% for revision in revisions %}
+              <option value="{{ revision.id }}"{% if right_revision.id == revision.id %} selected{% endif %}>{{ revision.revision_code }}</option>
+            {% endfor %}
+          </select>
+        </p>
+        <button type="submit">Vergleichen</button>
+      </div>
+    </form>
+  </div>
 
   {% if left_revision and right_revision %}
     <div class="section-header">
@@ -37,20 +42,26 @@
     </div>
     {% if comparisons %}
       {% for comparison in comparisons %}
-        <h3>{{ comparison.view_name }}</h3>
-        <div class="compare-grid">
-          <figure>
-            <img src="{% url 'plm:download_revision_artifact' comparison.left.id %}?inline=1" alt="{{ left_revision.revision_code }} {{ comparison.view_name }}">
-            <figcaption>{{ left_revision.revision_code }}</figcaption>
-          </figure>
-          <figure>
-            <img src="{% url 'plm:download_revision_artifact' comparison.right.id %}?inline=1" alt="{{ right_revision.revision_code }} {{ comparison.view_name }}">
-            <figcaption>{{ right_revision.revision_code }}</figcaption>
-          </figure>
-        </div>
+        <section class="data-card">
+          <div class="section-header mt-0">
+            <h3>{{ comparison.view_name }}</h3>
+          </div>
+          <div class="compare-grid">
+            <figure>
+              <img src="{% url 'plm:download_revision_artifact' comparison.left.id %}?inline=1" alt="{{ left_revision.revision_code }} {{ comparison.view_name }}">
+              <figcaption>{{ left_revision.revision_code }}</figcaption>
+            </figure>
+            <figure>
+              <img src="{% url 'plm:download_revision_artifact' comparison.right.id %}?inline=1" alt="{{ right_revision.revision_code }} {{ comparison.view_name }}">
+              <figcaption>{{ right_revision.revision_code }}</figcaption>
+            </figure>
+          </div>
+        </section>
       {% endfor %}
     {% else %}
-      <p>Keine gleichnamigen PNG-Ansichten fuer diese Revisionen gefunden.</p>
+      <div class="empty-state">Keine gleichnamigen PNG-Ansichten fuer diese Revisionen gefunden.</div>
     {% endif %}
+  {% else %}
+    <div class="empty-state">Zwei Revisionen auswaehlen, um vorhandene PNG-Ansichten nebeneinander zu vergleichen.</div>
   {% endif %}
 {% endblock %}

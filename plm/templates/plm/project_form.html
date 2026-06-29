@@ -6,23 +6,35 @@
   {% else %}
     <a class="back-link" href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a>
   {% endif %}
+
   <div class="page-header">
     <div class="page-header-main">
+      <span class="page-kicker">Projekt</span>
       <h1>{{ title|default:"Neues Projekt" }}</h1>
+      <p class="lead-text">Status, Datum und Beschreibung fuer den Projektkontext pflegen.</p>
     </div>
   </div>
 
-  <form method="post">
-    {% csrf_token %}
-    {% for field in form %}
-      <p>
-        {{ field.label_tag }}
-        {{ field }}
-        {% if field.errors %}
-          <span class="errors">{{ field.errors }}</span>
+  <div class="data-card">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <p>
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}
+            <span class="errors">{{ field.errors }}</span>
+          {% endif %}
+        </p>
+      {% endfor %}
+      <div class="toolbar-group">
+        <button type="submit">{{ submit_label|default:"Anlegen" }}</button>
+        {% if project %}
+          <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Abbrechen</a>
+        {% else %}
+          <a class="btn btn-outline-secondary" href="{% url 'plm:project_list' %}">Abbrechen</a>
         {% endif %}
-      </p>
-    {% endfor %}
-    <button type="submit">{{ submit_label|default:"Anlegen" }}</button>
-  </form>
+      </div>
+    </form>
+  </div>
 {% endblock %}

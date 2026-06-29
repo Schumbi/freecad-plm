@@ -3,8 +3,9 @@
 {% block content %}
   <div class="page-header">
     <div class="page-header-main">
+      <span class="page-kicker">Arbeitsbereich</span>
       <h1>Projekte</h1>
-      <p class="lead-text">Projektuebersicht mit Status, Datum und Beschreibung.</p>
+      <p class="lead-text">Aktive Entwicklungsprojekte mit Teilen, Baugruppen und Projektstaenden.</p>
     </div>
     {% if can_create_project %}
       <div class="page-header-actions">
@@ -12,30 +13,44 @@
       </div>
     {% endif %}
   </div>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <input class="filter-input" type="search" placeholder="Projekte filtern" disabled>
+      <span class="muted">{{ projects|length }} aktive Projekte</span>
+    </div>
+    <div class="toolbar-group">
+      <span class="status-badge status-running">Laufend</span>
+      <span class="status-badge status-important">Wichtig</span>
+      <span class="status-badge status-order">Auftrag</span>
+    </div>
+  </div>
+
   {% if projects %}
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Datum</th>
-            <th>Beschreibung</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for project in projects %}
-            <tr>
-              <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></td>
-              <td>{{ project.name }}</td>
-              <td>{{ project.get_status_display }}</td>
-              <td>{{ project.project_date|date:"d.m.Y" }}</td>
-              <td>{{ project.description }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="object-list">
+      {% for project in projects %}
+        <article class="object-row">
+          <div>
+            <a class="object-title" href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a>
+            <div class="object-meta">{{ project.project_date|date:"d.m.Y" }}</div>
+          </div>
+          <div>
+            <a class="object-title" href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a>
+            <div class="object-meta">{{ project.description|default:"Keine Beschreibung"|truncatechars:110 }}</div>
+          </div>
+          <div>
+            <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
+          </div>
+          <div>
+            <span class="stat-value">{{ project.parts.count }}</span>
+            <span class="stat-label">Teile</span>
+          </div>
+          <div>
+            <span class="stat-value">{{ project.snapshots.count }}</span>
+            <span class="stat-label">Staende</span>
+          </div>
+        </article>
+      {% endfor %}
     </div>
   {% else %}
     <div class="empty-state">Noch keine Projekte vorhanden.</div>

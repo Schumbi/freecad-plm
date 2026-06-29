@@ -1089,9 +1089,11 @@ class RolePermissionTests(TestCase):
         response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
 
         self.assertContains(response, 'data-dialog-target="#notes-')
+        self.assertContains(response, 'data-dialog-target="#revision-properties-')
         self.assertContains(response, 'data-dialog-target="#freecad-')
         self.assertContains(response, 'class="plm-dialog"')
         self.assertContains(response, "hidden")
+        self.assertNotContains(response, "?properties_revision=")
         self.assertNotContains(response, "<summary>Anmerkungen</summary>")
         self.assertNotContains(response, "<summary>Metadaten</summary>")
 

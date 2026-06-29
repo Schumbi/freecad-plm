@@ -4,40 +4,39 @@
   <a class="back-link" href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a>
   <div class="page-header">
     <div class="page-header-main">
+      <span class="page-kicker">{{ part.number }} - {{ part.name }}</span>
       <h1>PLMRevision pruefen</h1>
-      <p class="lead-text">
-        Die hochgeladene Datei passt nicht zur naechsten PLM-Revision fuer
-        {{ part.number }} - {{ part.name }}.
-      </p>
+      <p class="lead-text">Die hochgeladene Datei passt nicht zur naechsten PLM-Revision. Du kannst eine PLM-normalisierte Kopie speichern oder den Upload verwerfen.</p>
     </div>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <tbody>
-        <tr>
-          <th>Datei</th>
-          <td>{{ pending.original_filename }}</td>
-        </tr>
-        <tr>
-          <th>PLM erwartet</th>
-          <td>{{ pending.expected }}</td>
-        </tr>
-        <tr>
-          <th>FCStd enthaelt</th>
-          <td>{% if pending.actual %}{{ pending.actual }}{% else %}keine PLMRevision{% endif %}</td>
-        </tr>
-        <tr>
-          <th>Original-SHA-256</th>
-          <td>{{ pending.original_sha256|slice:":12" }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <div class="object-layout">
+    <div class="object-main">
+      <div class="data-card">
+        <dl class="properties-list">
+          <dt>Datei</dt>
+          <dd>{{ pending.original_filename }}</dd>
+          <dt>PLM erwartet</dt>
+          <dd><span class="status-badge status-draft">{{ pending.expected }}</span></dd>
+          <dt>FCStd enthaelt</dt>
+          <dd>{% if pending.actual %}{{ pending.actual }}{% else %}keine PLMRevision{% endif %}</dd>
+          <dt>Original-SHA-256</dt>
+          <dd>{{ pending.original_sha256|slice:":12" }}</dd>
+        </dl>
+      </div>
 
-  <form method="post" action="{% url 'plm:confirm_revision_upload' part.id %}">
-    {% csrf_token %}
-    <button type="submit" name="action" value="normalize">An PLM anpassen und hochladen</button>
-    <button type="submit" name="action" value="discard" class="secondary">Upload verwerfen</button>
-  </form>
+      <form method="post" action="{% url 'plm:confirm_revision_upload' part.id %}">
+        {% csrf_token %}
+        <div class="toolbar-group">
+          <button type="submit" name="action" value="normalize">An PLM anpassen und hochladen</button>
+          <button type="submit" name="action" value="discard" class="secondary">Upload verwerfen</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="context-panel">
+      <h2>Was passiert?</h2>
+      <p class="muted">Beim Anpassen wird nur die PLMRevision in der hochgeladenen Kopie korrigiert. Der Original-Hash bleibt im Audit nachvollziehbar.</p>
+    </aside>
+  </div>
 {% endblock %}
