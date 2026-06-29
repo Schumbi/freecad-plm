@@ -6,6 +6,7 @@ storage/
 .pytest_cache/
 test-model/
 old
+session
 .env
 .env.*
 !.env.example
