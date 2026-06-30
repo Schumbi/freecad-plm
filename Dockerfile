@@ -1,6 +1,8 @@
 FROM python:3.12-slim
 
 ARG INSTALL_FREECAD=1
+ARG PLM_UID=1000
+ARG PLM_GID=1000
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -18,6 +20,9 @@ RUN apt-get update \
             freecad; \
     fi \
     && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid "$PLM_GID" plm \
+    && useradd --uid "$PLM_UID" --gid "$PLM_GID" --create-home --shell /usr/sbin/nologin plm
 
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt

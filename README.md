@@ -50,12 +50,13 @@ DJANGO_SECRET_KEY=replace-with-a-long-random-secret
 DJANGO_ALLOWED_HOSTS=plm.example.local,localhost,127.0.0.1
 POSTGRES_PASSWORD=replace-with-a-strong-database-password
 PLM_IMAGE=git.home.schumbi.de/ralf/freecad-plm:latest
+PLM_USER=plm
 PLM_UID=1000
 PLM_GID=1000
 FREECADCMD_COMMAND=freecadcmd
 ```
 
-`PLM_UID` und `PLM_GID` sollten zur User-/Gruppen-ID des Serverusers passen, der die lokalen Verzeichnisse besitzen soll. Die Werte zeigt `id` oder `id <user>`.
+Das Runtime-Image enthaelt den User `plm` mit UID/GID `1000:1000`. `PLM_USER` sollte deshalb auf `plm` bleiben. `PLM_UID` und `PLM_GID` dokumentieren, wem die lokalen Verzeichnisse auf dem Host gehoeren sollen; die Werte zeigt `id` oder `id <user>`.
 
 Lokale Verzeichnisse fuer Modelle/Uploads und statische Dateien anlegen:
 

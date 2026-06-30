@@ -15,7 +15,7 @@ services:
 
   web:
     image: ${PLM_IMAGE:?PLM_IMAGE muss in .env gesetzt sein}
-    user: "${PLM_UID:-1000}:${PLM_GID:-1000}"
+    user: "${PLM_USER:-plm}"
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -41,7 +41,7 @@ services:
 
   worker:
     image: ${PLM_IMAGE:?PLM_IMAGE muss in .env gesetzt sein}
-    user: "${PLM_UID:-1000}:${PLM_GID:-1000}"
+    user: "${PLM_USER:-plm}"
     command: >
       sh -c "while true; do
              python manage.py process_export_jobs --limit 1;
