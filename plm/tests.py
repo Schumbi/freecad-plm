@@ -1088,6 +1088,14 @@ class RolePermissionTests(TestCase):
         self.assertContains(response, "Eigenschaften")
         self.assertContains(response, "Laufend")
 
+    def test_project_detail_shows_edit_button_for_admin(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+
+        self.assertContains(response, "Projekt bearbeiten")
+        self.assertContains(response, reverse("plm:edit_project", args=[self.project.id]))
+
     def test_admin_can_edit_project_properties(self):
         self.client.force_login(self.admin)
 
