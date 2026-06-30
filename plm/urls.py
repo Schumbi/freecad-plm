@@ -15,6 +15,11 @@ urlpatterns = [
     ),
     path("projects/<int:project_id>/edit/", views.edit_project, name="edit_project"),
     path(
+        "projects/<int:project_id>/delete/",
+        views.delete_project,
+        name="delete_project",
+    ),
+    path(
         "projects/<int:project_id>/snapshots/upload/",
         views.upload_project_snapshot,
         name="upload_project_snapshot",

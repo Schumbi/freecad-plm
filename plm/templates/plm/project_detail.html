@@ -15,6 +15,7 @@
           <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
           {% if can_edit_project %}
             <a class="btn btn-outline-secondary" href="{% url 'plm:edit_project' project.id %}">Projekt bearbeiten</a>
+            <a class="btn btn-outline-danger" href="{% url 'plm:delete_project' project.id %}">Projekt loeschen</a>
           {% endif %}
           {% if can_create_part %}
             <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Teil/Baugruppe anlegen</a>

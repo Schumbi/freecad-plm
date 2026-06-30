@@ -140,6 +140,27 @@
       border-color: #bac6cc;
       color: #40505a;
     }
+    .btn-danger,
+    button.btn-danger:not(.plm-dialog-close) {
+      background: var(--danger);
+      border-color: #842d2d;
+      color: white;
+    }
+    .btn-danger:hover,
+    button.btn-danger:not(.plm-dialog-close):hover {
+      background: #842d2d;
+      border-color: #842d2d;
+      color: white;
+    }
+    .btn-outline-danger {
+      border-color: #d9aaa8;
+      color: var(--danger);
+    }
+    .btn-outline-danger:hover {
+      background: var(--danger-soft);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
     button.secondary,
     .btn-secondary-soft {
       background: #eef3f5;
@@ -392,6 +413,10 @@
     .panel,
     .data-card {
       padding: var(--space-4);
+    }
+    .danger-card {
+      border-color: #e7c3c3;
+      box-shadow: 0 10px 26px rgba(163, 58, 58, 0.08);
     }
     .panel > :last-child,
     .data-card > :last-child {

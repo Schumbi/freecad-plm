@@ -1496,6 +1496,120 @@ class RolePermissionTests(TestCase):
         self.assertNotContains(response, "FreeCAD-Version")
 
 
+class ProjectDeleteTests(TestCase):
+    def setUp(self):
+        self.media_root = TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.settings_override.enable()
+        call_command("setup_plm_roles", stdout=StringIO())
+        self.admin = get_user_model().objects.create_user(
+            username="delete-admin",
+            password="test",
+        )
+        self.admin.groups.add(Group.objects.get(name=ROLE_ADMIN))
+        self.editor = get_user_model().objects.create_user(
+            username="delete-editor",
+            password="test",
+        )
+        self.editor.groups.add(Group.objects.get(name=ROLE_EDITOR))
+        self.project = Project.objects.create(code="DEL", name="Loeschprojekt")
+        self.part = Part.objects.create(
+            project=self.project,
+            number="P-001",
+            name="Testteil",
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def create_project_content(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.admin)
+        artifact = RevisionArtifact.objects.create(
+            revision=revision,
+            artifact_type=RevisionArtifact.ArtifactType.PNG,
+            view_name="front",
+            file=ContentFile(b"\x89PNG\r\n\x1a\n", name="front.png"),
+            original_filename="front.png",
+            sha256="a" * 64,
+            size_bytes=8,
+        )
+        snapshot = ProjectSnapshot.objects.create(
+            project=self.project,
+            name="Stand",
+            created_by=self.admin,
+        )
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            path="Testteil.FCStd",
+            revision=revision,
+        )
+        Checkout.objects.create(
+            part=self.part,
+            base_revision=revision,
+            checked_out_by=self.admin,
+        )
+        Annotation.objects.create(
+            project=self.project,
+            part=self.part,
+            revision=revision,
+            text="Pruefen",
+            created_by=self.admin,
+        )
+        return revision, artifact
+
+    def test_admin_can_delete_project_with_contents_and_files(self):
+        revision, artifact = self.create_project_content()
+        revision_path = Path(revision.file.path)
+        artifact_path = Path(artifact.file.path)
+        self.assertTrue(revision_path.exists())
+        self.assertTrue(artifact_path.exists())
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:delete_project", args=[self.project.id]),
+            {"confirmation": "DEL"},
+        )
+
+        self.assertRedirects(response, reverse("plm:project_list"))
+        self.assertFalse(Project.objects.filter(id=self.project.id).exists())
+        self.assertFalse(Part.objects.exists())
+        self.assertFalse(Revision.objects.exists())
+        self.assertFalse(RevisionArtifact.objects.exists())
+        self.assertFalse(ProjectSnapshot.objects.exists())
+        self.assertFalse(Checkout.objects.exists())
+        self.assertFalse(Annotation.objects.exists())
+        self.assertFalse(revision_path.exists())
+        self.assertFalse(artifact_path.exists())
+        event = AuditEvent.objects.get(action=AuditEvent.Action.PROJECT_DELETED)
+        self.assertEqual(event.metadata["project_code"], "DEL")
+        self.assertEqual(event.metadata["parts"], 1)
+
+    def test_project_delete_requires_exact_code(self):
+        self.create_project_content()
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:delete_project", args=[self.project.id]),
+            {"confirmation": "WRONG"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Project.objects.filter(id=self.project.id).exists())
+        self.assertTrue(Revision.objects.exists())
+
+    def test_editor_cannot_delete_project(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:delete_project", args=[self.project.id]),
+            {"confirmation": "DEL"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Project.objects.filter(id=self.project.id).exists())
+
+
 class FreeCADCmdJobTests(TestCase):
     def setUp(self):
         self.media_root = TemporaryDirectory()

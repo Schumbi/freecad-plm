@@ -1,0 +1,31 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <a class="back-link" href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a>
+
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">Projekt loeschen</span>
+      <h1>{{ project.code }} - {{ project.name }}</h1>
+      <p class="lead-text">Dieses Projekt und alle enthaltenen Teile, Revisionen, Projektstaende, Anmerkungen, Exportjobs und Artefakte werden dauerhaft entfernt.</p>
+    </div>
+  </div>
+
+  <div class="data-card danger-card">
+    <h2>Loeschen bestaetigen</h2>
+    <p>
+      Zur Sicherheit bitte den Projektcode <strong>{{ project.code }}</strong> eingeben.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <p>
+        <label for="confirmation">Projektcode</label>
+        <input id="confirmation" name="confirmation" autocomplete="off" required>
+      </p>
+      <div class="toolbar-group">
+        <button class="btn btn-danger" type="submit">Projekt dauerhaft loeschen</button>
+        <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

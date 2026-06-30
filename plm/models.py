@@ -361,6 +361,7 @@ class AuditEvent(models.Model):
     class Action(models.TextChoices):
         PROJECT_CREATED = "project_created", "Projekt angelegt"
         PROJECT_UPDATED = "project_updated", "Projekt geaendert"
+        PROJECT_DELETED = "project_deleted", "Projekt geloescht"
         PART_CREATED = "part_created", "Teil angelegt"
         REVISION_UPLOADED = "revision_uploaded", "Revision hochgeladen"
         REVISION_RELEASED = "revision_released", "Revision freigegeben"

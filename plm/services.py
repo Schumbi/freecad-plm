@@ -20,10 +20,12 @@ from .models import (
     Annotation,
     AuditEvent,
     Checkout,
+    ExportJob,
     Part,
     ProjectSnapshot,
     ProjectSnapshotEntry,
     Revision,
+    RevisionArtifact,
 )
 
 
@@ -338,6 +340,57 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
     )
     snapshot.import_summary = import_summary
     return snapshot
+
+
+@transaction.atomic
+def delete_project_tree(project, actor):
+    project = (
+        type(project)
+        .objects.select_for_update()
+        .prefetch_related("parts__revisions__artifacts")
+        .get(pk=project.pk)
+    )
+    summary = {
+        "project_id": project.id,
+        "project_code": project.code,
+        "parts": project.parts.count(),
+        "revisions": Revision.objects.filter(part__project=project).count(),
+        "artifacts": RevisionArtifact.objects.filter(revision__part__project=project).count(),
+        "snapshots": project.snapshots.count(),
+        "annotations": project.annotations.count(),
+        "checkouts": Checkout.objects.filter(part__project=project).count(),
+    }
+    project_label = str(project)
+
+    revisions = Revision.objects.filter(part__project=project)
+    revision_files = [revision.file for revision in revisions if revision.file]
+    artifact_files = [
+        artifact.file
+        for artifact in RevisionArtifact.objects.filter(revision__part__project=project)
+        if artifact.file
+    ]
+
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.PROJECT_DELETED,
+        object_repr=project_label,
+        metadata=summary,
+    )
+
+    Annotation.objects.filter(project=project).delete()
+    Checkout.objects.filter(part__project=project).delete()
+    ProjectSnapshotEntry.objects.filter(snapshot__project=project).delete()
+    ProjectSnapshot.objects.filter(project=project).delete()
+    RevisionArtifact.objects.filter(revision__part__project=project).delete()
+    ExportJob.objects.filter(revision__part__project=project).delete()
+    revisions.delete()
+    project.parts.all().delete()
+    project.delete()
+
+    for field_file in [*artifact_files, *revision_files]:
+        field_file.delete(save=False)
+
+    return summary
 
 
 def revision_reference_files(revision):

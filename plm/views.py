@@ -42,6 +42,7 @@ from .permissions import (
 from .services import (
     PLMRevisionConflict,
     create_revision_from_upload,
+    delete_project_tree,
     import_project_snapshot,
     next_part_number,
     release_revision,
@@ -196,6 +197,35 @@ def edit_project(request, project_id):
             "title": f"Eigenschaften: {project.code}",
             "submit_label": "Speichern",
         },
+        status=400 if request.method == "POST" else 200,
+    )
+
+
+@login_required
+def delete_project(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if not is_plm_admin(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Loeschen von Projekten.")
+
+    if request.method == "POST":
+        confirmation = request.POST.get("confirmation", "").strip()
+        if confirmation == project.code:
+            project_code = project.code
+            summary = delete_project_tree(project, request.user)
+            messages.success(
+                request,
+                (
+                    f"Projekt {project_code} wurde geloescht "
+                    f"({summary['parts']} Teile, {summary['revisions']} Revisionen)."
+                ),
+            )
+            return redirect("plm:project_list")
+        messages.error(request, "Der eingegebene Projektcode stimmt nicht.")
+
+    return render(
+        request,
+        "plm/project_confirm_delete.html",
+        {"project": project},
         status=400 if request.method == "POST" else 200,
     )
 
