@@ -131,12 +131,13 @@ def validate_revision_code_argument(revision_code):
     return revision_code
 
 
-def next_part_number(project):
+def next_part_number(project, category=Part.Category.PART):
+    prefix = "A" if category == Part.Category.ASSEMBLY else "P"
     max_number = 0
     for number in project.parts.values_list("number", flat=True):
-        if len(number) == 5 and number.startswith("P-") and number[2:].isdigit():
+        if len(number) == 5 and number.startswith(f"{prefix}-") and number[2:].isdigit():
             max_number = max(max_number, int(number[2:]))
-    return f"P-{max_number + 1:03d}"
+    return f"{prefix}-{max_number + 1:03d}"
 
 
 def safe_snapshot_path(path):
@@ -155,13 +156,27 @@ def part_category_from_metadata(metadata):
 
 def part_identity_from_metadata(project, path, metadata):
     properties = metadata.get("freecad_document", {}).get("properties", {})
-    number = (properties.get("Id") or "").strip()
-    if not number:
-        number = PurePosixPath(path).stem
-
+    category = part_category_from_metadata(metadata)
+    freecad_id = (properties.get("Id") or "").strip()
     name = (properties.get("Label") or "").strip()
     if not name:
         name = PurePosixPath(path).stem
+
+    if freecad_id:
+        number = freecad_id
+    else:
+        existing_by_path = (
+            ProjectSnapshotEntry.objects.filter(snapshot__project=project, path=path)
+            .select_related("revision__part", "snapshot")
+            .order_by("-snapshot__created_at", "-id")
+            .first()
+        )
+        if existing_by_path:
+            return existing_by_path.revision.part, False
+        existing_by_name = project.parts.filter(name=name).order_by("id").first()
+        if existing_by_name:
+            return existing_by_name, False
+        number = next_part_number(project, category)
 
     if project.parts.filter(number=number).exists():
         return project.parts.get(number=number), False
@@ -170,7 +185,7 @@ def part_identity_from_metadata(project, path, metadata):
         project=project,
         number=number,
         name=name,
-        category=part_category_from_metadata(metadata),
+        category=category,
     )
     return part, True
 

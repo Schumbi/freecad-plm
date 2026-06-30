@@ -429,10 +429,13 @@ class RevisionUploadServiceTests(TestCase):
         self.assertEqual(snapshot.name, "Sommerrodelbahn-Chipbox")
         self.assertEqual(snapshot.entries.count(), 5)
         self.assertEqual(Revision.objects.count(), 5)
-        self.assertTrue(Part.objects.filter(number="Box").exists())
-        self.assertTrue(Part.objects.filter(number="Deckel").exists())
-        self.assertEqual(Part.objects.get(number="Chip").category, Part.Category.PART)
-        druck = Part.objects.get(number="Druck")
+        self.assertEqual(Part.objects.get(name="Chip").number, "P-002")
+        self.assertEqual(Part.objects.get(name="Box").number, "P-003")
+        self.assertEqual(Part.objects.get(name="Deckel").number, "P-004")
+        self.assertEqual(Part.objects.get(name="Druck").number, "A-001")
+        self.assertEqual(Part.objects.get(name="Zusammenbau").number, "A-002")
+        self.assertEqual(Part.objects.get(name="Chip").category, Part.Category.PART)
+        druck = Part.objects.get(name="Druck")
         self.assertEqual(druck.category, Part.Category.ASSEMBLY)
         druck_revision = druck.revisions.get()
         self.assertEqual(
@@ -466,6 +469,52 @@ class RevisionUploadServiceTests(TestCase):
         self.assertEqual(Revision.objects.count(), 5)
         self.assertEqual(second.import_summary["created_revisions"], 0)
         self.assertEqual(second.import_summary["reused_revisions"], 5)
+
+    def test_import_project_snapshot_uses_freecad_id_as_part_number(self):
+        import_project_snapshot(
+            self.project,
+            make_project_zip_upload(
+                "identified.zip",
+                members={
+                    "Box.FCStd": make_fcstd_bytes(
+                        "Box",
+                        freecad_id="FC-BOX-001",
+                    ),
+                    "Druck.FCStd": make_fcstd_bytes(
+                        "Druck",
+                        freecad_id="ASM-DRUCK-001",
+                        object_type="Assembly::AssemblyObject",
+                    ),
+                },
+            ),
+            self.user,
+        )
+
+        self.assertEqual(Part.objects.get(name="Box").number, "FC-BOX-001")
+        self.assertEqual(Part.objects.get(name="Druck").number, "ASM-DRUCK-001")
+
+    def test_import_project_snapshot_numbers_parts_and_assemblies_separately(self):
+        project = Project.objects.create(code="EMPTY", name="Leeres Projekt")
+
+        import_project_snapshot(
+            project,
+            make_project_zip_upload(
+                "mixed.zip",
+                members={
+                    "Box.FCStd": make_fcstd_bytes("Box"),
+                    "Deckel.FCStd": make_fcstd_bytes("Deckel"),
+                    "Druck.FCStd": make_fcstd_bytes(
+                        "Druck",
+                        object_type="Assembly::AssemblyObject",
+                    ),
+                },
+            ),
+            self.user,
+        )
+
+        self.assertEqual(project.parts.get(name="Box").number, "P-001")
+        self.assertEqual(project.parts.get(name="Deckel").number, "P-002")
+        self.assertEqual(project.parts.get(name="Druck").number, "A-001")
 
     def test_import_project_snapshot_creates_revision_for_changed_member_only(self):
         import_project_snapshot(
@@ -502,7 +551,7 @@ class RevisionUploadServiceTests(TestCase):
         )
 
         self.assertEqual(Revision.objects.count(), 6)
-        self.assertEqual(Part.objects.get(number="Box").revisions.count(), 2)
+        self.assertEqual(Part.objects.get(name="Box").revisions.count(), 2)
         self.assertEqual(
             second.entries.get(path="Box.FCStd").revision.revision_code,
             "R0002",
@@ -890,7 +939,7 @@ class RevisionUploadViewTests(TestCase):
             name="Druckstand",
         )
         druck_revision = Revision.objects.get(
-            part__number="Druck",
+            part__name="Druck",
             extracted_metadata__freecad_document__document_kind="assembly",
         )
         AuditEvent.objects.all().delete()
@@ -1805,7 +1854,7 @@ class AddonApiWorkflowTests(TestCase):
             self.user,
             name="Arbeitsstand",
         )
-        root_revision = Revision.objects.get(part__number="Druck")
+        root_revision = Revision.objects.get(part__name="Druck")
 
         response = self.post_json(
             reverse("plm:api_revision_checkout", args=[root_revision.id]),
@@ -1815,7 +1864,7 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 201)
         manifest = response.json()["manifest"]
         self.assertEqual(manifest["snapshot"]["id"], snapshot.id)
-        self.assertEqual(manifest["part"]["number"], "Druck")
+        self.assertEqual(manifest["part"]["number"], "A-001")
         self.assertEqual(
             sorted(item["path"] for item in manifest["files"]),
             ["Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"],
