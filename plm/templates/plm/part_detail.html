@@ -28,14 +28,6 @@
           <input class="filter-input" type="search" placeholder="Revisionen filtern" disabled>
           <span class="muted">{{ revisions|length }} Revisionen</span>
         </div>
-        <div class="toolbar-group">
-          {% if can_upload %}
-            <form method="post" action="{% url 'plm:process_export_jobs_once' part.id %}">
-              {% csrf_token %}
-              <button type="submit">Wartende Jobs starten{% if queued_export_jobs_count %} ({{ queued_export_jobs_count }}){% endif %}</button>
-            </form>
-          {% endif %}
-        </div>
       </div>
 
       <div class="section-header">
@@ -83,17 +75,9 @@
                     <button type="button" data-dialog-target="#freecad-{{ revision.id }}">Metadaten</button>
                     <button type="button" data-dialog-target="#jobs-{{ revision.id }}">Jobs und Artefakte</button>
                     {% if can_upload %}
-                      <form method="post" action="{% url 'plm:create_revision_inspect_job' revision.id %}">
-                        {% csrf_token %}
-                        <button type="submit" title="Liest exportierbare Objekte und VarSets mit FreeCADCmd aus.">Objekte auslesen</button>
-                      </form>
                       {% if revision.extracted_metadata.freecadcmd.objects %}
                         <a href="{% url 'plm:create_revision_export_job' revision.id %}">Export planen</a>
                       {% endif %}
-                      <form method="post" action="{% url 'plm:create_revision_png_job' revision.id %}">
-                        {% csrf_token %}
-                        <button type="submit">PNG-Ansichten erzeugen</button>
-                      </form>
                     {% endif %}
                   </div>
                 </details>

@@ -671,7 +671,11 @@ class RevisionUploadViewTests(TestCase):
         revision = Revision.objects.get()
         self.assertEqual(revision.revision_code, "R0001")
         self.assertEqual(revision.created_by, self.user)
-        self.assertEqual(AuditEvent.objects.count(), 1)
+        self.assertEqual(
+            set(revision.export_jobs.values_list("job_type", flat=True)),
+            {ExportJob.JobType.INSPECT, ExportJob.JobType.PNG_VIEWS},
+        )
+        self.assertEqual(AuditEvent.objects.count(), 3)
 
     def test_duplicate_upload_shows_error_and_creates_no_new_revision(self):
         self.client.force_login(self.user)
@@ -751,6 +755,7 @@ class RevisionUploadViewTests(TestCase):
             "R0001",
         )
         self.assertTrue(revision.extracted_metadata["plm_revision"]["normalized"])
+        self.assertEqual(revision.export_jobs.count(), 2)
 
     def test_download_revision_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -1004,9 +1009,11 @@ class RevisionUploadViewTests(TestCase):
             reverse("plm:project_detail", args=[self.project.id]),
         )
         self.assertEqual(snapshot.entries.count(), 5)
+        self.assertEqual(ExportJob.objects.count(), 10)
         messages = list(response.wsgi_request._messages)
         self.assertIn("5 neue Revisionen", str(messages[0]))
         self.assertIn("0 unveraenderte Dateien", str(messages[0]))
+        self.assertIn("10 Analyse-/PNG-Jobs", str(messages[0]))
 
         response = self.client.get(
             reverse("plm:download_project_snapshot", args=[snapshot.id])
@@ -1234,6 +1241,7 @@ class RolePermissionTests(TestCase):
 
         self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
         self.assertEqual(Revision.objects.count(), 1)
+        self.assertEqual(ExportJob.objects.count(), 2)
 
     def test_upload_revision_stores_change_summary_as_notes(self):
         self.client.force_login(self.editor)
@@ -1249,6 +1257,7 @@ class RolePermissionTests(TestCase):
         self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
         revision = Revision.objects.get()
         self.assertEqual(revision.notes, "Bohrbild auf M4 angepasst.")
+        self.assertEqual(revision.export_jobs.count(), 2)
         self.assertEqual(
             AuditEvent.objects.get(action=AuditEvent.Action.REVISION_UPLOADED)
             .metadata["change_summary"],
@@ -1352,6 +1361,7 @@ class RolePermissionTests(TestCase):
         )
         self.assertEqual(part.revisions.count(), 1)
         self.assertEqual(part.revisions.get().revision_code, "R0001")
+        self.assertEqual(part.revisions.get().export_jobs.count(), 2)
 
     def test_empty_part_number_is_generated(self):
         self.client.force_login(self.editor)
@@ -1369,6 +1379,7 @@ class RolePermissionTests(TestCase):
         part = Part.objects.get(name="Automatisch nummeriert")
         self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
         self.assertEqual(part.number, "P-002")
+        self.assertEqual(part.revisions.get().export_jobs.count(), 2)
 
     def test_empty_part_number_uses_freecad_id_when_present(self):
         self.client.force_login(self.editor)
@@ -1387,6 +1398,7 @@ class RolePermissionTests(TestCase):
         self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
         self.assertEqual(part.name, "Testteil aus FreeCAD")
         self.assertEqual(part.revisions.count(), 1)
+        self.assertEqual(part.revisions.get().export_jobs.count(), 2)
 
     def test_empty_part_number_uses_next_available_p_number(self):
         Part.objects.create(project=self.project, number="P-010", name="Zehn")

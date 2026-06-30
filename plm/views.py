@@ -289,10 +289,15 @@ def upload_project_snapshot(request, project_id):
             summary = getattr(snapshot, "import_summary", {})
             created_revisions = summary.get("created_revisions", 0)
             reused_revisions = summary.get("reused_revisions", 0)
+            derivative_summary = prepare_revision_derivatives(
+                [entry.revision for entry in snapshot.entries.select_related("revision")],
+                request.user,
+            )
             message = (
                 f"Projektstand {snapshot.name} wurde importiert: "
                 f"{created_revisions} neue Revisionen, "
-                f"{reused_revisions} unveraenderte Dateien wiederverwendet."
+                f"{reused_revisions} unveraenderte Dateien wiederverwendet. "
+                f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
             )
             if created_revisions:
                 messages.success(request, message)
@@ -329,6 +334,7 @@ def create_part(request, project_id):
     if request.method == "POST":
         form = PartForm(request.POST, request.FILES, project=project)
         if form.is_valid():
+            revision = None
             try:
                 with transaction.atomic():
                     part = form.save(commit=False)
@@ -347,7 +353,7 @@ def create_part(request, project_id):
                             "category": part.category,
                         },
                     )
-                    create_revision_from_upload(
+                    revision = create_revision_from_upload(
                         part=part,
                         uploaded_file=form.cleaned_data["file"],
                         created_by=request.user,
@@ -357,9 +363,13 @@ def create_part(request, project_id):
             except ValidationError as exc:
                 form.add_error("file", exc)
             else:
+                derivative_summary = prepare_revision_derivatives([revision], request.user)
                 messages.success(
                     request,
-                    f"{part.number} wurde mit initialer Revision angelegt.",
+                    (
+                        f"{part.number} wurde mit initialer Revision angelegt. "
+                        f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
+                    ),
                 )
                 return redirect("plm:part_detail", part_id=part.id)
     else:
@@ -399,9 +409,6 @@ def part_detail(request, part_id):
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),
-            "queued_export_jobs_count": ExportJob.objects.filter(
-                status=ExportJob.Status.QUEUED
-            ).count(),
         },
     )
 
@@ -499,9 +506,13 @@ def upload_revision(request, part_id):
         except ValidationError as exc:
             form.add_error("file", exc)
         else:
+            derivative_summary = prepare_revision_derivatives([revision], request.user)
             messages.success(
                 request,
-                f"Revision {revision.revision_code} wurde hochgeladen.",
+                (
+                    f"Revision {revision.revision_code} wurde hochgeladen. "
+                    f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
+                ),
             )
             return redirect("plm:part_detail", part_id=part.id)
 
@@ -516,9 +527,6 @@ def upload_revision(request, part_id):
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),
-            "queued_export_jobs_count": ExportJob.objects.filter(
-                status=ExportJob.Status.QUEUED
-            ).count(),
         },
         status=400,
     )
@@ -563,9 +571,13 @@ def confirm_revision_upload(request, part_id):
     except ValidationError as exc:
         messages.error(request, exc.messages[0])
     else:
+        derivative_summary = prepare_revision_derivatives([revision], request.user)
         messages.success(
             request,
-            f"Revision {revision.revision_code} wurde an das PLM angepasst und hochgeladen.",
+            (
+                f"Revision {revision.revision_code} wurde an das PLM angepasst und hochgeladen. "
+                f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
+            ),
         )
     finally:
         clear_pending_revision_upload(request)
@@ -744,7 +756,37 @@ def revision_has_pending_png_job(revision):
     ).exists()
 
 
-def ensure_revision_png_views(revision, user):
+def revision_has_freecadcmd_metadata(revision):
+    return bool((revision.extracted_metadata or {}).get("freecadcmd"))
+
+
+def revision_has_pending_inspect_job(revision):
+    return revision.export_jobs.filter(
+        job_type=ExportJob.JobType.INSPECT,
+        status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING],
+    ).exists()
+
+
+def ensure_revision_inspect_job(revision, user, *, process_inline=True):
+    if revision_has_freecadcmd_metadata(revision):
+        return "ready"
+    if revision_has_pending_inspect_job(revision):
+        return "pending"
+
+    job = create_export_job(
+        revision=revision,
+        job_type=ExportJob.JobType.INSPECT,
+        created_by=user,
+    )
+    if process_inline and settings.PROCESS_EXPORT_JOBS_INLINE:
+        process_export_job(job)
+        revision.refresh_from_db()
+        job.refresh_from_db()
+        return "ready" if job.status == ExportJob.Status.SUCCEEDED else "failed"
+    return "queued"
+
+
+def ensure_revision_png_views(revision, user, *, process_inline=True):
     if revision_has_complete_png_views(revision):
         return "ready"
     if revision_has_pending_png_job(revision):
@@ -755,11 +797,28 @@ def ensure_revision_png_views(revision, user):
         job_type=ExportJob.JobType.PNG_VIEWS,
         created_by=user,
     )
-    if settings.PROCESS_EXPORT_JOBS_INLINE:
+    if process_inline and settings.PROCESS_EXPORT_JOBS_INLINE:
         process_export_job(job)
         job.refresh_from_db()
         return "ready" if job.status == ExportJob.Status.SUCCEEDED else "failed"
     return "queued"
+
+
+def prepare_revision_derivatives(revisions, user):
+    unique_revisions = {revision.id: revision for revision in revisions if revision}
+    summary = {"created_jobs": 0, "ready": 0, "failed": 0, "pending": 0}
+    for revision in unique_revisions.values():
+        before_jobs = ExportJob.objects.filter(revision=revision).count()
+        statuses = [
+            ensure_revision_inspect_job(revision, user, process_inline=False),
+            ensure_revision_png_views(revision, user, process_inline=False),
+        ]
+        after_jobs = ExportJob.objects.filter(revision=revision).count()
+        summary["created_jobs"] += max(after_jobs - before_jobs, 0)
+        summary["ready"] += statuses.count("ready")
+        summary["failed"] += statuses.count("failed")
+        summary["pending"] += statuses.count("pending") + statuses.count("queued")
+    return summary
 
 
 @login_required
