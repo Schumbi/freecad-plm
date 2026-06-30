@@ -41,9 +41,15 @@ Auf dem Server kann dann die Pull-Compose-Datei verwendet werden. In `.env` muss
 
 ```bash
 PLM_IMAGE=registry.example.local/freecad-plm:latest
+PLM_UID=1000
+PLM_GID=1000
+mkdir -p storage staticfiles
+sudo chown -R 1000:1000 storage staticfiles
 docker compose -f docker-compose.image.yml pull
 docker compose -f docker-compose.image.yml up -d
 ```
+
+`PLM_UID` und `PLM_GID` sollten zur User-/Gruppen-ID des Serverusers passen, der die lokalen Verzeichnisse besitzen soll. Die Werte zeigt `id` oder `id <user>`.
 
 Nach dem ersten Start:
 
