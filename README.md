@@ -48,6 +48,7 @@ In `.env` mindestens setzen:
 ```env
 DJANGO_SECRET_KEY=replace-with-a-long-random-secret
 DJANGO_ALLOWED_HOSTS=plm.example.local,localhost,127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=https://plm.example.local
 POSTGRES_PASSWORD=replace-with-a-strong-database-password
 PLM_IMAGE=git.home.schumbi.de/ralf/freecad-plm:latest
 PLM_USER=plm
@@ -79,6 +80,48 @@ Nach dem ersten Start:
 ```bash
 docker compose -f docker-compose.image.yml exec web python manage.py setup_plm_roles
 docker compose -f docker-compose.image.yml exec web python manage.py createsuperuser
+```
+
+### Betrieb Hinter Nginx
+
+Wenn Django hinter einem Reverse Proxy per HTTPS erreichbar ist, muessen die
+oeffentlichen Hosts und Origins in `.env` stehen:
+
+```env
+DJANGO_ALLOWED_HOSTS=jellyfin.schumbi.de,localhost,127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=https://jellyfin.schumbi.de
+PLM_HTTP_PORT=8000
+```
+
+Eine einfache nginx-Site fuer den lokalen Compose-Port:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name jellyfin.schumbi.de;
+
+    ssl_certificate /etc/letsencrypt/live/jellyfin.schumbi.de/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/jellyfin.schumbi.de/privkey.pem;
+
+    client_max_body_size 512m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+    }
+}
+```
+
+Nach Aenderungen an `.env` den Web-Container neu erstellen:
+
+```bash
+docker compose -f docker-compose.image.yml up -d --force-recreate web worker
 ```
 
 ### Image Manuell Bauen

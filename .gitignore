@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 db.sqlite3
 storage/
+staticfiles/
 .pytest_cache/
 test-model/
 old
