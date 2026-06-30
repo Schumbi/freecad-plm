@@ -1,0 +1,45 @@
+name: Build FreeCAD PLM Image
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  REGISTRY: git.home.schumbi.de/ralf
+  IMAGE_NAME: freecad-plm
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  build-image:
+    runs-on: arch
+    container:
+      image: git.home.schumbi.de/ralf/debian-docker-builder:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${{ env.REGISTRY }}" \
+            -u "${{ secrets.REGISTRY_USERNAME }}" \
+            --password-stdin
+
+      - name: Build image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          docker build \
+            --progress=plain \
+            --pull=false \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -t "${IMAGE}:latest" \
+            -t "${IMAGE}:${{ github.sha }}" \
+            .
+
+      - name: Push image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:${{ github.sha }}"

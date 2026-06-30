@@ -20,14 +20,7 @@ Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/>.
 
 Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker laufen aus demselben PLM-Image. Dieses Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd.
 
-Das Dockerfile fuer das Registry-Image liegt nicht in diesem App-Repo, sondern im Docker-Images-Repo:
-
-```text
-ssh://forgejo@home.schumbi.de/ralf/Docker-Images.git
-freecad-plm/Dockerfile
-```
-
-Der Forgejo-Workflow in diesem Repo baut daraus automatisch:
+Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut das Image bei jedem Push nach `main` oder `master` automatisch aus dem lokalen `Dockerfile` und veroeffentlicht:
 
 ```text
 git.home.schumbi.de/ralf/freecad-plm:latest
@@ -126,18 +119,14 @@ docker compose -f docker-compose.image.yml up -d --force-recreate web worker
 
 ### Image Manuell Bauen
 
-Normalerweise baut der Forgejo-Workflow im Docker-Images-Repo das Image. Manuell geht es dort so:
+Normalerweise baut der Forgejo-Workflow in diesem Repo das Image. Manuell geht es so:
 
 ```bash
-git clone ssh://forgejo@home.schumbi.de/ralf/Docker-Images.git /opt/Docker-Images
-cd /opt/Docker-Images/freecad-plm
-docker build \
-  --build-arg FREECAD_PLM_REF=main \
-  -t git.home.schumbi.de/ralf/freecad-plm:latest .
+git clone ssh://home.schumbi.de/ralf/freecad-plm.git /opt/freecad-plm-build
+cd /opt/freecad-plm-build
+docker build -t git.home.schumbi.de/ralf/freecad-plm:latest .
 docker push git.home.schumbi.de/ralf/freecad-plm:latest
 ```
-
-`FREECAD_PLM_REF` kann ein Branch, Tag oder Commit aus dem FreeCAD-PLM-Repo sein.
 
 ### Updates
 
