@@ -18,60 +18,100 @@ Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/>.
 
 ## Serverbetrieb Mit Docker Compose
 
-Der erste Serverpfad nutzt Docker Compose mit PostgreSQL, persistentem Media-Volume und separatem Worker. Das PLM-Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd, damit Web und Worker aus demselben Image gestartet werden koennen.
+Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker laufen aus demselben PLM-Image. Dieses Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd.
+
+Das Dockerfile fuer das Registry-Image liegt nicht in diesem App-Repo, sondern im Docker-Images-Repo:
+
+```text
+ssh://forgejo@home.schumbi.de/ralf/Docker-Images.git
+freecad-plm/Dockerfile
+```
+
+Der Forgejo-Workflow in diesem Repo baut daraus automatisch:
+
+```text
+git.home.schumbi.de/ralf/freecad-plm:latest
+git.home.schumbi.de/ralf/freecad-plm:<commit-sha>
+```
+
+### Server Mit Fertigem Image Starten
 
 ```bash
 git clone ssh://home.schumbi.de/ralf/freecad-plm.git /opt/freecad-plm
 cd /opt/freecad-plm
 cp .env.example .env
 $EDITOR .env
-docker compose up -d --build
 ```
 
-Vor produktiver Nutzung muessen in `.env` mindestens `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` und `POSTGRES_PASSWORD` angepasst werden. Die echte `.env` wird nicht committed. Der Worker verarbeitet Exportjobs in einer Schleife und nutzt `FreeCADCmd` aus dem Image.
+In `.env` mindestens setzen:
 
-Image fuer ein eigenes Docker-Repository bauen und pushen:
-
-```bash
-docker build --build-arg INSTALL_FREECAD=1 -t registry.example.local/freecad-plm:latest .
-docker push registry.example.local/freecad-plm:latest
-```
-
-Auf dem Server kann dann die Pull-Compose-Datei verwendet werden. In `.env` muss `PLM_IMAGE` auf das gepushte Image zeigen:
-
-```bash
-PLM_IMAGE=registry.example.local/freecad-plm:latest
+```env
+DJANGO_SECRET_KEY=replace-with-a-long-random-secret
+DJANGO_ALLOWED_HOSTS=plm.example.local,localhost,127.0.0.1
+POSTGRES_PASSWORD=replace-with-a-strong-database-password
+PLM_IMAGE=git.home.schumbi.de/ralf/freecad-plm:latest
 PLM_UID=1000
 PLM_GID=1000
-mkdir -p storage staticfiles
-sudo chown -R 1000:1000 storage staticfiles
-docker compose -f docker-compose.image.yml pull
-docker compose -f docker-compose.image.yml up -d
+FREECADCMD_COMMAND=freecadcmd
 ```
 
 `PLM_UID` und `PLM_GID` sollten zur User-/Gruppen-ID des Serverusers passen, der die lokalen Verzeichnisse besitzen soll. Die Werte zeigt `id` oder `id <user>`.
 
+Lokale Verzeichnisse fuer Modelle/Uploads und statische Dateien anlegen:
+
+```bash
+mkdir -p storage staticfiles
+sudo chown -R 1000:1000 storage staticfiles
+```
+
+Start:
+
+```bash
+docker compose -f docker-compose.image.yml pull
+docker compose -f docker-compose.image.yml up -d
+```
+
+`storage/` liegt neben der Compose-Datei und enthaelt hochgeladene Modelle, Revisionen und erzeugte Artefakte. `staticfiles/` enthaelt nur neu generierbare Django-Static-Dateien.
+
 Nach dem ersten Start:
 
 ```bash
-docker compose exec web python manage.py setup_plm_roles
-docker compose exec web python manage.py createsuperuser
+docker compose -f docker-compose.image.yml exec web python manage.py setup_plm_roles
+docker compose -f docker-compose.image.yml exec web python manage.py createsuperuser
 ```
 
-Update-Image bauen und pushen:
+### Image Manuell Bauen
+
+Normalerweise baut der Forgejo-Workflow im Docker-Images-Repo das Image. Manuell geht es dort so:
 
 ```bash
-docker build --build-arg INSTALL_FREECAD=1 -t registry.example.local/freecad-plm:latest .
-docker push registry.example.local/freecad-plm:latest
+git clone ssh://forgejo@home.schumbi.de/ralf/Docker-Images.git /opt/Docker-Images
+cd /opt/Docker-Images/freecad-plm
+docker build \
+  --build-arg FREECAD_PLM_REF=main \
+  -t git.home.schumbi.de/ralf/freecad-plm:latest .
+docker push git.home.schumbi.de/ralf/freecad-plm:latest
 ```
 
-Update auf dem Server:
+`FREECAD_PLM_REF` kann ein Branch, Tag oder Commit aus dem FreeCAD-PLM-Repo sein.
+
+### Updates
+
+Wenn das Image neu gebaut wurde:
 
 ```bash
 cd /opt/freecad-plm
 git pull
 docker compose -f docker-compose.image.yml pull
 docker compose -f docker-compose.image.yml up -d
+```
+
+### Lokaler Compose-Build
+
+Alternativ kann das App-Repo lokal ein Image bauen. Das ist fuer Entwicklung praktisch, auf dem Server aber langsamer als das fertige Registry-Image:
+
+```bash
+docker compose up -d --build
 ```
 
 ## Rollen
