@@ -1,16 +1,21 @@
 FROM python:3.12-slim
 
-ARG INSTALL_FREECAD=0
+ARG INSTALL_FREECAD=1
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV FREECADCMD_COMMAND=freecadcmd
+ENV PROCESS_EXPORT_JOBS_INLINE=0
 
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
     && if [ "$INSTALL_FREECAD" = "1" ]; then \
-        apt-get install -y --no-install-recommends freecad; \
+        apt-get install -y --no-install-recommends \
+            freecad; \
     fi \
     && rm -rf /var/lib/apt/lists/*
 

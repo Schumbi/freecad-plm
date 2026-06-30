@@ -14,11 +14,7 @@ services:
       retries: 5
 
   web:
-    image: ${PLM_IMAGE:-freecad-plm:local}
-    build:
-      context: .
-      args:
-        INSTALL_FREECAD: "1"
+    image: ${PLM_IMAGE:?PLM_IMAGE muss in .env gesetzt sein}
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -43,11 +39,7 @@ services:
         condition: service_healthy
 
   worker:
-    image: ${PLM_IMAGE:-freecad-plm:local}
-    build:
-      context: .
-      args:
-        INSTALL_FREECAD: "1"
+    image: ${PLM_IMAGE:?PLM_IMAGE muss in .env gesetzt sein}
     command: >
       sh -c "while true; do
              python manage.py process_export_jobs --limit 1;

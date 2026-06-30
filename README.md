@@ -18,7 +18,7 @@ Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/>.
 
 ## Serverbetrieb Mit Docker Compose
 
-Der erste Serverpfad nutzt Docker Compose mit PostgreSQL, persistentem Media-Volume und separatem Worker:
+Der erste Serverpfad nutzt Docker Compose mit PostgreSQL, persistentem Media-Volume und separatem Worker. Das PLM-Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd, damit Web und Worker aus demselben Image gestartet werden koennen.
 
 ```bash
 git clone ssh://home.schumbi.de/ralf/freecad-plm.git /opt/freecad-plm
@@ -28,7 +28,22 @@ $EDITOR .env
 docker compose up -d --build
 ```
 
-Vor produktiver Nutzung muessen in `.env` mindestens `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` und `POSTGRES_PASSWORD` angepasst werden. Die echte `.env` wird nicht committed. Der Worker wird mit FreeCAD im Image gebaut und verarbeitet Exportjobs in einer Schleife.
+Vor produktiver Nutzung muessen in `.env` mindestens `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` und `POSTGRES_PASSWORD` angepasst werden. Die echte `.env` wird nicht committed. Der Worker verarbeitet Exportjobs in einer Schleife und nutzt `FreeCADCmd` aus dem Image.
+
+Image fuer ein eigenes Docker-Repository bauen und pushen:
+
+```bash
+docker build --build-arg INSTALL_FREECAD=1 -t registry.example.local/freecad-plm:latest .
+docker push registry.example.local/freecad-plm:latest
+```
+
+Auf dem Server kann dann die Pull-Compose-Datei verwendet werden. In `.env` muss `PLM_IMAGE` auf das gepushte Image zeigen:
+
+```bash
+PLM_IMAGE=registry.example.local/freecad-plm:latest
+docker compose -f docker-compose.image.yml pull
+docker compose -f docker-compose.image.yml up -d
+```
 
 Nach dem ersten Start:
 
@@ -37,13 +52,20 @@ docker compose exec web python manage.py setup_plm_roles
 docker compose exec web python manage.py createsuperuser
 ```
 
-Updates auf dem Server:
+Update-Image bauen und pushen:
+
+```bash
+docker build --build-arg INSTALL_FREECAD=1 -t registry.example.local/freecad-plm:latest .
+docker push registry.example.local/freecad-plm:latest
+```
+
+Update auf dem Server:
 
 ```bash
 cd /opt/freecad-plm
 git pull
-docker compose up -d --build
-docker compose exec web python manage.py migrate
+docker compose -f docker-compose.image.yml pull
+docker compose -f docker-compose.image.yml up -d
 ```
 
 ## Rollen
@@ -109,15 +131,13 @@ PNG-Ansichten werden ohne FreeCAD-GUI erzeugt. Der Worker exportiert die Revisio
 Empfohlene Server-Konfiguration:
 
 ```bash
-FREECADCMD_COMMAND='FreeCADCmd'
+FREECADCMD_COMMAND='freecadcmd'
 PREVIEW_PNG_WIDTH=400
 PREVIEW_PNG_HEIGHT=300
 PROCESS_EXPORT_JOBS_INLINE=0
 ```
 
 Mit `PROCESS_EXPORT_JOBS_INLINE=0` legt die Weboberflaeche Export- und PNG-Jobs nur an. Der Docker-Worker verarbeitet sie im Hintergrund. So muss der Webprozess kein FreeCAD starten.
-
-Wartende Analyse- und Exportjobs koennen auf der Teildetailseite mit `Wartende Jobs starten` einmalig verarbeitet werden.
 
 Auf einem Server mit nativer FreeCAD-Installation reicht meistens:
 
