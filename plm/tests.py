@@ -105,7 +105,14 @@ def make_zip_upload(name="part.FCStd", members=None):
 def make_3mf_upload(name="plate.3mf", members=None):
     members = members or {
         "3D/3dmodel.model": "<model unit=\"millimeter\"></model>",
-        "Metadata/project_settings.config": "printer_model=Bambu Lab X1C",
+        "Metadata/project_settings.config": """
+            printer_model = Bambu Lab X1C
+            print_settings_id = 0.20mm Standard @BBL X1C
+            filament_type = PETG
+            filament_vendor = Bambu Lab
+            nozzle_diameter = 0.4
+            layer_height = 0.2
+        """,
         "Metadata/thumbnail.png": b"\x89PNG\r\n\x1a\n",
     }
     buffer = BytesIO()
@@ -1583,11 +1590,45 @@ class ManufacturingFileTests(TestCase):
         self.assertEqual(manufacturing_file.machine, machine)
         self.assertEqual(manufacturing_file.metadata["container"], "3mf")
         self.assertTrue(manufacturing_file.metadata["has_thumbnail"])
+        self.assertEqual(
+            manufacturing_file.metadata["extracted_fields"]["printer_profile"],
+            "0.20mm Standard @BBL X1C",
+        )
         self.assertTrue(Path(manufacturing_file.file.path).exists())
         event = AuditEvent.objects.get(
             action=AuditEvent.Action.MANUFACTURING_FILE_UPLOADED
         )
         self.assertEqual(event.metadata["manufacturing_file_id"], manufacturing_file.id)
+
+    def test_bambu_3mf_metadata_prefills_manufacturing_fields(self):
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+        )
+
+        self.assertEqual(manufacturing_file.slicer_name, "Bambu Studio")
+        self.assertEqual(manufacturing_file.machine_label, "Bambu Lab X1C")
+        self.assertEqual(manufacturing_file.printer_profile, "0.20mm Standard @BBL X1C")
+        self.assertEqual(manufacturing_file.material, "PETG")
+        self.assertEqual(manufacturing_file.material_brand, "Bambu Lab")
+        self.assertEqual(str(manufacturing_file.nozzle_diameter), "0.4")
+        self.assertEqual(str(manufacturing_file.layer_height), "0.2")
+
+    def test_manual_manufacturing_fields_override_3mf_metadata(self):
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+            slicer_name="OrcaSlicer",
+            machine_label="P1S",
+            material="PLA",
+        )
+
+        self.assertEqual(manufacturing_file.slicer_name, "OrcaSlicer")
+        self.assertEqual(manufacturing_file.machine_label, "P1S")
+        self.assertEqual(manufacturing_file.material, "PLA")
+        self.assertEqual(manufacturing_file.material_brand, "Bambu Lab")
 
     def test_duplicate_manufacturing_file_for_revision_is_rejected(self):
         content = make_3mf_upload().read()

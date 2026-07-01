@@ -1,7 +1,9 @@
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from io import BytesIO
+import json
 from pathlib import PurePosixPath
 from zipfile import BadZipFile, ZipFile
 
@@ -48,6 +50,14 @@ MANUFACTURING_FILE_EXTENSIONS = {
     ".stp": ManufacturingFile.FileType.STEP_VENDOR,
     ".pdf": ManufacturingFile.FileType.PDF_DRAWING,
 }
+BAMBU_CONFIG_NAMES = {
+    "project_settings.config",
+    "model_settings.config",
+    "slice_info.config",
+    "filament_settings.config",
+    "printer_settings.config",
+    "process_settings.config",
+}
 
 
 @dataclass(frozen=True)
@@ -93,6 +103,177 @@ def infer_manufacturing_file_type(filename):
     return MANUFACTURING_FILE_EXTENSIONS.get(suffix)
 
 
+def decode_config_bytes(data):
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return ""
+
+
+def flatten_config_value(value, prefix=""):
+    if isinstance(value, dict):
+        items = []
+        for key, nested in value.items():
+            key_prefix = f"{prefix}.{key}" if prefix else str(key)
+            items.extend(flatten_config_value(nested, key_prefix).items())
+        return dict(items)
+    if isinstance(value, list):
+        if all(not isinstance(item, (dict, list)) for item in value):
+            return {prefix: ", ".join(str(item) for item in value if item not in [None, ""])}
+        items = {}
+        for index, nested in enumerate(value):
+            key_prefix = f"{prefix}.{index}" if prefix else str(index)
+            items.update(flatten_config_value(nested, key_prefix))
+        return items
+    return {prefix: "" if value is None else str(value)}
+
+
+def parse_slicer_config(text):
+    parsed = {}
+    stripped = text.strip()
+    if not stripped:
+        return parsed
+
+    try:
+        json_value = json.loads(stripped)
+    except json.JSONDecodeError:
+        json_value = None
+    if json_value is not None:
+        return flatten_config_value(json_value)
+
+    for line in stripped.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", ";", "[")) or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        parsed[key.strip()] = value.strip().strip('"')
+    return parsed
+
+
+def first_config_value(config, *keys):
+    normalized = {key.lower(): value for key, value in config.items() if value}
+    for key in keys:
+        value = normalized.get(key.lower())
+        if value:
+            return value
+    for wanted in keys:
+        wanted = wanted.lower()
+        for key, value in normalized.items():
+            if key.endswith(f".{wanted}") or key.endswith(wanted):
+                return value
+    return ""
+
+
+def decimal_config_value(config, *keys):
+    value = first_config_value(config, *keys)
+    if not value:
+        return None
+    value = str(value).split(",", 1)[0].strip()
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        return None
+
+
+def int_config_value(config, *keys):
+    value = first_config_value(config, *keys)
+    if not value:
+        return None
+    value = str(value).split(",", 1)[0].strip()
+    try:
+        return int(float(value))
+    except ValueError:
+        return None
+
+
+def json_safe_value(value):
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: json_safe_value(nested) for key, nested in value.items()}
+    if isinstance(value, list):
+        return [json_safe_value(nested) for nested in value]
+    return value
+
+
+def extract_slicer_fields(configs):
+    merged = {}
+    source_names = []
+    for item in configs:
+        source_names.append(item["name"])
+        merged.update(item["values"])
+
+    machine_label = first_config_value(
+        merged,
+        "printer_model",
+        "printer_model_id",
+        "printer_name",
+        "machine_name",
+        "compatible_printers",
+    )
+    printer_profile = first_config_value(
+        merged,
+        "print_settings_id",
+        "process_settings_id",
+        "setting_id",
+        "name",
+        "inherits",
+    )
+    material = first_config_value(
+        merged,
+        "filament_type",
+        "filament_settings_id",
+        "filament_preset",
+        "material_type",
+    )
+    material_brand = first_config_value(
+        merged,
+        "filament_vendor",
+        "filament_brand",
+        "material_brand",
+    )
+    slicer_name = first_config_value(merged, "slicer", "slicer_name")
+    if not slicer_name:
+        haystack = " ".join([*source_names, *merged.keys(), *merged.values()]).lower()
+        if "bambu" in haystack or any(name.endswith(".config") for name in source_names):
+            slicer_name = "Bambu Studio"
+
+    return {
+        "slicer_name": slicer_name,
+        "slicer_version": first_config_value(
+            merged,
+            "slicer_version",
+            "bambu_studio_version",
+            "version",
+        ),
+        "machine_label": machine_label,
+        "printer_profile": printer_profile,
+        "material": material,
+        "material_brand": material_brand,
+        "nozzle_diameter": decimal_config_value(
+            merged,
+            "nozzle_diameter",
+            "nozzle_diameters",
+            "printer_nozzle_diameter",
+        ),
+        "layer_height": decimal_config_value(merged, "layer_height"),
+        "estimated_print_time_seconds": int_config_value(
+            merged,
+            "estimated_print_time",
+            "print_time",
+            "estimated_print_time_seconds",
+        ),
+        "estimated_material_g": decimal_config_value(
+            merged,
+            "filament_used_g",
+            "total_filament_used_g",
+            "estimated_material_g",
+        ),
+    }
+
+
 def inspect_manufacturing_upload(uploaded_file):
     original_filename = PurePosixPath(uploaded_file.name).name
     suffix = PurePosixPath(original_filename).suffix.lower()
@@ -115,6 +296,22 @@ def inspect_manufacturing_upload(uploaded_file):
                 metadata["has_thumbnail"] = any(
                     "thumbnail" in name.lower() for name in names
                 )
+                configs = []
+                for name in names:
+                    path = PurePosixPath(name)
+                    if path.name not in BAMBU_CONFIG_NAMES and not name.lower().endswith(".config"):
+                        continue
+                    text = decode_config_bytes(archive.read(name))
+                    values = parse_slicer_config(text)
+                    if values:
+                        configs.append({"name": name, "values": values})
+                metadata["slicer_configs"] = [
+                    {"name": item["name"], "keys": sorted(item["values"].keys())}
+                    for item in configs
+                ]
+                metadata["extracted_fields"] = json_safe_value(
+                    extract_slicer_fields(configs)
+                )
         except BadZipFile as exc:
             raise ValidationError("3MF-Dateien muessen gueltige ZIP-Container sein.") from exc
     return {
@@ -123,6 +320,7 @@ def inspect_manufacturing_upload(uploaded_file):
         "size_bytes": size_bytes,
         "file_type": MANUFACTURING_FILE_EXTENSIONS[suffix],
         "metadata": metadata,
+        "extracted_fields": metadata.get("extracted_fields", {}),
     }
 
 
@@ -151,6 +349,7 @@ def create_manufacturing_file_from_upload(
 ):
     info = inspect_manufacturing_upload(uploaded_file)
     resolved_file_type = file_type or info["file_type"]
+    extracted = info.get("extracted_fields", {})
     if ManufacturingFile.objects.filter(
         revision=revision,
         sha256=info["sha256"],
@@ -170,17 +369,20 @@ def create_manufacturing_file_from_upload(
         size_bytes=info["size_bytes"],
         label=label.strip(),
         description=description.strip(),
-        slicer_name=slicer_name.strip(),
-        slicer_version=slicer_version.strip(),
+        slicer_name=slicer_name.strip() or extracted.get("slicer_name", ""),
+        slicer_version=slicer_version.strip() or extracted.get("slicer_version", ""),
         machine=machine,
-        machine_label=machine_label.strip(),
-        printer_profile=printer_profile.strip(),
-        material=material.strip(),
-        material_brand=material_brand.strip(),
-        nozzle_diameter=nozzle_diameter,
-        layer_height=layer_height,
-        estimated_print_time_seconds=estimated_print_time_seconds,
-        estimated_material_g=estimated_material_g,
+        machine_label=machine_label.strip() or extracted.get("machine_label", ""),
+        printer_profile=printer_profile.strip() or extracted.get("printer_profile", ""),
+        material=material.strip() or extracted.get("material", ""),
+        material_brand=material_brand.strip() or extracted.get("material_brand", ""),
+        nozzle_diameter=nozzle_diameter or extracted.get("nozzle_diameter"),
+        layer_height=layer_height or extracted.get("layer_height"),
+        estimated_print_time_seconds=(
+            estimated_print_time_seconds
+            or extracted.get("estimated_print_time_seconds")
+        ),
+        estimated_material_g=estimated_material_g or extracted.get("estimated_material_g"),
         metadata=info["metadata"],
         uploaded_by=uploaded_by,
     )
