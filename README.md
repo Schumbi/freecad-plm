@@ -128,6 +128,31 @@ docker build -t git.home.schumbi.de/ralf/freecad-plm:latest .
 docker push git.home.schumbi.de/ralf/freecad-plm:latest
 ```
 
+### Image-Build Ausloesen
+
+Im Normalfall reicht ein Push ins App-Repo:
+
+```bash
+cd /home/ralf/devel/freecad-plm
+git push
+```
+
+Der Forgejo-Workflow `Build FreeCAD PLM Image` startet bei Push nach `main` oder
+`master` automatisch. Den Lauf findest du in Forgejo unter:
+
+```text
+ralf/freecad-plm -> Actions -> Build FreeCAD PLM Image
+```
+
+Wenn ein Build ohne neuen Commit erneut laufen soll, kann der Workflow dort auch
+manuell ueber `Run workflow` gestartet werden. Nach einem erfolgreichen Lauf ist
+das Registry-Image aktualisiert:
+
+```text
+git.home.schumbi.de/ralf/freecad-plm:latest
+git.home.schumbi.de/ralf/freecad-plm:<commit-sha>
+```
+
 ### Updates
 
 Wenn das Image neu gebaut wurde:
