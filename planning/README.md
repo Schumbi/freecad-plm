@@ -38,6 +38,7 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 8. `planning/SESSION_NOTES.md`
 9. `planning/FREECAD_ADDON_PLAN.md`
 10. `planning/UI_REDESIGN_PLAN.md`
+11. `planning/MANUFACTURING_FILES_PLAN.md`
 
 ## Arbeitsregel
 

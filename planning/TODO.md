@@ -14,6 +14,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Docker-Compose-Stack auf dem Zielserver mit echtem Media-Volume und PostgreSQL testen.
 - FreeCAD-Addon-Prototyp gegen die neue `/api/`-Schnittstelle anhand `planning/FREECAD_ADDON_PLAN.md` bauen.
 - API-Authentifizierung fuer Addon-Nutzung spaeter von Session/CSRF-Ausnahme auf Token oder Personal Access Tokens umstellen.
+- Manufacturing-Dateien fuer gedruckte Revisionen gemaess `planning/MANUFACTURING_FILES_PLAN.md` umsetzen.
 - Fehlende Suche fuer Projekte, Teile, Revisionen und Dateinamen entwerfen und umsetzen.
 - Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche entwerfen und umsetzen.
 - Folgeausbau fuer VarSet-Parameterbearbeitung und Neurendern planen.
