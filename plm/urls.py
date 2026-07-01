@@ -83,6 +83,21 @@ urlpatterns = [
         name="download_revision_artifact",
     ),
     path(
+        "revisions/<int:revision_id>/manufacturing-files/upload/",
+        views.upload_manufacturing_file,
+        name="upload_manufacturing_file",
+    ),
+    path(
+        "manufacturing-files/<int:manufacturing_file_id>/download/",
+        views.download_manufacturing_file,
+        name="download_manufacturing_file",
+    ),
+    path(
+        "manufacturing-files/<int:manufacturing_file_id>/obsolete/",
+        views.obsolete_manufacturing_file,
+        name="obsolete_manufacturing_file",
+    ),
+    path(
         "parts/<int:part_id>/compare/",
         views.revision_compare,
         name="revision_compare",

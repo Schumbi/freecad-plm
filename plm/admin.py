@@ -4,6 +4,10 @@ from .models import (
     AuditEvent,
     Checkout,
     ExportJob,
+    ManufacturingFile,
+    ManufacturingMachine,
+    ManufacturingRun,
+    ManufacturingRunAttachment,
     Part,
     Project,
     ProjectSnapshot,
@@ -79,6 +83,81 @@ class RevisionArtifactAdmin(admin.ModelAdmin):
     list_filter = ("artifact_type",)
     search_fields = ("revision__part__number", "revision__revision_code", "original_filename")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ManufacturingMachine)
+class ManufacturingMachineAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "machine_type",
+        "manufacturer",
+        "model",
+        "integration_kind",
+        "is_active",
+    )
+    list_filter = ("machine_type", "manufacturer", "is_active")
+    search_fields = ("name", "manufacturer", "model", "serial_number", "network_address")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ManufacturingFile)
+class ManufacturingFileAdmin(admin.ModelAdmin):
+    list_display = (
+        "revision",
+        "label",
+        "file_type",
+        "purpose",
+        "status",
+        "machine",
+        "slicer_name",
+        "material",
+        "created_at",
+    )
+    list_filter = ("file_type", "purpose", "status", "machine")
+    search_fields = (
+        "revision__part__number",
+        "revision__part__name",
+        "revision__revision_code",
+        "label",
+        "original_filename",
+        "sha256",
+    )
+    readonly_fields = ("created_at", "updated_at", "storage_key", "sha256", "size_bytes")
+
+
+class ManufacturingRunAttachmentInline(admin.TabularInline):
+    model = ManufacturingRunAttachment
+    extra = 0
+    readonly_fields = ("created_at", "updated_at", "sha256", "size_bytes")
+
+
+@admin.register(ManufacturingRun)
+class ManufacturingRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "manufacturing_file",
+        "machine",
+        "status",
+        "operator",
+        "quantity",
+        "started_at",
+        "finished_at",
+    )
+    list_filter = ("status", "machine")
+    search_fields = (
+        "manufacturing_file__revision__part__number",
+        "manufacturing_file__label",
+        "operator__username",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    inlines = (ManufacturingRunAttachmentInline,)
+
+
+@admin.register(ManufacturingRunAttachment)
+class ManufacturingRunAttachmentAdmin(admin.ModelAdmin):
+    list_display = ("run", "attachment_type", "original_filename", "size_bytes", "created_at")
+    list_filter = ("attachment_type",)
+    search_fields = ("run__manufacturing_file__label", "original_filename", "sha256")
+    readonly_fields = ("created_at", "updated_at", "sha256", "size_bytes")
 
 
 @admin.register(Checkout)

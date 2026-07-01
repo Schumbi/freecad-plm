@@ -412,3 +412,15 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `planning/FREECAD_ADDON_PLAN.md` angelegt.
 - Das Dokument beschreibt Zielbild, Addon-Repo-Struktur, Konfiguration, API-Vertrag, Checkout-/Check-in-Workflow, lokale Workspace-Regeln, UI-Anforderungen, Implementierungsbausteine und Tests.
 - Zweck: Eine neue Codex-Instanz kann daraus ein separates FreeCAD-Addon fuer die vorhandene Server-API bauen.
+
+## 2026-07-01
+
+### Manufacturing-Dateien Fuer Gedruckte Revisionen
+
+- `ManufacturingMachine`, `ManufacturingFile`, `ManufacturingRun` und `ManufacturingRunAttachment` angelegt.
+- Manufacturing-Dateien haengen an einer Revision und speichern Slicer-/Druckdateien wie 3MF, G-Code, BGCode, STL, STEP oder PDF inklusive Hash, Groesse, Status, Material, Slicer und optionalem Maschinenbezug.
+- 3MF-Uploads werden als ZIP-Container geprueft und mit einfacher Inhaltsinventur gespeichert.
+- Die Teildetailseite zeigt pro Revision einen Fertigungsdialog mit Upload, Liste, Download und Obsolet-Aktion.
+- `ManufacturingRun` und Attachments sind modellseitig vorbereitet, damit spaeter ein Bambu-/Maschinenanschluss Bilder, Logs und Reports einem konkreten Fertigungslauf zuordnen kann.
+- Projektloeschung raeumt Manufacturing-Dateien und spaetere Run-Anhaenge aus Storage und Datenbank auf.
+- `.venv/bin/python manage.py test plm` laeuft mit 97 Tests erfolgreich.

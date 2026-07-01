@@ -1,7 +1,8 @@
 from django import forms
 
 from .fcstd import validate_fcstd_upload
-from .models import ExportJob, Part, Project, Revision
+from .models import ExportJob, ManufacturingFile, ManufacturingMachine, Part, Project, Revision
+from .services import inspect_manufacturing_upload
 
 
 class ProjectForm(forms.ModelForm):
@@ -173,3 +174,78 @@ class RevisionExportJobForm(forms.Form):
             type_id = item.get("type", "")
             choices.append((name, f"{label} ({name}, {type_id})"))
         self.fields["selected_objects"].choices = choices
+
+
+class ManufacturingFileUploadForm(forms.ModelForm):
+    file = forms.FileField(label="Fertigungsdatei")
+
+    class Meta:
+        model = ManufacturingFile
+        fields = [
+            "file",
+            "purpose",
+            "status",
+            "label",
+            "description",
+            "slicer_name",
+            "slicer_version",
+            "machine",
+            "machine_label",
+            "printer_profile",
+            "material",
+            "material_brand",
+            "nozzle_diameter",
+            "layer_height",
+            "estimated_print_time_seconds",
+            "estimated_material_g",
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+        labels = {
+            "purpose": "Zweck",
+            "status": "Status",
+            "label": "Label",
+            "description": "Beschreibung",
+            "slicer_name": "Slicer",
+            "slicer_version": "Slicer-Version",
+            "machine": "Herstellungsmaschine",
+            "machine_label": "Maschine/Freitext",
+            "printer_profile": "Druckerprofil",
+            "material": "Material",
+            "material_brand": "Materialhersteller",
+            "nozzle_diameter": "Duese mm",
+            "layer_height": "Layerhoehe mm",
+            "estimated_print_time_seconds": "Geschaetzte Druckzeit Sekunden",
+            "estimated_material_g": "Geschaetztes Material g",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.upload_info = None
+        self.fields["machine"].queryset = ManufacturingMachine.objects.filter(
+            is_active=True
+        )
+        for field_name in [
+            "machine",
+            "label",
+            "description",
+            "slicer_name",
+            "slicer_version",
+            "machine_label",
+            "printer_profile",
+            "material",
+            "material_brand",
+        ]:
+            self.fields[field_name].required = False
+
+    def clean_file(self):
+        uploaded_file = self.cleaned_data["file"]
+        self.upload_info = inspect_manufacturing_upload(uploaded_file)
+        return uploaded_file
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.upload_info:
+            cleaned_data["file_type"] = self.upload_info["file_type"]
+        return cleaned_data

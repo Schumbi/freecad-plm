@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from hashlib import sha256
 from io import BytesIO
 from pathlib import PurePosixPath
 from zipfile import BadZipFile, ZipFile
@@ -21,6 +22,9 @@ from .models import (
     AuditEvent,
     Checkout,
     ExportJob,
+    ManufacturingFile,
+    ManufacturingRun,
+    ManufacturingRunAttachment,
     Part,
     ProjectSnapshot,
     ProjectSnapshotEntry,
@@ -35,6 +39,15 @@ REVISION_CODE_MAX_NUMBER = 10**REVISION_CODE_NUMBER_WIDTH - 1
 REVISION_CODE_PATTERN = re.compile(
     rf"^{re.escape(REVISION_CODE_PREFIX)}(\d{{{REVISION_CODE_NUMBER_WIDTH}}})$"
 )
+MANUFACTURING_FILE_EXTENSIONS = {
+    ".3mf": ManufacturingFile.FileType.SLICER_3MF,
+    ".gcode": ManufacturingFile.FileType.GCODE,
+    ".bgcode": ManufacturingFile.FileType.BGCODE,
+    ".stl": ManufacturingFile.FileType.STL_PRINT,
+    ".step": ManufacturingFile.FileType.STEP_VENDOR,
+    ".stp": ManufacturingFile.FileType.STEP_VENDOR,
+    ".pdf": ManufacturingFile.FileType.PDF_DRAWING,
+}
 
 
 @dataclass(frozen=True)
@@ -60,6 +73,132 @@ class PLMRevisionConflict(ValidationError):
         self.actual = actual
         self.original_filename = original_filename
         self.original_sha256 = original_sha256
+
+
+def upload_file_digest(uploaded_file):
+    digest = sha256()
+    size = 0
+    if hasattr(uploaded_file, "seek"):
+        uploaded_file.seek(0)
+    for chunk in uploaded_file.chunks():
+        digest.update(chunk)
+        size += len(chunk)
+    if hasattr(uploaded_file, "seek"):
+        uploaded_file.seek(0)
+    return digest.hexdigest(), size
+
+
+def infer_manufacturing_file_type(filename):
+    suffix = PurePosixPath(filename).suffix.lower()
+    return MANUFACTURING_FILE_EXTENSIONS.get(suffix)
+
+
+def inspect_manufacturing_upload(uploaded_file):
+    original_filename = PurePosixPath(uploaded_file.name).name
+    suffix = PurePosixPath(original_filename).suffix.lower()
+    if suffix not in MANUFACTURING_FILE_EXTENSIONS:
+        allowed = ", ".join(sorted(MANUFACTURING_FILE_EXTENSIONS))
+        raise ValidationError(f"Nicht unterstuetzter Dateityp. Erlaubt: {allowed}.")
+
+    file_sha256, size_bytes = upload_file_digest(uploaded_file)
+    metadata = {"extension": suffix}
+    if suffix == ".3mf":
+        try:
+            data = read_uploaded_file(uploaded_file)
+            with ZipFile(BytesIO(data)) as archive:
+                names = archive.namelist()
+                metadata["container"] = "3mf"
+                metadata["members"] = [
+                    {"name": name, "size": archive.getinfo(name).file_size}
+                    for name in names[:200]
+                ]
+                metadata["has_thumbnail"] = any(
+                    "thumbnail" in name.lower() for name in names
+                )
+        except BadZipFile as exc:
+            raise ValidationError("3MF-Dateien muessen gueltige ZIP-Container sein.") from exc
+    return {
+        "original_filename": original_filename,
+        "sha256": file_sha256,
+        "size_bytes": size_bytes,
+        "file_type": MANUFACTURING_FILE_EXTENSIONS[suffix],
+        "metadata": metadata,
+    }
+
+
+@transaction.atomic
+def create_manufacturing_file_from_upload(
+    *,
+    revision,
+    uploaded_file,
+    uploaded_by,
+    file_type="",
+    purpose=ManufacturingFile.Purpose.PRINT,
+    status=ManufacturingFile.Status.DRAFT,
+    label="",
+    description="",
+    slicer_name="",
+    slicer_version="",
+    machine=None,
+    machine_label="",
+    printer_profile="",
+    material="",
+    material_brand="",
+    nozzle_diameter=None,
+    layer_height=None,
+    estimated_print_time_seconds=None,
+    estimated_material_g=None,
+):
+    info = inspect_manufacturing_upload(uploaded_file)
+    resolved_file_type = file_type or info["file_type"]
+    if ManufacturingFile.objects.filter(
+        revision=revision,
+        sha256=info["sha256"],
+    ).exists():
+        raise ValidationError(
+            "Diese Fertigungsdatei ist fuer diese Revision bereits vorhanden."
+        )
+
+    manufacturing_file = ManufacturingFile.objects.create(
+        revision=revision,
+        file_type=resolved_file_type,
+        purpose=purpose,
+        status=status,
+        file=uploaded_file,
+        original_filename=info["original_filename"],
+        sha256=info["sha256"],
+        size_bytes=info["size_bytes"],
+        label=label.strip(),
+        description=description.strip(),
+        slicer_name=slicer_name.strip(),
+        slicer_version=slicer_version.strip(),
+        machine=machine,
+        machine_label=machine_label.strip(),
+        printer_profile=printer_profile.strip(),
+        material=material.strip(),
+        material_brand=material_brand.strip(),
+        nozzle_diameter=nozzle_diameter,
+        layer_height=layer_height,
+        estimated_print_time_seconds=estimated_print_time_seconds,
+        estimated_material_g=estimated_material_g,
+        metadata=info["metadata"],
+        uploaded_by=uploaded_by,
+    )
+    AuditEvent.objects.create(
+        actor=uploaded_by,
+        action=AuditEvent.Action.MANUFACTURING_FILE_UPLOADED,
+        object_repr=str(manufacturing_file),
+        metadata={
+            "manufacturing_file_id": manufacturing_file.id,
+            "revision_id": revision.id,
+            "part_id": revision.part_id,
+            "sha256": manufacturing_file.sha256,
+            "file_type": manufacturing_file.file_type,
+            "status": manufacturing_file.status,
+            "machine_id": machine.id if machine else None,
+        },
+    )
+    return manufacturing_file
 
 
 def revision_code_number(code):
@@ -356,6 +495,9 @@ def delete_project_tree(project, actor):
         "parts": project.parts.count(),
         "revisions": Revision.objects.filter(part__project=project).count(),
         "artifacts": RevisionArtifact.objects.filter(revision__part__project=project).count(),
+        "manufacturing_files": ManufacturingFile.objects.filter(
+            revision__part__project=project
+        ).count(),
         "snapshots": project.snapshots.count(),
         "annotations": project.annotations.count(),
         "checkouts": Checkout.objects.filter(part__project=project).count(),
@@ -369,6 +511,18 @@ def delete_project_tree(project, actor):
         for artifact in RevisionArtifact.objects.filter(revision__part__project=project)
         if artifact.file
     ]
+    manufacturing_files = [
+        item.file
+        for item in ManufacturingFile.objects.filter(revision__part__project=project)
+        if item.file
+    ]
+    manufacturing_attachments = [
+        item.file
+        for item in ManufacturingRunAttachment.objects.filter(
+            run__manufacturing_file__revision__part__project=project
+        )
+        if item.file
+    ]
 
     AuditEvent.objects.create(
         actor=actor,
@@ -381,13 +535,25 @@ def delete_project_tree(project, actor):
     Checkout.objects.filter(part__project=project).delete()
     ProjectSnapshotEntry.objects.filter(snapshot__project=project).delete()
     ProjectSnapshot.objects.filter(project=project).delete()
+    ManufacturingRunAttachment.objects.filter(
+        run__manufacturing_file__revision__part__project=project
+    ).delete()
+    ManufacturingRun.objects.filter(
+        manufacturing_file__revision__part__project=project
+    ).delete()
+    ManufacturingFile.objects.filter(revision__part__project=project).delete()
     RevisionArtifact.objects.filter(revision__part__project=project).delete()
     ExportJob.objects.filter(revision__part__project=project).delete()
     revisions.delete()
     project.parts.all().delete()
     project.delete()
 
-    for field_file in [*artifact_files, *revision_files]:
+    for field_file in [
+        *manufacturing_attachments,
+        *manufacturing_files,
+        *artifact_files,
+        *revision_files,
+    ]:
         field_file.delete(save=False)
 
     return summary

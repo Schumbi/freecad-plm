@@ -53,6 +53,9 @@
                   {% for artifact in revision.artifacts.all %}
                     <span class="artifact-pill">{{ artifact.artifact_type|upper }}{% if artifact.view_name %} {{ artifact.view_name }}{% endif %}</span>
                   {% endfor %}
+                  {% for manufacturing_file in revision.manufacturing_files.all %}
+                    <span class="artifact-pill">Fertigung {{ manufacturing_file.get_file_type_display }}</span>
+                  {% endfor %}
                   {% for job in revision.export_jobs.all %}
                     <span class="job-status-pill job-{{ job.status }}">{{ job.get_job_type_display }}: {{ job.get_status_display }}</span>
                   {% endfor %}
@@ -73,6 +76,7 @@
                   <div class="action-menu-content">
                     <button type="button" data-dialog-target="#revision-properties-{{ revision.id }}">Eigenschaften</button>
                     <button type="button" data-dialog-target="#freecad-{{ revision.id }}">Metadaten</button>
+                    <button type="button" data-dialog-target="#manufacturing-{{ revision.id }}">Fertigung</button>
                     <button type="button" data-dialog-target="#jobs-{{ revision.id }}">Jobs und Artefakte</button>
                     {% if can_upload %}
                       {% if revision.extracted_metadata.freecadcmd.objects %}
@@ -206,6 +210,74 @@
                     <dt>SHA-256</dt>
                     <dd>{{ revision.sha256 }}</dd>
                   </dl>
+                </div>
+              </div>
+            </div>
+
+            <div class="plm-dialog" id="manufacturing-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="manufacturing-title-{{ revision.id }}" hidden>
+              <div class="plm-dialog-panel wide">
+                <div class="plm-dialog-header">
+                  <h5 class="plm-dialog-title" id="manufacturing-title-{{ revision.id }}">Fertigung {{ revision.revision_code }}</h5>
+                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                </div>
+                <div class="plm-dialog-body">
+                  <h5>Fertigungsdateien</h5>
+                  {% if revision.manufacturing_files.all %}
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>Typ</th>
+                          <th>Status</th>
+                          <th>Slicer</th>
+                          <th>Maschine</th>
+                          <th>Material</th>
+                          <th>Aktionen</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for manufacturing_file in revision.manufacturing_files.all %}
+                          <tr>
+                            <td>{{ manufacturing_file.label|default:manufacturing_file.original_filename }}</td>
+                            <td>{{ manufacturing_file.get_file_type_display }}</td>
+                            <td>{{ manufacturing_file.get_status_display }}</td>
+                            <td>
+                              {{ manufacturing_file.slicer_name|default:"-" }}
+                              {% if manufacturing_file.slicer_version %} {{ manufacturing_file.slicer_version }}{% endif %}
+                            </td>
+                            <td>
+                              {% if manufacturing_file.machine %}
+                                {{ manufacturing_file.machine }}
+                              {% else %}
+                                {{ manufacturing_file.machine_label|default:"-" }}
+                              {% endif %}
+                            </td>
+                            <td>{{ manufacturing_file.material|default:"-" }}</td>
+                            <td>
+                              <a href="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">Download</a>
+                              {% if can_release and manufacturing_file.status != "obsolete" %}
+                                <form class="inline-form" method="post" action="{% url 'plm:obsolete_manufacturing_file' manufacturing_file.id %}">
+                                  {% csrf_token %}
+                                  <button type="submit">Obsolet</button>
+                                </form>
+                              {% endif %}
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  {% else %}
+                    <div class="empty-state">Noch keine Fertigungsdateien fuer diese Revision.</div>
+                  {% endif %}
+
+                  {% if can_upload %}
+                    <h5>Fertigungsdatei hochladen</h5>
+                    <form method="post" action="{% url 'plm:upload_manufacturing_file' revision.id %}" enctype="multipart/form-data">
+                      {% csrf_token %}
+                      {{ manufacturing_form.as_p }}
+                      <button type="submit">Fertigungsdatei hochladen</button>
+                    </form>
+                  {% endif %}
                 </div>
               </div>
             </div>

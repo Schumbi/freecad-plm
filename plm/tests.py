@@ -22,6 +22,10 @@ from .models import (
     AuditEvent,
     Checkout,
     ExportJob,
+    ManufacturingFile,
+    ManufacturingMachine,
+    ManufacturingRun,
+    ManufacturingRunAttachment,
     Part,
     Project,
     ProjectSnapshot,
@@ -39,6 +43,7 @@ from .permissions import (
 )
 from .services import (
     PLMRevisionConflict,
+    create_manufacturing_file_from_upload,
     create_revision_from_upload,
     import_project_snapshot,
     next_revision_code,
@@ -89,6 +94,19 @@ def write_zip_member(archive, name, content):
 def make_zip_upload(name="part.FCStd", members=None):
     members = members or {
         "Document.xml": FREECAD_DOCUMENT_XML,
+    }
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        for member_name, content in members.items():
+            write_zip_member(archive, member_name, content)
+    return SimpleUploadedFile(name, buffer.getvalue())
+
+
+def make_3mf_upload(name="plate.3mf", members=None):
+    members = members or {
+        "3D/3dmodel.model": "<model unit=\"millimeter\"></model>",
+        "Metadata/project_settings.config": "printer_model=Bambu Lab X1C",
+        "Metadata/thumbnail.png": b"\x89PNG\r\n\x1a\n",
     }
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
@@ -1506,6 +1524,182 @@ class RolePermissionTests(TestCase):
         self.assertContains(response, "PLMRevision")
         self.assertNotContains(response, revision.sha256)
         self.assertNotContains(response, "FreeCAD-Version")
+
+
+class ManufacturingFileTests(TestCase):
+    def setUp(self):
+        self.media_root = TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.settings_override.enable()
+        call_command("setup_plm_roles", stdout=StringIO())
+        self.admin = get_user_model().objects.create_user(
+            username="manufacturing-admin",
+            password="test",
+        )
+        self.admin.groups.add(Group.objects.get(name=ROLE_ADMIN))
+        self.editor = get_user_model().objects.create_user(
+            username="manufacturing-editor",
+            password="test",
+        )
+        self.editor.groups.add(Group.objects.get(name=ROLE_EDITOR))
+        self.project = Project.objects.create(code="MFG", name="Fertigung")
+        self.part = Part.objects.create(
+            project=self.project,
+            number="P-001",
+            name="Druckteil",
+        )
+        self.revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(),
+            self.admin,
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def test_service_creates_manufacturing_file_with_machine_context(self):
+        machine = ManufacturingMachine.objects.create(
+            name="Bambu X1C",
+            manufacturer="Bambu Lab",
+            model="X1 Carbon",
+            integration_kind="bambulab",
+        )
+
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+            label="PETG 0.20mm",
+            slicer_name="Bambu Studio",
+            machine=machine,
+            material="PETG",
+        )
+
+        self.assertEqual(
+            manufacturing_file.file_type,
+            ManufacturingFile.FileType.SLICER_3MF,
+        )
+        self.assertEqual(manufacturing_file.machine, machine)
+        self.assertEqual(manufacturing_file.metadata["container"], "3mf")
+        self.assertTrue(manufacturing_file.metadata["has_thumbnail"])
+        self.assertTrue(Path(manufacturing_file.file.path).exists())
+        event = AuditEvent.objects.get(
+            action=AuditEvent.Action.MANUFACTURING_FILE_UPLOADED
+        )
+        self.assertEqual(event.metadata["manufacturing_file_id"], manufacturing_file.id)
+
+    def test_duplicate_manufacturing_file_for_revision_is_rejected(self):
+        content = make_3mf_upload().read()
+        create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=SimpleUploadedFile("first.3mf", content),
+            uploaded_by=self.editor,
+        )
+
+        with self.assertRaises(ValidationError):
+            create_manufacturing_file_from_upload(
+                revision=self.revision,
+                uploaded_file=SimpleUploadedFile("second.3mf", content),
+                uploaded_by=self.editor,
+            )
+
+    def test_editor_can_upload_and_download_manufacturing_file(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:upload_manufacturing_file", args=[self.revision.id]),
+            {
+                "file": make_3mf_upload(),
+                "file_type": ManufacturingFile.FileType.SLICER_3MF,
+                "purpose": ManufacturingFile.Purpose.PRINT,
+                "status": ManufacturingFile.Status.APPROVED,
+                "label": "Bambu PETG",
+                "slicer_name": "Bambu Studio",
+                "machine_label": "Bambu X1C",
+                "material": "PETG",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        manufacturing_file = ManufacturingFile.objects.get()
+        self.assertEqual(manufacturing_file.status, ManufacturingFile.Status.APPROVED)
+
+        detail = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+        self.assertContains(detail, "Fertigung")
+        self.assertContains(detail, "Bambu PETG")
+        self.assertContains(detail, "Bambu Studio")
+
+        download = self.client.get(
+            reverse("plm:download_manufacturing_file", args=[manufacturing_file.id])
+        )
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(
+            download["Content-Disposition"],
+            'attachment; filename="plate.3mf"',
+        )
+
+    def test_admin_can_mark_manufacturing_file_obsolete(self):
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+            status=ManufacturingFile.Status.APPROVED,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:obsolete_manufacturing_file", args=[manufacturing_file.id])
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        manufacturing_file.refresh_from_db()
+        self.assertEqual(manufacturing_file.status, ManufacturingFile.Status.OBSOLETE)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.MANUFACTURING_FILE_STATUS_CHANGED
+            ).exists()
+        )
+
+    def test_project_delete_removes_manufacturing_files_and_run_attachments(self):
+        machine = ManufacturingMachine.objects.create(name="Bambu X1C")
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+            machine=machine,
+        )
+        run = ManufacturingRun.objects.create(
+            manufacturing_file=manufacturing_file,
+            machine=machine,
+            operator=self.admin,
+        )
+        attachment = ManufacturingRunAttachment.objects.create(
+            run=run,
+            attachment_type=ManufacturingRunAttachment.AttachmentType.PHOTO,
+            file=ContentFile(b"\x89PNG\r\n\x1a\n", name="result.png"),
+            original_filename="result.png",
+            sha256="b" * 64,
+            size_bytes=8,
+            uploaded_by=self.admin,
+        )
+        manufacturing_path = Path(manufacturing_file.file.path)
+        attachment_path = Path(attachment.file.path)
+        self.assertTrue(manufacturing_path.exists())
+        self.assertTrue(attachment_path.exists())
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:delete_project", args=[self.project.id]),
+            {"confirmation": "MFG"},
+        )
+
+        self.assertRedirects(response, reverse("plm:project_list"))
+        self.assertFalse(ManufacturingFile.objects.exists())
+        self.assertFalse(ManufacturingRun.objects.exists())
+        self.assertFalse(ManufacturingRunAttachment.objects.exists())
+        self.assertFalse(manufacturing_path.exists())
+        self.assertFalse(attachment_path.exists())
 
 
 class ProjectDeleteTests(TestCase):

@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -83,6 +85,28 @@ def revision_artifact_upload_path(instance, filename):
     return (
         f"projects/{project_id}/parts/{part_id}/revisions/"
         f"{revision.revision_code}/artifacts/{artifact_type}/{filename}"
+    )
+
+
+def manufacturing_file_upload_path(instance, filename):
+    revision = instance.revision
+    project_id = revision.part.project_id or "unassigned-project"
+    part_id = revision.part_id or "unassigned-part"
+    return (
+        f"projects/{project_id}/parts/{part_id}/revisions/"
+        f"{revision.revision_code}/manufacturing/{instance.storage_key}/{filename}"
+    )
+
+
+def manufacturing_run_attachment_upload_path(instance, filename):
+    manufacturing_file = instance.run.manufacturing_file
+    revision = manufacturing_file.revision
+    project_id = revision.part.project_id or "unassigned-project"
+    part_id = revision.part_id or "unassigned-part"
+    return (
+        f"projects/{project_id}/parts/{part_id}/revisions/"
+        f"{revision.revision_code}/manufacturing/{manufacturing_file.storage_key}/"
+        f"runs/{instance.run_id}/attachments/{filename}"
     )
 
 
@@ -210,6 +234,210 @@ class RevisionArtifact(TimeStampedModel):
     def __str__(self):
         label = self.view_name or self.artifact_type
         return f"{self.revision} {label}"
+
+
+class ManufacturingMachine(TimeStampedModel):
+    class MachineType(models.TextChoices):
+        PRINTER_3D = "printer_3d", "3D-Drucker"
+        CNC = "cnc", "CNC"
+        LASER = "laser", "Laser"
+        EXTERNAL = "external", "Externer Fertiger"
+        OTHER = "other", "Sonstige"
+
+    name = models.CharField(max_length=160)
+    machine_type = models.CharField(
+        max_length=20,
+        choices=MachineType.choices,
+        default=MachineType.PRINTER_3D,
+    )
+    manufacturer = models.CharField(max_length=120, blank=True)
+    model = models.CharField(max_length=120, blank=True)
+    serial_number = models.CharField(max_length=120, blank=True)
+    network_address = models.CharField(max_length=255, blank=True)
+    integration_kind = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text="Spaeter z.B. bambulab, octoprint, moonraker oder vendor-api.",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ManufacturingFile(TimeStampedModel):
+    class FileType(models.TextChoices):
+        SLICER_3MF = "slicer_3mf", "Slicer-3MF"
+        GCODE = "gcode", "G-Code"
+        BGCODE = "bgcode", "Bambu/Prusa BGCode"
+        STL_PRINT = "stl_print", "STL Fertigung"
+        STEP_VENDOR = "step_vendor", "STEP Fertiger"
+        PDF_DRAWING = "pdf_drawing", "Fertigungs-PDF"
+        OTHER = "other", "Sonstige"
+
+    class Purpose(models.TextChoices):
+        PRINT = "print", "3D-Druck"
+        EXTERNAL_MANUFACTURING = "external_manufacturing", "Externe Fertigung"
+        INSPECTION = "inspection", "Pruefung"
+        DOCUMENTATION = "documentation", "Dokumentation"
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Entwurf"
+        APPROVED = "approved", "Freigegeben"
+        PRINTED = "printed", "Gedruckt"
+        OBSOLETE = "obsolete", "Obsolet"
+
+    revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        related_name="manufacturing_files",
+    )
+    storage_key = models.UUIDField(default=uuid4, editable=False, unique=True)
+    file_type = models.CharField(
+        max_length=30,
+        choices=FileType.choices,
+        default=FileType.SLICER_3MF,
+    )
+    purpose = models.CharField(
+        max_length=30,
+        choices=Purpose.choices,
+        default=Purpose.PRINT,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+    file = models.FileField(upload_to=manufacturing_file_upload_path, max_length=500)
+    original_filename = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    size_bytes = models.PositiveBigIntegerField()
+    label = models.CharField(max_length=160, blank=True)
+    description = models.TextField(blank=True)
+    slicer_name = models.CharField(max_length=120, blank=True)
+    slicer_version = models.CharField(max_length=80, blank=True)
+    machine = models.ForeignKey(
+        ManufacturingMachine,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="manufacturing_files",
+    )
+    machine_label = models.CharField(max_length=160, blank=True)
+    printer_profile = models.CharField(max_length=160, blank=True)
+    material = models.CharField(max_length=120, blank=True)
+    material_brand = models.CharField(max_length=120, blank=True)
+    nozzle_diameter = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    layer_height = models.DecimalField(max_digits=5, decimal_places=3, null=True, blank=True)
+    estimated_print_time_seconds = models.PositiveIntegerField(null=True, blank=True)
+    estimated_material_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_manufacturing_files",
+    )
+
+    class Meta:
+        ordering = ["revision__part__project__code", "revision__part__number", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["revision", "sha256"],
+                name="unique_manufacturing_file_sha_per_revision",
+            ),
+        ]
+
+    def __str__(self):
+        label = self.label or self.original_filename
+        return f"{self.revision} {label}"
+
+
+class ManufacturingRun(TimeStampedModel):
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Geplant"
+        RUNNING = "running", "Laeuft"
+        SUCCEEDED = "succeeded", "Erfolgreich"
+        FAILED = "failed", "Fehlgeschlagen"
+        SCRAPPED = "scrapped", "Ausschuss"
+
+    manufacturing_file = models.ForeignKey(
+        ManufacturingFile,
+        on_delete=models.PROTECT,
+        related_name="runs",
+    )
+    machine = models.ForeignKey(
+        ManufacturingMachine,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="runs",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PLANNED,
+    )
+    operator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="manufacturing_runs",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=1)
+    material_batch = models.CharField(max_length=160, blank=True)
+    result_notes = models.TextField(blank=True)
+    machine_report = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.manufacturing_file} {self.get_status_display()}"
+
+
+class ManufacturingRunAttachment(TimeStampedModel):
+    class AttachmentType(models.TextChoices):
+        PHOTO = "photo", "Foto"
+        LOG = "log", "Log"
+        REPORT = "report", "Report"
+        MEASUREMENT = "measurement", "Messprotokoll"
+        OTHER = "other", "Sonstige"
+
+    run = models.ForeignKey(
+        ManufacturingRun,
+        on_delete=models.PROTECT,
+        related_name="attachments",
+    )
+    attachment_type = models.CharField(
+        max_length=20,
+        choices=AttachmentType.choices,
+        default=AttachmentType.PHOTO,
+    )
+    file = models.FileField(
+        upload_to=manufacturing_run_attachment_upload_path,
+        max_length=500,
+    )
+    original_filename = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    size_bytes = models.PositiveBigIntegerField()
+    caption = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_manufacturing_run_attachments",
+    )
+
+    class Meta:
+        ordering = ["run", "attachment_type", "created_at"]
+
+    def __str__(self):
+        return f"{self.run} {self.original_filename}"
 
 
 class Checkout(TimeStampedModel):
@@ -371,6 +599,11 @@ class AuditEvent(models.Model):
         EXPORT_JOB_CREATED = "export_job_created", "Exportjob angelegt"
         EXPORT_JOB_FAILED = "export_job_failed", "Exportjob fehlgeschlagen"
         REVISION_ARTIFACT_CREATED = "revision_artifact_created", "Revisionsartefakt angelegt"
+        MANUFACTURING_FILE_UPLOADED = "manufacturing_file_uploaded", "Fertigungsdatei hochgeladen"
+        MANUFACTURING_FILE_UPDATED = "manufacturing_file_updated", "Fertigungsdatei geaendert"
+        MANUFACTURING_FILE_STATUS_CHANGED = "manufacturing_file_status_changed", "Fertigungsdatei-Status geaendert"
+        MANUFACTURING_RUN_CREATED = "manufacturing_run_created", "Fertigungslauf angelegt"
+        MANUFACTURING_RUN_ATTACHMENT_ADDED = "manufacturing_run_attachment_added", "Fertigungslauf-Anhang angelegt"
         CHECKOUT_CREATED = "checkout_created", "Checkout angelegt"
         CHECKOUT_CANCELED = "checkout_canceled", "Checkout abgebrochen"
         CHECKOUT_COMPLETED = "checkout_completed", "Checkout eingecheckt"
