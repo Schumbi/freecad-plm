@@ -98,6 +98,16 @@ def manufacturing_file_upload_path(instance, filename):
     )
 
 
+def manufacturing_thumbnail_upload_path(instance, filename):
+    revision = instance.revision
+    project_id = revision.part.project_id or "unassigned-project"
+    part_id = revision.part_id or "unassigned-part"
+    return (
+        f"projects/{project_id}/parts/{part_id}/revisions/"
+        f"{revision.revision_code}/manufacturing/{instance.storage_key}/preview/{filename}"
+    )
+
+
 def manufacturing_run_attachment_upload_path(instance, filename):
     manufacturing_file = instance.run.manufacturing_file
     revision = manufacturing_file.revision
@@ -310,9 +320,15 @@ class ManufacturingFile(TimeStampedModel):
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
-        default=Status.DRAFT,
+        default=Status.APPROVED,
     )
     file = models.FileField(upload_to=manufacturing_file_upload_path, max_length=500)
+    thumbnail = models.FileField(
+        upload_to=manufacturing_thumbnail_upload_path,
+        max_length=500,
+        blank=True,
+    )
+    thumbnail_original_filename = models.CharField(max_length=255, blank=True)
     original_filename = models.CharField(max_length=255)
     sha256 = models.CharField(max_length=64)
     size_bytes = models.PositiveBigIntegerField()

@@ -221,12 +221,13 @@
                   <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
-                  <h5>Fertigungsdateien</h5>
+                  <h5>Verwendbare Fertigungsdateien</h5>
                   {% if revision.manufacturing_files.all %}
                     <table>
                       <thead>
                         <tr>
                           <th>Label</th>
+                          <th>Vorschau</th>
                           <th>Typ</th>
                           <th>Status</th>
                           <th>Slicer</th>
@@ -239,6 +240,13 @@
                         {% for manufacturing_file in revision.manufacturing_files.all %}
                           <tr>
                             <td>{{ manufacturing_file.label|default:manufacturing_file.original_filename }}</td>
+                            <td>
+                              {% if manufacturing_file.thumbnail %}
+                                <img class="manufacturing-thumbnail" src="{% url 'plm:manufacturing_file_thumbnail' manufacturing_file.id %}" alt="{{ manufacturing_file.label|default:manufacturing_file.original_filename }}">
+                              {% else %}
+                                -
+                              {% endif %}
+                            </td>
                             <td>{{ manufacturing_file.get_file_type_display }}</td>
                             <td>{{ manufacturing_file.get_status_display }}</td>
                             <td>
@@ -258,7 +266,7 @@
                               {% if can_release and manufacturing_file.status != "obsolete" %}
                                 <form class="inline-form" method="post" action="{% url 'plm:obsolete_manufacturing_file' manufacturing_file.id %}">
                                   {% csrf_token %}
-                                  <button type="submit">Obsolet</button>
+                                  <button type="submit">Als obsolet markieren</button>
                                 </form>
                               {% endif %}
                             </td>
@@ -267,7 +275,7 @@
                       </tbody>
                     </table>
                   {% else %}
-                    <div class="empty-state">Noch keine Fertigungsdateien fuer diese Revision.</div>
+                    <div class="empty-state">Noch keine verwendbare Fertigungsdatei fuer diese Revision.</div>
                   {% endif %}
 
                   {% if can_upload %}

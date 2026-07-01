@@ -93,6 +93,11 @@ urlpatterns = [
         name="download_manufacturing_file",
     ),
     path(
+        "manufacturing-files/<int:manufacturing_file_id>/thumbnail/",
+        views.manufacturing_file_thumbnail,
+        name="manufacturing_file_thumbnail",
+    ),
+    path(
         "manufacturing-files/<int:manufacturing_file_id>/obsolete/",
         views.obsolete_manufacturing_file,
         name="obsolete_manufacturing_file",

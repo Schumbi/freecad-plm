@@ -900,7 +900,7 @@ def upload_manufacturing_file(request, revision_id):
                 uploaded_by=request.user,
                 file_type=form.cleaned_data.get("file_type", ""),
                 purpose=form.cleaned_data["purpose"],
-                status=form.cleaned_data["status"],
+                status=ManufacturingFile.Status.APPROVED,
                 label=form.cleaned_data["label"],
                 description=form.cleaned_data["description"],
                 slicer_name=form.cleaned_data["slicer_name"],
@@ -959,6 +959,21 @@ def download_manufacturing_file(request, manufacturing_file_id):
         manufacturing_file.file.open("rb"),
         as_attachment=True,
         filename=manufacturing_file.original_filename,
+    )
+
+
+@login_required
+def manufacturing_file_thumbnail(request, manufacturing_file_id):
+    manufacturing_file = get_object_or_404(
+        ManufacturingFile.objects.select_related("revision", "revision__part"),
+        id=manufacturing_file_id,
+    )
+    if not manufacturing_file.thumbnail:
+        return HttpResponseForbidden("Keine Vorschau fuer diese Fertigungsdatei.")
+    return FileResponse(
+        manufacturing_file.thumbnail.open("rb"),
+        as_attachment=False,
+        filename=manufacturing_file.thumbnail_original_filename or "preview.png",
     )
 
 

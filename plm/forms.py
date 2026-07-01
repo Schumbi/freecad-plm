@@ -184,7 +184,6 @@ class ManufacturingFileUploadForm(forms.ModelForm):
         fields = [
             "file",
             "purpose",
-            "status",
             "label",
             "description",
             "slicer_name",
@@ -204,7 +203,6 @@ class ManufacturingFileUploadForm(forms.ModelForm):
         }
         labels = {
             "purpose": "Zweck",
-            "status": "Status",
             "label": "Label",
             "description": "Beschreibung",
             "slicer_name": "Slicer",

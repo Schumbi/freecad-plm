@@ -122,6 +122,42 @@ def make_3mf_upload(name="plate.3mf", members=None):
     return SimpleUploadedFile(name, buffer.getvalue())
 
 
+def make_bambu_json_3mf_upload(name="bambu.3mf"):
+    return make_3mf_upload(
+        name=name,
+        members={
+            "3D/3dmodel.model": "<model unit=\"millimeter\"></model>",
+            "Metadata/project_settings.config": json.dumps(
+                {
+                    "printer_model": "Bambu Lab A1",
+                    "print_settings_id": "0.08mm Extra Fine @BBL A1",
+                    "filament_type": ["PLA", "PLA", "ABS"],
+                    "filament_vendor": ["SUNLU", "Bambu Lab", "Bambu Lab"],
+                    "nozzle_diameter": ["0.4"],
+                    "layer_height": "0.08",
+                }
+            ),
+            "Metadata/slice_info.config": """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <config>
+                  <header>
+                    <header_item key="X-BBL-Client-Type" value="slicer"/>
+                    <header_item key="X-BBL-Client-Version" value="02.07.01.57"/>
+                  </header>
+                </config>
+            """,
+            "Metadata/plate_1.json": json.dumps(
+                {
+                    "nozzle_diameter": 0.4,
+                    "layer_height": 0.2,
+                    "bed_type": "hot_plate",
+                }
+            ),
+            "Metadata/plate_1.png": b"\x89PNG\r\n\x1a\n",
+        },
+    )
+
+
 def freecad_document_xml(label, freecad_id="", object_type="PartDesign::Body", xlinks=None):
     xlinks = xlinks or []
     xlink_xml = "\n".join(
@@ -1588,8 +1624,11 @@ class ManufacturingFileTests(TestCase):
             ManufacturingFile.FileType.SLICER_3MF,
         )
         self.assertEqual(manufacturing_file.machine, machine)
+        self.assertEqual(manufacturing_file.status, ManufacturingFile.Status.APPROVED)
         self.assertEqual(manufacturing_file.metadata["container"], "3mf")
         self.assertTrue(manufacturing_file.metadata["has_thumbnail"])
+        self.assertEqual(manufacturing_file.thumbnail_original_filename, "thumbnail.png")
+        self.assertTrue(Path(manufacturing_file.thumbnail.path).exists())
         self.assertEqual(
             manufacturing_file.metadata["extracted_fields"]["printer_profile"],
             "0.20mm Standard @BBL X1C",
@@ -1614,6 +1653,22 @@ class ManufacturingFileTests(TestCase):
         self.assertEqual(manufacturing_file.material_brand, "Bambu Lab")
         self.assertEqual(str(manufacturing_file.nozzle_diameter), "0.4")
         self.assertEqual(str(manufacturing_file.layer_height), "0.2")
+
+    def test_bambu_json_3mf_metadata_prefills_manufacturing_fields(self):
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_bambu_json_3mf_upload(),
+            uploaded_by=self.editor,
+        )
+
+        self.assertEqual(manufacturing_file.slicer_name, "Bambu Studio")
+        self.assertEqual(manufacturing_file.slicer_version, "02.07.01.57")
+        self.assertEqual(manufacturing_file.machine_label, "Bambu Lab A1")
+        self.assertEqual(manufacturing_file.printer_profile, "0.08mm Extra Fine @BBL A1")
+        self.assertEqual(manufacturing_file.material, "PLA, ABS")
+        self.assertEqual(manufacturing_file.material_brand, "SUNLU, Bambu Lab")
+        self.assertEqual(str(manufacturing_file.nozzle_diameter), "0.4")
+        self.assertEqual(str(manufacturing_file.layer_height), "0.08")
 
     def test_manual_manufacturing_fields_override_3mf_metadata(self):
         manufacturing_file = create_manufacturing_file_from_upload(
@@ -1654,7 +1709,6 @@ class ManufacturingFileTests(TestCase):
                 "file": make_3mf_upload(),
                 "file_type": ManufacturingFile.FileType.SLICER_3MF,
                 "purpose": ManufacturingFile.Purpose.PRINT,
-                "status": ManufacturingFile.Status.APPROVED,
                 "label": "Bambu PETG",
                 "slicer_name": "Bambu Studio",
                 "machine_label": "Bambu X1C",
@@ -1670,6 +1724,10 @@ class ManufacturingFileTests(TestCase):
         self.assertContains(detail, "Fertigung")
         self.assertContains(detail, "Bambu PETG")
         self.assertContains(detail, "Bambu Studio")
+        self.assertContains(
+            detail,
+            reverse("plm:manufacturing_file_thumbnail", args=[manufacturing_file.id]),
+        )
 
         download = self.client.get(
             reverse("plm:download_manufacturing_file", args=[manufacturing_file.id])
@@ -1678,6 +1736,14 @@ class ManufacturingFileTests(TestCase):
         self.assertEqual(
             download["Content-Disposition"],
             'attachment; filename="plate.3mf"',
+        )
+        thumbnail = self.client.get(
+            reverse("plm:manufacturing_file_thumbnail", args=[manufacturing_file.id])
+        )
+        self.assertEqual(thumbnail.status_code, 200)
+        self.assertEqual(
+            thumbnail["Content-Disposition"],
+            'inline; filename="thumbnail.png"',
         )
 
     def test_admin_can_mark_manufacturing_file_obsolete(self):
@@ -1725,8 +1791,10 @@ class ManufacturingFileTests(TestCase):
             uploaded_by=self.admin,
         )
         manufacturing_path = Path(manufacturing_file.file.path)
+        thumbnail_path = Path(manufacturing_file.thumbnail.path)
         attachment_path = Path(attachment.file.path)
         self.assertTrue(manufacturing_path.exists())
+        self.assertTrue(thumbnail_path.exists())
         self.assertTrue(attachment_path.exists())
         self.client.force_login(self.admin)
 
@@ -1740,6 +1808,7 @@ class ManufacturingFileTests(TestCase):
         self.assertFalse(ManufacturingRun.objects.exists())
         self.assertFalse(ManufacturingRunAttachment.objects.exists())
         self.assertFalse(manufacturing_path.exists())
+        self.assertFalse(thumbnail_path.exists())
         self.assertFalse(attachment_path.exists())
 
 

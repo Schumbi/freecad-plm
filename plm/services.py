@@ -5,6 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import PurePosixPath
+from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError
@@ -58,6 +59,13 @@ BAMBU_CONFIG_NAMES = {
     "printer_settings.config",
     "process_settings.config",
 }
+THREEMF_THUMBNAIL_PREFERRED_NAMES = (
+    "Metadata/thumbnail.png",
+    "Metadata/thumbnail1.png",
+    "Metadata/plate_1_small.png",
+    "Metadata/plate_1.png",
+    "Metadata/top_1.png",
+)
 
 
 @dataclass(frozen=True)
@@ -121,13 +129,41 @@ def flatten_config_value(value, prefix=""):
         return dict(items)
     if isinstance(value, list):
         if all(not isinstance(item, (dict, list)) for item in value):
-            return {prefix: ", ".join(str(item) for item in value if item not in [None, ""])}
+            return {prefix: ", ".join(unique_values(value))}
         items = {}
         for index, nested in enumerate(value):
             key_prefix = f"{prefix}.{index}" if prefix else str(index)
             items.update(flatten_config_value(nested, key_prefix))
         return items
     return {prefix: "" if value is None else str(value)}
+
+
+def unique_values(values):
+    unique = []
+    seen = set()
+    for value in values:
+        if value in [None, ""]:
+            continue
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        unique.append(text)
+    return unique
+
+
+def parse_slicer_xml_config(stripped):
+    parsed = {}
+    try:
+        root = ElementTree.fromstring(stripped)
+    except ElementTree.ParseError:
+        return parsed
+    for node in root.iter():
+        key = node.attrib.get("key")
+        value = node.attrib.get("value")
+        if key and value is not None:
+            parsed[key] = value
+    return parsed
 
 
 def parse_slicer_config(text):
@@ -142,6 +178,10 @@ def parse_slicer_config(text):
         json_value = None
     if json_value is not None:
         return flatten_config_value(json_value)
+
+    xml_values = parse_slicer_xml_config(stripped)
+    if xml_values:
+        return xml_values
 
     for line in stripped.splitlines():
         line = line.strip()
@@ -198,10 +238,24 @@ def json_safe_value(value):
     return value
 
 
+def slicer_config_priority(config_name):
+    name = config_name.lower()
+    path = PurePosixPath(name)
+    if path.name.startswith("plate_") and path.suffix == ".json":
+        return 10
+    if path.name == "model_settings.config":
+        return 20
+    if path.name == "project_settings.config":
+        return 30
+    if path.name == "slice_info.config":
+        return 40
+    return 25
+
+
 def extract_slicer_fields(configs):
     merged = {}
     source_names = []
-    for item in configs:
+    for item in sorted(configs, key=lambda item: slicer_config_priority(item["name"])):
         source_names.append(item["name"])
         merged.update(item["values"])
 
@@ -244,9 +298,10 @@ def extract_slicer_fields(configs):
         "slicer_name": slicer_name,
         "slicer_version": first_config_value(
             merged,
-            "slicer_version",
-            "bambu_studio_version",
-            "version",
+        "slicer_version",
+        "X-BBL-Client-Version",
+        "bambu_studio_version",
+        "version",
         ),
         "machine_label": machine_label,
         "printer_profile": printer_profile,
@@ -274,6 +329,35 @@ def extract_slicer_fields(configs):
     }
 
 
+def thumbnail_candidate_score(name):
+    normalized = name.replace("\\", "/")
+    if normalized in THREEMF_THUMBNAIL_PREFERRED_NAMES:
+        return THREEMF_THUMBNAIL_PREFERRED_NAMES.index(normalized)
+    lower_name = normalized.lower()
+    if not lower_name.endswith((".png", ".jpg", ".jpeg")):
+        return 1000
+    if "thumbnail" in lower_name:
+        return 100
+    if "plate" in lower_name and "small" in lower_name:
+        return 120
+    if "plate" in lower_name:
+        return 140
+    if "top" in lower_name:
+        return 160
+    return 500
+
+
+def select_3mf_thumbnail_name(names):
+    candidates = [
+        name
+        for name in names
+        if thumbnail_candidate_score(name) < 1000
+    ]
+    if not candidates:
+        return ""
+    return sorted(candidates, key=thumbnail_candidate_score)[0]
+
+
 def inspect_manufacturing_upload(uploaded_file):
     original_filename = PurePosixPath(uploaded_file.name).name
     suffix = PurePosixPath(original_filename).suffix.lower()
@@ -283,6 +367,7 @@ def inspect_manufacturing_upload(uploaded_file):
 
     file_sha256, size_bytes = upload_file_digest(uploaded_file)
     metadata = {"extension": suffix}
+    thumbnail = None
     if suffix == ".3mf":
         try:
             data = read_uploaded_file(uploaded_file)
@@ -296,10 +381,32 @@ def inspect_manufacturing_upload(uploaded_file):
                 metadata["has_thumbnail"] = any(
                     "thumbnail" in name.lower() for name in names
                 )
+                thumbnail_name = select_3mf_thumbnail_name(names)
+                thumbnail = None
+                if thumbnail_name:
+                    thumbnail = {
+                        "name": PurePosixPath(thumbnail_name).name,
+                        "source": thumbnail_name,
+                        "content": archive.read(thumbnail_name),
+                    }
+                    metadata["thumbnail"] = {
+                        "name": thumbnail["name"],
+                        "source": thumbnail["source"],
+                        "size": len(thumbnail["content"]),
+                    }
                 configs = []
                 for name in names:
                     path = PurePosixPath(name)
-                    if path.name not in BAMBU_CONFIG_NAMES and not name.lower().endswith(".config"):
+                    is_bambu_config = (
+                        path.name in BAMBU_CONFIG_NAMES
+                        or name.lower().endswith(".config")
+                    )
+                    is_plate_json = (
+                        path.parent.name == "Metadata"
+                        and path.name.startswith("plate_")
+                        and path.suffix.lower() == ".json"
+                    )
+                    if not is_bambu_config and not is_plate_json:
                         continue
                     text = decode_config_bytes(archive.read(name))
                     values = parse_slicer_config(text)
@@ -321,6 +428,7 @@ def inspect_manufacturing_upload(uploaded_file):
         "file_type": MANUFACTURING_FILE_EXTENSIONS[suffix],
         "metadata": metadata,
         "extracted_fields": metadata.get("extracted_fields", {}),
+        "thumbnail": thumbnail if suffix == ".3mf" else None,
     }
 
 
@@ -332,7 +440,7 @@ def create_manufacturing_file_from_upload(
     uploaded_by,
     file_type="",
     purpose=ManufacturingFile.Purpose.PRINT,
-    status=ManufacturingFile.Status.DRAFT,
+    status=ManufacturingFile.Status.APPROVED,
     label="",
     description="",
     slicer_name="",
@@ -386,6 +494,21 @@ def create_manufacturing_file_from_upload(
         metadata=info["metadata"],
         uploaded_by=uploaded_by,
     )
+    thumbnail = info.get("thumbnail")
+    if thumbnail:
+        manufacturing_file.thumbnail.save(
+            thumbnail["name"],
+            ContentFile(thumbnail["content"]),
+            save=False,
+        )
+        manufacturing_file.thumbnail_original_filename = thumbnail["name"]
+        manufacturing_file.save(
+            update_fields=[
+                "thumbnail",
+                "thumbnail_original_filename",
+                "updated_at",
+            ]
+        )
     AuditEvent.objects.create(
         actor=uploaded_by,
         action=AuditEvent.Action.MANUFACTURING_FILE_UPLOADED,
@@ -718,6 +841,11 @@ def delete_project_tree(project, actor):
         for item in ManufacturingFile.objects.filter(revision__part__project=project)
         if item.file
     ]
+    manufacturing_thumbnails = [
+        item.thumbnail
+        for item in ManufacturingFile.objects.filter(revision__part__project=project)
+        if item.thumbnail
+    ]
     manufacturing_attachments = [
         item.file
         for item in ManufacturingRunAttachment.objects.filter(
@@ -752,6 +880,7 @@ def delete_project_tree(project, actor):
 
     for field_file in [
         *manufacturing_attachments,
+        *manufacturing_thumbnails,
         *manufacturing_files,
         *artifact_files,
         *revision_files,
