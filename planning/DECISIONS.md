@@ -224,3 +224,24 @@ Grund:
 - Ein Jobmodell laesst sich spaeter ohne Datenmodellbruch in einen Worker verschieben.
 
 Status: entschieden.
+
+## 2026-07-02: Browser-3D-Viewer Nutzt Gecachte Preview-Quellen
+
+Entscheidung: Der Web-Viewer zeigt Modell-Dateien in einem schwebenden Dialog. Direkt browserfaehige Dateien wie STL und 3MF werden direkt geladen; FCStd- und STEP-Kontexte nutzen ein serverseitig erzeugtes STL-Preview-Artefakt.
+
+Regeln:
+
+- Three.js wird lokal ausgeliefert, nicht per CDN.
+- Der Viewer ist eine Vorschau- und Inspektionsfunktion; Downloads bleiben die fuehrende Dateiuebergabe.
+- FCStd wird nicht im Browser geparst.
+- STEP wird nicht direkt im Browser geparst.
+- Die vorhandene FreeCADCmd-/Preview-Pipeline erzeugt das STL-Preview-Artefakt.
+- Das STL-Preview-Artefakt ist ein abgeleitetes Artefakt und keine neue PLM-Revision.
+
+Grund:
+
+- Browserseitiges FCStd-/STEP-Parsing waere deutlich schwerer und weniger robust.
+- Das PLM hat bereits einen Headless-FreeCADCmd-Pfad, der aus FCStd ein Vorschau-Mesh erzeugt.
+- Gecachte Preview-Dateien vermeiden wiederholte schwere Konvertierungen beim Anzeigen.
+
+Status: entschieden.

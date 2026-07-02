@@ -696,6 +696,28 @@ class RevisionUploadViewTests(TestCase):
                 size_bytes=len(content),
             )
 
+    def create_viewer_stl_artifact(self, revision):
+        content = (
+            b"solid triangle\n"
+            b"facet normal 0 0 1\n"
+            b"outer loop\n"
+            b"vertex 0 0 0\n"
+            b"vertex 1 0 0\n"
+            b"vertex 0 1 0\n"
+            b"endloop\n"
+            b"endfacet\n"
+            b"endsolid triangle\n"
+        )
+        return RevisionArtifact.objects.create(
+            revision=revision,
+            artifact_type=RevisionArtifact.ArtifactType.STL,
+            view_name="viewer-preview",
+            file=ContentFile(content, name="preview.stl"),
+            original_filename="preview.stl",
+            sha256="b" * 64,
+            size_bytes=len(content),
+        )
+
     def test_project_list_requires_login(self):
         response = self.client.get(reverse("plm:project_list"))
 
@@ -719,6 +741,36 @@ class RevisionUploadViewTests(TestCase):
         self.assertContains(response, "Testteil aus FreeCAD")
         self.assertContains(response, "CC-BY")
         self.assertContains(response, "1.1R1")
+
+    def test_part_detail_shows_3d_viewer_buttons(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        RevisionArtifact.objects.create(
+            revision=revision,
+            artifact_type=RevisionArtifact.ArtifactType.STL,
+            file=ContentFile(b"solid model\nendsolid model\n", name="artifact.stl"),
+            original_filename="artifact.stl",
+            sha256="c" * 64,
+            size_bytes=25,
+        )
+        create_manufacturing_file_from_upload(
+            revision=revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.user,
+            label="Slicer-Datei",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, "3D anzeigen")
+        self.assertContains(response, reverse("plm:revision_viewer_source", args=[revision.id]))
+        artifact = RevisionArtifact.objects.get(original_filename="artifact.stl")
+        self.assertContains(response, reverse("plm:artifact_viewer_source", args=[artifact.id]))
+        manufacturing_file = ManufacturingFile.objects.get()
+        self.assertContains(
+            response,
+            reverse("plm:manufacturing_file_viewer_source", args=[manufacturing_file.id]),
+        )
 
     def test_upload_revision_creates_revision(self):
         self.client.force_login(self.user)
@@ -842,6 +894,7 @@ class RevisionUploadViewTests(TestCase):
             AuditEvent.objects.get().action,
             AuditEvent.Action.REVISION_DOWNLOADED,
         )
+        response.close()
 
     def test_png_views_button_processes_job_immediately(self):
         self.client.force_login(self.user)
@@ -880,6 +933,83 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(job.job_type, ExportJob.JobType.PNG_VIEWS)
         self.assertEqual(job.status, ExportJob.Status.QUEUED)
         process.assert_not_called()
+
+    def test_viewer_preview_button_uses_png_preview_pipeline(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        with patch("plm.views.ensure_revision_viewer_preview", return_value="queued") as ensure:
+            response = self.client.post(
+                reverse("plm:create_revision_viewer_preview", args=[revision.id])
+            )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        ensure.assert_called_once_with(revision, self.user)
+
+    def test_revision_viewer_source_requires_login(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        self.create_viewer_stl_artifact(revision)
+
+        response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response["Location"])
+
+    def test_revision_viewer_source_returns_preview_stl_inline(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        self.create_viewer_stl_artifact(revision)
+
+        response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "model/stl")
+        self.assertIn("inline", response["Content-Disposition"])
+        response.close()
+
+    def test_revision_viewer_source_reports_missing_preview(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "keine 3D-Vorschau", status_code=404)
+
+    def test_artifact_viewer_source_returns_direct_stl(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        artifact = RevisionArtifact.objects.create(
+            revision=revision,
+            artifact_type=RevisionArtifact.ArtifactType.STL,
+            file=ContentFile(b"solid model\nendsolid model\n", name="artifact.stl"),
+            original_filename="artifact.stl",
+            sha256="d" * 64,
+            size_bytes=25,
+        )
+
+        response = self.client.get(reverse("plm:artifact_viewer_source", args=[artifact.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "model/stl")
+        response.close()
+
+    def test_manufacturing_viewer_source_returns_direct_3mf(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.user,
+        )
+
+        response = self.client.get(
+            reverse("plm:manufacturing_file_viewer_source", args=[manufacturing_file.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "model/3mf")
+        response.close()
 
     def test_revision_compare_queues_missing_png_views_for_selected_revisions(self):
         self.client.force_login(self.user)
@@ -1737,6 +1867,7 @@ class ManufacturingFileTests(TestCase):
             download["Content-Disposition"],
             'attachment; filename="plate.3mf"',
         )
+        download.close()
         thumbnail = self.client.get(
             reverse("plm:manufacturing_file_thumbnail", args=[manufacturing_file.id])
         )
@@ -1745,6 +1876,7 @@ class ManufacturingFileTests(TestCase):
             thumbnail["Content-Disposition"],
             'inline; filename="thumbnail.png"',
         )
+        thumbnail.close()
 
     def test_admin_can_mark_manufacturing_file_obsolete(self):
         manufacturing_file = create_manufacturing_file_from_upload(
@@ -2092,6 +2224,13 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
             RevisionArtifact.objects.filter(
                 artifact_type=RevisionArtifact.ArtifactType.STEP,
                 view_name="preview",
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            RevisionArtifact.objects.filter(
+                artifact_type=RevisionArtifact.ArtifactType.STL,
+                view_name="viewer-preview",
             ).count(),
             1,
         )

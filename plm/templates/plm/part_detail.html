@@ -64,6 +64,15 @@
 
               <div class="revision-actions">
                 <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a>
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  data-model-viewer-source="{% url 'plm:revision_viewer_source' revision.id %}"
+                  data-model-viewer-format="stl"
+                  data-model-viewer-title="{{ revision.revision_code }} - {{ revision.original_filename }}"
+                  data-model-viewer-download="{% url 'plm:download_revision' revision.id %}">
+                  3D anzeigen
+                </button>
                 {% if can_release and revision.status == "draft" %}
                   <form method="post" action="{% url 'plm:release_revision' revision.id %}">
                     {% csrf_token %}
@@ -79,6 +88,10 @@
                     <button type="button" data-dialog-target="#manufacturing-{{ revision.id }}">Fertigung</button>
                     <button type="button" data-dialog-target="#jobs-{{ revision.id }}">Jobs und Artefakte</button>
                     {% if can_upload %}
+                      <form method="post" action="{% url 'plm:create_revision_viewer_preview' revision.id %}">
+                        {% csrf_token %}
+                        <button type="submit">3D-Vorschau erzeugen</button>
+                      </form>
                       {% if revision.extracted_metadata.freecadcmd.objects %}
                         <a href="{% url 'plm:create_revision_export_job' revision.id %}">Export planen</a>
                       {% endif %}
@@ -263,6 +276,17 @@
                             <td>{{ manufacturing_file.material|default:"-" }}</td>
                             <td>
                               <a href="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">Download</a>
+                              {% if manufacturing_file.file_type == "slicer_3mf" or manufacturing_file.file_type == "stl_print" or manufacturing_file.file_type == "step_vendor" %}
+                                <button
+                                  type="button"
+                                  class="btn btn-outline-secondary btn-sm"
+                                  data-model-viewer-source="{% url 'plm:manufacturing_file_viewer_source' manufacturing_file.id %}"
+                                  data-model-viewer-format="{% if manufacturing_file.file_type == "slicer_3mf" %}3mf{% else %}stl{% endif %}"
+                                  data-model-viewer-title="{{ manufacturing_file.label|default:manufacturing_file.original_filename }}"
+                                  data-model-viewer-download="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">
+                                  3D anzeigen
+                                </button>
+                              {% endif %}
                               {% if can_release and manufacturing_file.status != "obsolete" %}
                                 <form class="inline-form" method="post" action="{% url 'plm:obsolete_manufacturing_file' manufacturing_file.id %}">
                                   {% csrf_token %}
@@ -320,6 +344,17 @@
                             {{ artifact.original_filename }}
                           </a>
                           {% if artifact.view_name %}({{ artifact.view_name }}){% endif %}
+                          {% if artifact.artifact_type == "stl" or artifact.artifact_type == "3mf" or artifact.artifact_type == "step" %}
+                            <button
+                              type="button"
+                              class="btn btn-outline-secondary btn-sm"
+                              data-model-viewer-source="{% url 'plm:artifact_viewer_source' artifact.id %}"
+                              data-model-viewer-format="{% if artifact.artifact_type == "3mf" %}3mf{% else %}stl{% endif %}"
+                              data-model-viewer-title="{{ artifact.original_filename }}"
+                              data-model-viewer-download="{% url 'plm:download_revision_artifact' artifact.id %}">
+                              3D anzeigen
+                            </button>
+                          {% endif %}
                         </li>
                       {% endfor %}
                     </ul>

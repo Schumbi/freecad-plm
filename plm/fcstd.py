@@ -26,10 +26,13 @@ PLM_REVISION_PROPERTY = "PLMRevision"
 
 
 def read_uploaded_file(uploaded_file):
+    was_closed = bool(getattr(uploaded_file, "closed", False))
     position = uploaded_file.tell() if hasattr(uploaded_file, "tell") else None
     data = uploaded_file.read()
     if hasattr(uploaded_file, "seek"):
         uploaded_file.seek(position or 0)
+    if was_closed and hasattr(uploaded_file, "close"):
+        uploaded_file.close()
     return data
 
 

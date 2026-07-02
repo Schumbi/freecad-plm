@@ -18,6 +18,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche entwerfen und umsetzen.
 - Folgeausbau fuer VarSet-Parameterbearbeitung und Neurendern planen.
 - ManufacturingRun-UI und Maschinenintegration fuer Bambu/andere Herstellungsmaschinen planen und umsetzen.
+- 3D-Viewer im Browser mit echten FCStd-, STEP-, STL- und 3MF-Dateien auf der laufenden Instanz testen.
+- STEP-/FCStd-Viewer-Preview-Erzeugung auf dem Server mit echtem FreeCADCmd-Worker gegen reale Dateien pruefen.
 
 ## Als Naechstes
 
@@ -90,3 +92,4 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Objektbezogene Anmerkungen fuer Teile/Revisionen angelegt.
 - Addon-Uebergabeplan mit API-Vertrag und Implementierungsvorgaben in `planning/FREECAD_ADDON_PLAN.md` angelegt.
 - Manufacturing-Dateien fuer gedruckte Revisionen angelegt: Datenmodell, Upload, Download, 3MF-Basisvalidierung, Maschinenbezug und spaeter erweiterbare Fertigungslauf-/Anhangmodelle.
+- Schwebenden 3D-Viewer fuer Revisionen, Artefakte und Fertigungsdateien angelegt; STL/3MF werden direkt angezeigt, FCStd/STEP nutzen ein gespeichertes STL-Preview-Artefakt.

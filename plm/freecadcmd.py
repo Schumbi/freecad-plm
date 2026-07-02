@@ -3,6 +3,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -328,6 +329,14 @@ def run_freecadcmd_job(job):
         result = json.loads(result_path.read_text(encoding="utf-8"))
         preview_mesh_path = result.pop("preview_mesh_path", "")
         if preview_mesh_path:
+            preview_mesh = Path(preview_mesh_path)
+            result.setdefault("artifacts", []).append(
+                {
+                    "path": str(preview_mesh),
+                    "artifact_type": "stl",
+                    "view_name": "viewer-preview",
+                }
+            )
             result.setdefault("artifacts", []).extend(
                 render_stl_views(
                     preview_mesh_path,
@@ -421,12 +430,14 @@ def configured_command(configured, label, job=None):
     if isinstance(configured, (list, tuple)):
         command = [str(item) for item in configured]
     else:
-        command = shlex.split(str(configured))
+        command = shlex.split(str(configured), posix=os.name != "nt")
     if not command:
         raise RuntimeError(f"{label} ist nicht konfiguriert.")
 
     executable = command[0]
     command = with_flatpak_worker_options(command)
+    if Path(executable).suffix.lower() == ".py" and Path(executable).exists():
+        return [sys.executable, *command]
     if shutil.which(executable) or Path(executable).exists():
         return command
 

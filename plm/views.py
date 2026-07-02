@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.http import FileResponse
 from django.http import HttpResponseForbidden
+from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import (
@@ -61,6 +62,22 @@ from .freecadcmd import (
 
 
 PENDING_REVISION_UPLOAD_SESSION_KEY = "pending_revision_upload"
+VIEWER_PREVIEW_VIEW_NAME = "viewer-preview"
+VIEWER_FALLBACK_VIEW_NAME = "preview"
+VIEWER_SUPPORTED_ARTIFACT_TYPES = {
+    RevisionArtifact.ArtifactType.STL,
+    RevisionArtifact.ArtifactType.THREEMF,
+    RevisionArtifact.ArtifactType.STEP,
+}
+VIEWER_SUPPORTED_MANUFACTURING_TYPES = {
+    ManufacturingFile.FileType.SLICER_3MF,
+    ManufacturingFile.FileType.STL_PRINT,
+    ManufacturingFile.FileType.STEP_VENDOR,
+}
+VIEWER_CONTENT_TYPES = {
+    "stl": "model/stl",
+    "3mf": "model/3mf",
+}
 
 
 def save_pending_revision_upload(part, uploaded_file, conflict, change_summary=""):
@@ -113,6 +130,43 @@ def referenced_revision_zip_response(root_entry):
         buffer,
         as_attachment=True,
         filename=f"{root_entry.snapshot.project.code}-{PurePosixPath(root_entry.path).stem}-with-references.zip",
+    )
+
+
+def viewer_file_format(filename, fallback=""):
+    suffix = PurePosixPath(filename or "").suffix.lower()
+    if suffix == ".stl":
+        return "stl"
+    if suffix == ".3mf":
+        return "3mf"
+    if fallback in {"stl", "3mf"}:
+        return fallback
+    return ""
+
+
+def revision_viewer_artifact(revision):
+    artifacts = revision.artifacts.filter(
+        artifact_type=RevisionArtifact.ArtifactType.STL,
+    )
+    return (
+        artifacts.filter(view_name=VIEWER_PREVIEW_VIEW_NAME).first()
+        or artifacts.filter(view_name=VIEWER_FALLBACK_VIEW_NAME).first()
+        or artifacts.first()
+    )
+
+
+def viewer_file_response(field_file, filename, file_format):
+    return FileResponse(
+        field_file.open("rb"),
+        as_attachment=False,
+        filename=filename,
+        content_type=VIEWER_CONTENT_TYPES.get(file_format, "application/octet-stream"),
+    )
+
+
+def missing_viewer_preview_response():
+    return HttpResponseNotFound(
+        "Fuer diese Datei gibt es noch keine 3D-Vorschau. Erzeuge zuerst die 3D-Vorschau."
     )
 
 
@@ -741,6 +795,30 @@ def create_revision_png_job(request, revision_id):
     return redirect("plm:part_detail", part_id=revision.part_id)
 
 
+@login_required
+def create_revision_viewer_preview(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Erzeugen von 3D-Vorschauen.")
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=revision.part_id)
+
+    status = ensure_revision_viewer_preview(revision, request.user)
+    if status == "ready":
+        messages.success(request, f"3D-Vorschau fuer {revision.revision_code} ist verfuegbar.")
+    elif status in {"queued", "pending"}:
+        messages.info(
+            request,
+            "3D-Vorschau wurde eingeplant. Starte den Worker oder warte, bis er den Job verarbeitet hat.",
+        )
+    else:
+        messages.error(request, f"3D-Vorschau fuer {revision.revision_code} konnte nicht erzeugt werden.")
+    return redirect("plm:part_detail", part_id=revision.part_id)
+
+
 def revision_png_view_names(revision):
     return set(
         revision.artifacts.filter(
@@ -806,6 +884,25 @@ def ensure_revision_png_views(revision, user, *, process_inline=True):
         process_export_job(job)
         job.refresh_from_db()
         return "ready" if job.status == ExportJob.Status.SUCCEEDED else "failed"
+    return "queued"
+
+
+def ensure_revision_viewer_preview(revision, user, *, process_inline=True):
+    if revision_viewer_artifact(revision):
+        return "ready"
+    if revision_has_pending_png_job(revision):
+        return "pending"
+
+    job = create_export_job(
+        revision=revision,
+        job_type=ExportJob.JobType.PNG_VIEWS,
+        created_by=user,
+    )
+    if process_inline and settings.PROCESS_EXPORT_JOBS_INLINE:
+        process_export_job(job)
+        job.refresh_from_db()
+        revision.refresh_from_db()
+        return "ready" if job.status == ExportJob.Status.SUCCEEDED and revision_viewer_artifact(revision) else "failed"
     return "queued"
 
 
@@ -876,6 +973,37 @@ def download_revision_artifact(request, artifact_id):
         as_attachment=as_attachment,
         filename=artifact.original_filename,
     )
+
+
+@login_required
+def revision_viewer_source(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by").prefetch_related("artifacts"),
+        id=revision_id,
+    )
+    artifact = revision_viewer_artifact(revision)
+    if not artifact:
+        return missing_viewer_preview_response()
+    return viewer_file_response(artifact.file, artifact.original_filename, "stl")
+
+
+@login_required
+def artifact_viewer_source(request, artifact_id):
+    artifact = get_object_or_404(
+        RevisionArtifact.objects.select_related("revision", "revision__part"),
+        id=artifact_id,
+    )
+    if artifact.artifact_type not in VIEWER_SUPPORTED_ARTIFACT_TYPES:
+        return HttpResponseForbidden("Dieses Artefakt kann nicht als 3D-Modell angezeigt werden.")
+
+    file_format = viewer_file_format(artifact.original_filename, artifact.artifact_type)
+    if file_format:
+        return viewer_file_response(artifact.file, artifact.original_filename, file_format)
+
+    preview = revision_viewer_artifact(artifact.revision)
+    if not preview:
+        return missing_viewer_preview_response()
+    return viewer_file_response(preview.file, preview.original_filename, "stl")
 
 
 @login_required
@@ -960,6 +1088,31 @@ def download_manufacturing_file(request, manufacturing_file_id):
         as_attachment=True,
         filename=manufacturing_file.original_filename,
     )
+
+
+@login_required
+def manufacturing_file_viewer_source(request, manufacturing_file_id):
+    manufacturing_file = get_object_or_404(
+        ManufacturingFile.objects.select_related("revision", "revision__part"),
+        id=manufacturing_file_id,
+    )
+    if manufacturing_file.file_type not in VIEWER_SUPPORTED_MANUFACTURING_TYPES:
+        return HttpResponseForbidden(
+            "Diese Fertigungsdatei kann nicht als 3D-Modell angezeigt werden."
+        )
+
+    file_format = viewer_file_format(manufacturing_file.original_filename)
+    if file_format:
+        return viewer_file_response(
+            manufacturing_file.file,
+            manufacturing_file.original_filename,
+            file_format,
+        )
+
+    preview = revision_viewer_artifact(manufacturing_file.revision)
+    if not preview:
+        return missing_viewer_preview_response()
+    return viewer_file_response(preview.file, preview.original_filename, "stl")
 
 
 @login_required

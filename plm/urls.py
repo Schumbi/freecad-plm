@@ -78,9 +78,24 @@ urlpatterns = [
         name="create_revision_png_job",
     ),
     path(
+        "revisions/<int:revision_id>/viewer-preview/",
+        views.create_revision_viewer_preview,
+        name="create_revision_viewer_preview",
+    ),
+    path(
+        "revisions/<int:revision_id>/viewer-source/",
+        views.revision_viewer_source,
+        name="revision_viewer_source",
+    ),
+    path(
         "artifacts/<int:artifact_id>/download/",
         views.download_revision_artifact,
         name="download_revision_artifact",
+    ),
+    path(
+        "artifacts/<int:artifact_id>/viewer-source/",
+        views.artifact_viewer_source,
+        name="artifact_viewer_source",
     ),
     path(
         "revisions/<int:revision_id>/manufacturing-files/upload/",
@@ -91,6 +106,11 @@ urlpatterns = [
         "manufacturing-files/<int:manufacturing_file_id>/download/",
         views.download_manufacturing_file,
         name="download_manufacturing_file",
+    ),
+    path(
+        "manufacturing-files/<int:manufacturing_file_id>/viewer-source/",
+        views.manufacturing_file_viewer_source,
+        name="manufacturing_file_viewer_source",
     ),
     path(
         "manufacturing-files/<int:manufacturing_file_id>/thumbnail/",

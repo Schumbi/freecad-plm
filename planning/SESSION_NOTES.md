@@ -424,3 +424,31 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `ManufacturingRun` und Attachments sind modellseitig vorbereitet, damit spaeter ein Bambu-/Maschinenanschluss Bilder, Logs und Reports einem konkreten Fertigungslauf zuordnen kann.
 - Projektloeschung raeumt Manufacturing-Dateien und spaetere Run-Anhaenge aus Storage und Datenbank auf.
 - `.venv/bin/python manage.py test plm` laeuft mit 97 Tests erfolgreich.
+
+## 2026-07-02
+
+### 3D-Viewer Fuer Modell-Dateien
+
+- Three.js 0.160.0 wurde lokal unter `plm/static/plm/vendor/three/` abgelegt.
+- Globaler schwebender Dialog `3D-Modell` in `base.html` angelegt.
+- `plm/static/plm/model-viewer.js` rendert STL und 3MF mit OrbitControls, Auto-Fit, Reset und Drahtgitter-Umschaltung.
+- Die Teildetailseite zeigt separate Buttons `3D anzeigen` fuer:
+  - Revisionen
+  - viewerfaehige Artefakte
+  - viewerfaehige Fertigungsdateien
+- Neue Viewer-Quellendpunkte angelegt:
+  - `revision_viewer_source`
+  - `artifact_viewer_source`
+  - `manufacturing_file_viewer_source`
+- Direkte STL- und 3MF-Dateien werden inline an den Browser-Viewer geliefert.
+- FCStd- und STEP-Kontexte nutzen ein gespeichertes STL-Preview-Artefakt der Revision.
+- Der bestehende PNG-/Preview-Job speichert das temporaere STL-Mesh jetzt zusaetzlich als `RevisionArtifact` mit `artifact_type=stl` und `view_name=viewer-preview`.
+- Neuer Button/Endpunkt `3D-Vorschau erzeugen` nutzt die bestehende PNG-/Preview-Pipeline, damit FCStd-Revisionen eine 3D-Viewer-Quelle bekommen.
+- Windows-Kompatibilitaet verbessert:
+  - `FREECADCMD_COMMAND` nutzt auf Windows passendes `shlex.split(..., posix=False)`.
+  - `.py`-Kommandos werden fuer Tests ueber den aktuellen Python-Interpreter ausgefuehrt.
+  - FieldFile-Reads werden nach dem Lesen wieder geschlossen, wenn die Datei vorher geschlossen war.
+- Lokale `.venv` wurde auf Windows angelegt und `requirements.txt` installiert.
+- `node --check plm/static/plm/model-viewer.js` ist gruen.
+- `manage.py check` ist gruen.
+- `manage.py test plm` laeuft mit 107 Tests erfolgreich.

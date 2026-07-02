@@ -732,6 +732,10 @@
       max-width: 72rem;
       width: min(100%, 72rem);
     }
+    .plm-dialog-panel.viewer {
+      max-width: 88rem;
+      width: min(100%, 88rem);
+    }
     .plm-dialog-header {
       align-items: center;
       border-bottom: 1px solid var(--border-soft);
@@ -749,6 +753,51 @@
       max-height: 72vh;
       overflow: auto;
       padding: var(--space-4);
+    }
+    .model-viewer-layout {
+      display: grid;
+      gap: var(--space-3);
+    }
+    .model-viewer-toolbar {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      justify-content: space-between;
+    }
+    .model-viewer-toolbar-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+    .model-viewer-canvas {
+      aspect-ratio: 16 / 9;
+      background: #20282d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      min-height: 28rem;
+      overflow: hidden;
+      position: relative;
+    }
+    .model-viewer-canvas canvas {
+      display: block;
+      height: 100%;
+      width: 100%;
+    }
+    .model-viewer-status {
+      align-items: center;
+      background: rgba(24, 36, 43, 0.78);
+      border-radius: 6px;
+      color: white;
+      display: flex;
+      inset: var(--space-3);
+      justify-content: center;
+      padding: var(--space-3);
+      pointer-events: none;
+      position: absolute;
+      text-align: center;
+      z-index: 2;
     }
     .plm-dialog-close {
       background: transparent;
@@ -885,6 +934,36 @@
       </main>
     </div>
   </div>
+  <div class="plm-dialog" id="model-viewer-dialog" role="dialog" aria-modal="true" aria-labelledby="model-viewer-title" hidden>
+    <div class="plm-dialog-panel viewer">
+      <div class="plm-dialog-header">
+        <h5 class="plm-dialog-title" id="model-viewer-title">3D-Modell</h5>
+        <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+      </div>
+      <div class="plm-dialog-body">
+        <div class="model-viewer-layout">
+          <div class="model-viewer-toolbar">
+            <span class="muted" id="model-viewer-format">Viewer</span>
+            <div class="model-viewer-toolbar-actions">
+              <button type="button" class="secondary" id="model-viewer-wireframe">Drahtgitter</button>
+              <button type="button" class="secondary" id="model-viewer-reset">Ansicht zuruecksetzen</button>
+              <a class="btn btn-outline-secondary btn-sm" id="model-viewer-download" href="#">Download</a>
+            </div>
+          </div>
+          <div class="model-viewer-canvas" id="model-viewer-canvas">
+            <div class="model-viewer-status" id="model-viewer-status">Bereit.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "{% static 'plm/vendor/three/build/three.module.js' %}"
+      }
+    }
+  </script>
   <script>
     (function () {
       function closeDialog(dialog) {
@@ -921,5 +1000,6 @@
       });
     }());
   </script>
+  <script type="module" src="{% static 'plm/model-viewer.js' %}"></script>
 </body>
 </html>
