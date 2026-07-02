@@ -14,7 +14,9 @@ from django.db import transaction
 from django.http import FileResponse
 from django.http import HttpResponseForbidden
 from django.http import HttpResponseNotFound
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .forms import (
     ManufacturingFileUploadForm,
@@ -168,6 +170,44 @@ def missing_viewer_preview_response():
     return HttpResponseNotFound(
         "Fuer diese Datei gibt es noch keine 3D-Vorschau. Erzeuge zuerst die 3D-Vorschau."
     )
+
+
+def viewer_status_payload(revision):
+    artifact = revision_viewer_artifact(revision)
+    if artifact:
+        return {
+            "status": "ready",
+            "message": "3D-Vorschau ist bereit.",
+            "source_url": reverse("plm:revision_viewer_source", args=[revision.id]),
+        }
+
+    pending_job = revision.export_jobs.filter(
+        job_type=ExportJob.JobType.PNG_VIEWS,
+        status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING],
+    ).order_by("-created_at").first()
+    if pending_job:
+        label = "laeuft" if pending_job.status == ExportJob.Status.RUNNING else "wartet"
+        return {
+            "status": pending_job.status,
+            "message": f"3D-Vorschau {label}.",
+            "job_id": pending_job.id,
+        }
+
+    failed_job = revision.export_jobs.filter(
+        job_type=ExportJob.JobType.PNG_VIEWS,
+        status=ExportJob.Status.FAILED,
+    ).order_by("-created_at").first()
+    if failed_job:
+        return {
+            "status": "failed",
+            "message": failed_job.error or "3D-Vorschau konnte nicht erzeugt werden.",
+            "job_id": failed_job.id,
+        }
+
+    return {
+        "status": "missing",
+        "message": "3D-Vorschau wird vorbereitet.",
+    }
 
 
 @login_required
@@ -807,6 +847,14 @@ def create_revision_viewer_preview(request, revision_id):
         return redirect("plm:part_detail", part_id=revision.part_id)
 
     status = ensure_revision_viewer_preview(revision, request.user)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        revision.refresh_from_db()
+        payload = viewer_status_payload(revision)
+        if status == "failed":
+            payload["status"] = "failed"
+            payload.setdefault("message", f"3D-Vorschau fuer {revision.revision_code} konnte nicht erzeugt werden.")
+        return JsonResponse(payload)
+
     if status == "ready":
         messages.success(request, f"3D-Vorschau fuer {revision.revision_code} ist verfuegbar.")
     elif status in {"queued", "pending"}:
@@ -817,6 +865,15 @@ def create_revision_viewer_preview(request, revision_id):
     else:
         messages.error(request, f"3D-Vorschau fuer {revision.revision_code} konnte nicht erzeugt werden.")
     return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def revision_viewer_status(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by").prefetch_related("artifacts", "export_jobs"),
+        id=revision_id,
+    )
+    return JsonResponse(viewer_status_payload(revision))
 
 
 def revision_png_view_names(revision):

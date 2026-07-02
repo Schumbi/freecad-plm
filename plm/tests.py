@@ -764,6 +764,8 @@ class RevisionUploadViewTests(TestCase):
 
         self.assertContains(response, "3D anzeigen")
         self.assertContains(response, reverse("plm:revision_viewer_source", args=[revision.id]))
+        self.assertContains(response, reverse("plm:create_revision_viewer_preview", args=[revision.id]))
+        self.assertContains(response, reverse("plm:revision_viewer_status", args=[revision.id]))
         artifact = RevisionArtifact.objects.get(original_filename="artifact.stl")
         self.assertContains(response, reverse("plm:artifact_viewer_source", args=[artifact.id]))
         manufacturing_file = ManufacturingFile.objects.get()
@@ -945,6 +947,35 @@ class RevisionUploadViewTests(TestCase):
 
         self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
         ensure.assert_called_once_with(revision, self.user)
+
+    def test_viewer_preview_ajax_returns_status_payload(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        with patch("plm.views.ensure_revision_viewer_preview", return_value="queued"):
+            response = self.client.post(
+                reverse("plm:create_revision_viewer_preview", args=[revision.id]),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "missing")
+        self.assertIn("message", response.json())
+
+    def test_viewer_status_reports_ready_preview(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        self.create_viewer_stl_artifact(revision)
+
+        response = self.client.get(reverse("plm:revision_viewer_status", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ready")
+        self.assertEqual(
+            payload["source_url"],
+            reverse("plm:revision_viewer_source", args=[revision.id]),
+        )
 
     def test_revision_viewer_source_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)

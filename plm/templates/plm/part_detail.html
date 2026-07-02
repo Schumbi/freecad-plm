@@ -68,6 +68,8 @@
                   type="button"
                   class="btn btn-outline-secondary btn-sm"
                   data-model-viewer-source="{% url 'plm:revision_viewer_source' revision.id %}"
+                  data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
+                  data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
                   data-model-viewer-format="stl"
                   data-model-viewer-title="{{ revision.revision_code }} - {{ revision.original_filename }}"
                   data-model-viewer-download="{% url 'plm:download_revision' revision.id %}">
@@ -281,6 +283,8 @@
                                   type="button"
                                   class="btn btn-outline-secondary btn-sm"
                                   data-model-viewer-source="{% url 'plm:manufacturing_file_viewer_source' manufacturing_file.id %}"
+                                  data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
+                                  data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
                                   data-model-viewer-format="{% if manufacturing_file.file_type == "slicer_3mf" %}3mf{% else %}stl{% endif %}"
                                   data-model-viewer-title="{{ manufacturing_file.label|default:manufacturing_file.original_filename }}"
                                   data-model-viewer-download="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">
@@ -349,6 +353,8 @@
                               type="button"
                               class="btn btn-outline-secondary btn-sm"
                               data-model-viewer-source="{% url 'plm:artifact_viewer_source' artifact.id %}"
+                              data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
+                              data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
                               data-model-viewer-format="{% if artifact.artifact_type == "3mf" %}3mf{% else %}stl{% endif %}"
                               data-model-viewer-title="{{ artifact.original_filename }}"
                               data-model-viewer-download="{% url 'plm:download_revision_artifact' artifact.id %}">

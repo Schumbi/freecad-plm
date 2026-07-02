@@ -452,3 +452,18 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `node --check plm/static/plm/model-viewer.js` ist gruen.
 - `manage.py check` ist gruen.
 - `manage.py test plm` laeuft mit 107 Tests erfolgreich.
+
+### Fortschritt 3D-Viewer Automatische Preview
+
+- Klick auf `3D anzeigen` oeffnet den Viewer-Dialog jetzt sofort.
+- Wenn noch kein STL-Preview-Artefakt vorhanden ist, startet der Dialog automatisch die 3D-Preview-Erzeugung ueber den bestehenden Preview-/PNG-Jobpfad.
+- Der Dialog zeigt den Fortschritt als Statusmeldung an:
+  - Vorschau wird erzeugt
+  - wartet/laeuft
+  - bereit, Modell wird geladen
+  - fehlgeschlagen
+- Neuer JSON-Statusendpunkt `revision_viewer_status` meldet `missing`, `queued`, `running`, `ready` oder `failed`.
+- Direkte STL-/3MF-Dateien werden weiterhin ohne Preview-Job direkt geladen.
+- `node --check plm/static/plm/model-viewer.js` ist gruen.
+- `manage.py check` ist gruen.
+- `manage.py test plm` laeuft mit 109 Tests erfolgreich.

@@ -83,6 +83,11 @@ urlpatterns = [
         name="create_revision_viewer_preview",
     ),
     path(
+        "revisions/<int:revision_id>/viewer-status/",
+        views.revision_viewer_status,
+        name="revision_viewer_status",
+    ),
+    path(
         "revisions/<int:revision_id>/viewer-source/",
         views.revision_viewer_source,
         name="revision_viewer_source",

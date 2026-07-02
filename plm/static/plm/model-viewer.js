@@ -19,6 +19,14 @@ let controls;
 let currentObject;
 let animationFrame;
 let wireframe = false;
+let activeLoadId = 0;
+
+class ViewerHttpError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 function setStatus(message, visible = true) {
   statusElement.textContent = message;
@@ -149,9 +157,41 @@ async function fetchModel(sourceUrl) {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `3D-Modell konnte nicht geladen werden (${response.status}).`);
+    throw new ViewerHttpError(
+      text || `3D-Modell konnte nicht geladen werden (${response.status}).`,
+      response.status,
+    );
   }
   return response.arrayBuffer();
+}
+
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+      ...(options.method === "POST" ? { "X-CSRFToken": csrfToken() } : {}),
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : { message: await response.text() };
+  if (!response.ok) {
+    throw new ViewerHttpError(payload.message || `Anfrage fehlgeschlagen (${response.status}).`, response.status);
+  }
+  return payload;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function parseModel(buffer, format) {
@@ -167,6 +207,7 @@ function parseModel(buffer, format) {
 }
 
 async function openViewer(trigger) {
+  const loadId = ++activeLoadId;
   ensureScene();
   dialog.hidden = false;
   document.body.classList.add("modal-open");
@@ -181,7 +222,8 @@ async function openViewer(trigger) {
   downloadLink.href = trigger.dataset.modelViewerDownload || sourceUrl;
 
   try {
-    const buffer = await fetchModel(sourceUrl);
+    const buffer = await loadModelBuffer(trigger, sourceUrl, loadId);
+    if (loadId !== activeLoadId) return;
     currentObject = parseModel(buffer, format);
     scene.add(currentObject);
     setWireframe(wireframe);
@@ -191,6 +233,45 @@ async function openViewer(trigger) {
   } catch (error) {
     setStatus(error.message || "3D-Modell konnte nicht angezeigt werden.");
   }
+}
+
+async function loadModelBuffer(trigger, sourceUrl, loadId) {
+  try {
+    return await fetchModel(sourceUrl);
+  } catch (error) {
+    const prepareUrl = trigger.dataset.modelViewerPrepare;
+    const statusUrl = trigger.dataset.modelViewerStatus;
+    if (error.status !== 404 || !prepareUrl || !statusUrl) {
+      throw error;
+    }
+    return prepareAndLoadModel(sourceUrl, prepareUrl, statusUrl, loadId);
+  }
+}
+
+async function prepareAndLoadModel(sourceUrl, prepareUrl, statusUrl, loadId) {
+  setStatus("3D-Vorschau wird erzeugt...");
+  const initial = await fetchJson(prepareUrl, { method: "POST" });
+  if (loadId !== activeLoadId) throw new Error("3D-Anzeige wurde abgebrochen.");
+  if (initial.message) setStatus(initial.message);
+
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const status = attempt === 0 ? initial : await fetchJson(statusUrl);
+    if (loadId !== activeLoadId) throw new Error("3D-Anzeige wurde abgebrochen.");
+
+    if (status.status === "ready") {
+      setStatus("3D-Vorschau ist bereit. Modell wird geladen...");
+      return fetchModel(status.source_url || sourceUrl);
+    }
+
+    if (status.status === "failed") {
+      throw new Error(status.message || "3D-Vorschau konnte nicht erzeugt werden.");
+    }
+
+    setStatus(status.message || "3D-Vorschau wird erzeugt...");
+    await wait(1500);
+  }
+
+  throw new Error("3D-Vorschau ist noch nicht fertig. Bitte spaeter erneut oeffnen.");
 }
 
 document.addEventListener("click", (event) => {
