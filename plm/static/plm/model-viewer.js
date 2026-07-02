@@ -47,10 +47,6 @@ function ensureScene() {
   keyLight.position.set(80, 120, 90);
   scene.add(keyLight);
 
-  const grid = new THREE.GridHelper(200, 20, 0x5f6d74, 0x3d484e);
-  grid.name = "viewer-grid";
-  scene.add(grid);
-
   const axes = new THREE.AxesHelper(60);
   axes.name = "viewer-axes";
   scene.add(axes);
@@ -112,14 +108,20 @@ function fitCamera(object) {
 
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
-  const maxSize = Math.max(size.x, size.y, size.z, 1);
-  const distance = maxSize / (2 * Math.tan((Math.PI * camera.fov) / 360));
+  const radius = Math.max(size.length() * 0.5, 1);
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
+  const fitFov = Math.min(verticalFov, horizontalFov);
+  const distance = (radius * 1.45) / Math.sin(fitFov / 2);
+  const viewDirection = new THREE.Vector3(1, 0.75, 1).normalize();
 
-  camera.near = Math.max(distance / 1000, 0.1);
-  camera.far = distance * 1000;
-  camera.position.copy(center).add(new THREE.Vector3(distance, distance * 0.75, distance));
+  camera.near = Math.max(distance / 500, 0.01);
+  camera.far = distance * 500;
+  camera.position.copy(center).addScaledVector(viewDirection, distance);
   camera.updateProjectionMatrix();
   controls.target.copy(center);
+  controls.minDistance = Math.max(radius * 0.05, 0.01);
+  controls.maxDistance = distance * 20;
   controls.update();
 }
 
@@ -166,9 +168,9 @@ function parseModel(buffer, format) {
 
 async function openViewer(trigger) {
   ensureScene();
-  resizeRenderer();
   dialog.hidden = false;
   document.body.classList.add("modal-open");
+  resizeRenderer();
   setStatus("3D-Modell wird geladen...");
   clearModel();
 
