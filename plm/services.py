@@ -948,24 +948,73 @@ def manifest_entries_for_revision(revision, snapshot=None):
     references = revision_reference_files(revision)
     if references and root_entry is None:
         raise ValidationError(
-            "Referenzierte Revisionen koennen nur mit Projektstand ausgecheckt werden."
+            "Referenzierte Revisionen koennen nur mit Projektstand geladen werden."
         )
     if root_entry is None:
         return [
             {
-                "path": revision.original_filename,
+                "path": safe_snapshot_path(revision.original_filename),
                 "revision": revision,
                 "is_root": True,
             }
         ]
     return [
         {
-            "path": entry.path,
+            "path": safe_snapshot_path(entry.path),
             "revision": entry.revision,
             "is_root": entry.id == root_entry.id,
         }
         for entry in snapshot_entries_with_references(root_entry)
     ]
+
+
+def manifest_file_payload(entry):
+    revision = entry["revision"]
+    return {
+        "path": entry["path"],
+        "is_root": entry["is_root"],
+        "revision_id": revision.id,
+        "part_id": revision.part_id,
+        "part_number": revision.part.number,
+        "revision_code": revision.revision_code,
+        "filename": revision.original_filename,
+        "sha256": revision.sha256,
+        "size_bytes": revision.size_bytes,
+    }
+
+
+def revision_manifest(revision, snapshot=None):
+    entries = manifest_entries_for_revision(revision, snapshot=snapshot)
+    return {
+        "project": {
+            "id": revision.part.project_id,
+            "code": revision.part.project.code,
+            "name": revision.part.project.name,
+        },
+        "part": {
+            "id": revision.part_id,
+            "number": revision.part.number,
+            "name": revision.part.name,
+            "category": revision.part.category,
+        },
+        "revision": {
+            "id": revision.id,
+            "revision_code": revision.revision_code,
+            "status": revision.status,
+            "original_filename": revision.original_filename,
+            "sha256": revision.sha256,
+            "size_bytes": revision.size_bytes,
+        },
+        "snapshot": (
+            {
+                "id": snapshot.id,
+                "name": snapshot.name,
+            }
+            if snapshot is not None
+            else None
+        ),
+        "files": [manifest_file_payload(entry) for entry in entries],
+    }
 
 
 def checkout_manifest(checkout):
@@ -1000,20 +1049,7 @@ def checkout_manifest(checkout):
             if checkout.snapshot_id
             else None
         ),
-        "files": [
-            {
-                "path": entry["path"],
-                "is_root": entry["is_root"],
-                "revision_id": entry["revision"].id,
-                "part_id": entry["revision"].part_id,
-                "part_number": entry["revision"].part.number,
-                "revision_code": entry["revision"].revision_code,
-                "filename": entry["revision"].original_filename,
-                "sha256": entry["revision"].sha256,
-                "size_bytes": entry["revision"].size_bytes,
-            }
-            for entry in entries
-        ],
+        "files": [manifest_file_payload(entry) for entry in entries],
     }
 
 

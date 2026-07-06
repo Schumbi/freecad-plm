@@ -271,6 +271,69 @@ Antwort: Datei-Download der `.FCStd`-Datei.
 
 Das Addon muss den Download nach dem Speichern lokal per SHA-256 gegen `sha256` aus Revision oder Manifest pruefen.
 
+### Read-only Manifest
+
+`GET /api/revisions/<revision_id>/manifest/`
+
+Optional:
+
+`GET /api/revisions/<revision_id>/manifest/?snapshot_id=<snapshot_id>`
+
+Scope: `read`.
+
+Der Endpunkt erzeugt keinen Checkout und setzt keinen Lock. Er liefert dieselbe Datei-Aufloesung wie Checkout-Manifeste, damit read-only Oeffnen und Checkout dieselbe Downloadlogik nutzen koennen.
+
+Wenn `snapshot_id` angegeben ist, werden referenzierte Dateien aus genau diesem Projektstand aufgeloest. Wenn eine Revision externe FreeCAD-Referenzen enthaelt und kein passender Snapshot-Kontext verfuegbar ist, antwortet der Server mit `409`.
+
+Antwort:
+
+```json
+{
+  "manifest": {
+    "project": {
+      "id": 1,
+      "code": "PRJ",
+      "name": "Projekt"
+    },
+    "part": {
+      "id": 1,
+      "number": "P-001",
+      "name": "Testteil",
+      "category": "assembly"
+    },
+    "revision": {
+      "id": 1,
+      "revision_code": "R0001",
+      "status": "draft",
+      "original_filename": "Assembly.FCStd",
+      "sha256": "...",
+      "size_bytes": 1234,
+      "download_url": "http://127.0.0.1:8000/api/revisions/1/file/"
+    },
+    "snapshot": {
+      "id": 1,
+      "name": "Arbeitsstand"
+    },
+    "files": [
+      {
+        "path": "Assembly.FCStd",
+        "is_root": true,
+        "revision_id": 1,
+        "part_id": 1,
+        "part_number": "P-001",
+        "revision_code": "R0001",
+        "filename": "Assembly.FCStd",
+        "sha256": "...",
+        "size_bytes": 1234,
+        "download_url": "http://127.0.0.1:8000/api/revisions/1/file/"
+      }
+    ]
+  }
+}
+```
+
+Das Addon soll fuer read-only Oeffnen `manifest.files` herunterladen, SHA-256 pruefen, `manifest.json` schreiben und die Datei mit `is_root: true` oeffnen.
+
 ### Checkout
 
 `POST /api/revisions/<revision_id>/checkout/`
@@ -336,18 +399,19 @@ Antwort `201`:
         "revision_code": "R0001",
         "filename": "Assembly.FCStd",
         "sha256": "...",
-        "size_bytes": 1234
+        "size_bytes": 1234,
+        "download_url": "http://127.0.0.1:8000/api/revisions/1/file/"
       }
     ]
   }
 }
 ```
 
-Hinweis: Direkt nach Checkout enthaelt das Manifest aus diesem Endpunkt noch keine `download_url` pro Datei. Das Addon soll danach `GET /api/checkouts/<checkout_id>/manifest/` laden.
+Hinweis: Direkt nach Checkout enthaelt das Manifest bereits `download_url` pro Datei. Das Addon kann trotzdem `GET /api/checkouts/<checkout_id>/manifest/` erneut laden, wenn es einen gespeicherten Checkout spaeter fortsetzt.
 
 `GET /api/checkouts/<checkout_id>/manifest/`
 
-Wie oben, aber jedes Element in `manifest.files` enthaelt zusaetzlich:
+Wie oben: jedes Element in `manifest.files` enthaelt eine Download-URL.
 
 ```json
 {
@@ -577,6 +641,7 @@ Wichtig:
 - `get_part(part_id)`
 - `update_part(part_id, data)`
 - `get_revision(revision_id)`
+- `get_revision_manifest(revision_id, snapshot_id=None)`
 - `download_revision_file(url, target_path, expected_sha256)`
 - `checkout_revision(revision_id, snapshot_id=None, workspace_hint="")`
 - `get_checkout_manifest(checkout_id)`
@@ -654,7 +719,6 @@ Manueller FreeCAD-Smoke-Test:
 
 Diese Punkte soll die Addon-Instanz nicht loesen, sondern hoechstens als TODO dokumentieren:
 
-- Token-basierte Authentifizierung fuer Addons.
 - API fuer Snapshot-Auswahl je Revision/Baugruppe.
 - API fuer Suche ueber Projekte, Teile, Revisionen und Dateinamen.
 - Maschinenlesbare PLMRevision-Konfliktantwort mit Option zur serverseitigen Normalisierung.

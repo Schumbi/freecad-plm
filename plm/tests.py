@@ -2577,6 +2577,98 @@ class AddonApiWorkflowTests(TestCase):
         )
         self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
 
+    def test_read_token_fetches_single_revision_manifest_without_checkout(self):
+        self.authorize_token([ApiToken.Scope.READ])
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        response = self.client.get(
+            reverse("plm:api_revision_manifest", args=[revision.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        expected_download_url = (
+            f"http://testserver{reverse('plm:api_revision_file', args=[revision.id])}"
+        )
+        manifest = response.json()["manifest"]
+        self.assertEqual(manifest["part"]["number"], "P-001")
+        self.assertEqual(manifest["revision"]["id"], revision.id)
+        self.assertEqual(manifest["revision"]["download_url"], expected_download_url)
+        self.assertIsNone(manifest["snapshot"])
+        self.assertEqual(len(manifest["files"]), 1)
+        self.assertEqual(
+            manifest["files"][0],
+            {
+                "path": "part.FCStd",
+                "is_root": True,
+                "revision_id": revision.id,
+                "part_id": self.part.id,
+                "part_number": "P-001",
+                "revision_code": "R0001",
+                "filename": "part.FCStd",
+                "sha256": revision.sha256,
+                "size_bytes": revision.size_bytes,
+                "download_url": expected_download_url,
+            },
+        )
+        self.assertFalse(Checkout.objects.exists())
+
+    def test_revision_manifest_with_snapshot_contains_exact_dependencies(self):
+        self.authorize_token([ApiToken.Scope.READ])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+
+        response = self.client.get(
+            reverse("plm:api_revision_manifest", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        manifest = response.json()["manifest"]
+        self.assertEqual(manifest["snapshot"]["id"], snapshot.id)
+        self.assertEqual(manifest["revision"]["id"], root_revision.id)
+        self.assertEqual(
+            sorted(item["path"] for item in manifest["files"]),
+            ["Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"],
+        )
+        self.assertEqual(
+            [item["path"] for item in manifest["files"] if item["is_root"]],
+            ["Druck.FCStd"],
+        )
+        self.assertTrue(all(item["download_url"] for item in manifest["files"]))
+        self.assertFalse(Checkout.objects.exists())
+
+    def test_revision_manifest_rejects_referenced_revision_without_snapshot(self):
+        self.authorize_token([ApiToken.Scope.READ])
+        revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(
+                members={
+                    "Document.xml": freecad_document_xml(
+                        "Druck",
+                        xlinks=[("Box.FCStd", "Body")],
+                    ),
+                }
+            ),
+            self.user,
+            normalize_plm_revision=True,
+        )
+
+        response = self.client.get(
+            reverse("plm:api_revision_manifest", args=[revision.id])
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["error"],
+            "Referenzierte Revisionen koennen nur mit Projektstand geladen werden.",
+        )
+        self.assertFalse(Checkout.objects.exists())
+
     def test_second_active_checkout_for_same_part_is_rejected(self):
         self.authorize_token([ApiToken.Scope.CHECKOUT])
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)

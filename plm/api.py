@@ -20,6 +20,7 @@ from .services import (
     create_annotation,
     create_checkout,
     next_part_number,
+    revision_manifest,
 )
 
 
@@ -111,6 +112,18 @@ def checkout_payload(checkout):
         "completed_at": checkout.completed_at.isoformat() if checkout.completed_at else None,
         "canceled_at": checkout.canceled_at.isoformat() if checkout.canceled_at else None,
     }
+
+
+def add_manifest_download_urls(manifest, request):
+    if "revision" in manifest:
+        manifest["revision"]["download_url"] = request.build_absolute_uri(
+            reverse("plm:api_revision_file", args=[manifest["revision"]["id"]])
+        )
+    for item in manifest["files"]:
+        item["download_url"] = request.build_absolute_uri(
+            reverse("plm:api_revision_file", args=[item["revision_id"]])
+        )
+    return manifest
 
 
 def user_can_mutate_models(user):
@@ -258,6 +271,29 @@ def revision_file_api(request, revision_id):
     )
 
 
+@api_auth_required(get=ApiToken.Scope.READ)
+@require_http_methods(["GET"])
+def revision_manifest_api(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "part__project"),
+        id=revision_id,
+    )
+    snapshot = None
+    snapshot_id = request.GET.get("snapshot_id")
+    if snapshot_id:
+        snapshot = get_object_or_404(
+            ProjectSnapshot,
+            id=snapshot_id,
+            project=revision.part.project,
+        )
+    try:
+        manifest = revision_manifest(revision, snapshot=snapshot)
+    except ValidationError as exc:
+        return validation_error_response(exc, status=409)
+    add_manifest_download_urls(manifest, request)
+    return JsonResponse({"manifest": manifest})
+
+
 @csrf_exempt
 @api_auth_required(post=ApiToken.Scope.CHECKOUT)
 @require_http_methods(["POST"])
@@ -284,7 +320,7 @@ def revision_checkout_api(request, revision_id):
     return JsonResponse(
         {
             "checkout": checkout_payload(checkout),
-            "manifest": checkout_manifest(checkout),
+            "manifest": add_manifest_download_urls(checkout_manifest(checkout), request),
         },
         status=201,
     )
@@ -304,10 +340,7 @@ def checkout_manifest_api(request, checkout_id):
         id=checkout_id,
     )
     manifest = checkout_manifest(checkout)
-    for item in manifest["files"]:
-        item["download_url"] = request.build_absolute_uri(
-            reverse("plm:api_revision_file", args=[item["revision_id"]])
-        )
+    add_manifest_download_urls(manifest, request)
     return JsonResponse({"checkout": checkout_payload(checkout), "manifest": manifest})
 
 

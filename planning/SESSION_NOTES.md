@@ -467,3 +467,16 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `node --check plm/static/plm/model-viewer.js` ist gruen.
 - `manage.py check` ist gruen.
 - `manage.py test plm` laeuft mit 109 Tests erfolgreich.
+
+## 2026-07-06
+
+### Read-only Revision-Manifest Fuer Addon
+
+- Neuer API-Endpunkt `GET /api/revisions/<revision_id>/manifest/` angelegt.
+- Optionaler Query-Parameter `snapshot_id` nutzt denselben Snapshot-/Referenzresolver wie Checkout-Manifeste.
+- Der Endpunkt braucht nur Scope `read`, erzeugt keinen Checkout und setzt keinen Lock.
+- Manifeste enthalten genau eine Root-Datei mit `is_root: true`, sichere relative Pfade, SHA-256 und Download-URLs pro Datei.
+- Referenzierte Revisionen ohne passenden Projektstand liefern `409` mit klarer Fehlermeldung.
+- Checkout-POST-Manifeste enthalten jetzt ebenfalls Download-URLs pro Datei.
+- `planning/FREECAD_ADDON_PLAN.md` wurde auf den neuen read-only Manifestvertrag aktualisiert.
+- `.venv/bin/python manage.py test plm` laeuft mit 121 Tests erfolgreich.
