@@ -2942,6 +2942,22 @@ class AddonApiWorkflowTests(TestCase):
         self.assertTrue(
             Revision.objects.filter(part=box_revision.part, revision_code="R0002").exists()
         )
+        new_snapshot = ProjectSnapshot.objects.exclude(id=snapshot.id).get()
+        self.assertEqual(
+            new_snapshot.entries.get(path="Druck.FCStd").revision,
+            root_created,
+        )
+
+        next_checkout = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_created.id]),
+            {},
+        )
+
+        self.assertEqual(next_checkout.status_code, 201)
+        self.assertEqual(
+            next_checkout.json()["manifest"]["snapshot"]["id"],
+            new_snapshot.id,
+        )
 
     def test_multi_file_checkin_rejects_unknown_manifest_path_and_keeps_checkout_active(self):
         self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])

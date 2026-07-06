@@ -1068,6 +1068,10 @@ def create_checkout(base_revision, checked_out_by, snapshot=None, workspace_hint
     part = base_revision.part
     if Checkout.objects.filter(part=part, status=Checkout.Status.ACTIVE).exists():
         raise ValidationError("Dieses Teil ist bereits ausgecheckt.")
+    if snapshot is None:
+        root_entry = snapshot_entry_for_revision(base_revision)
+        if root_entry is not None:
+            snapshot = root_entry.snapshot
     manifest_entries_for_revision(base_revision, snapshot=snapshot)
     checkout = Checkout.objects.create(
         part=part,
@@ -1124,6 +1128,11 @@ def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
             "updated_at",
         ]
     )
+    completed_snapshot = create_snapshot_from_checkout_revisions(
+        checkout,
+        actor,
+        revisions,
+    )
     AuditEvent.objects.create(
         actor=actor,
         action=AuditEvent.Action.CHECKOUT_COMPLETED,
@@ -1144,9 +1153,42 @@ def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
                 }
                 for item in revisions
             ],
+            "completed_snapshot_id": completed_snapshot.id if completed_snapshot else None,
         },
     )
     return checkout
+
+
+def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
+    if not checkout.snapshot_id or not revisions:
+        return None
+
+    replacements = {item["path"]: item["revision"] for item in revisions}
+    snapshot = ProjectSnapshot.objects.create(
+        project=checkout.part.project,
+        name=f"{checkout.snapshot.name} - Checkout {checkout.id}",
+        created_by=actor,
+    )
+    for entry in checkout.snapshot.entries.select_related("revision").order_by("path"):
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            path=entry.path,
+            revision=replacements.get(entry.path, entry.revision),
+        )
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.PROJECT_SNAPSHOT_CREATED,
+        object_repr=str(snapshot),
+        metadata={
+            "project_id": checkout.part.project_id,
+            "snapshot_id": snapshot.id,
+            "source_snapshot_id": checkout.snapshot_id,
+            "checkout_id": checkout.id,
+            "entry_count": snapshot.entries.count(),
+            "updated_paths": sorted(replacements),
+        },
+    )
+    return snapshot
 
 
 @transaction.atomic
