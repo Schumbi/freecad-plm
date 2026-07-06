@@ -13,7 +13,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Management-Command `process_export_jobs` mit echten FCStd-Testdateien ausfuehren.
 - Docker-Compose-Stack auf dem Zielserver mit echtem Media-Volume und PostgreSQL testen.
 - FreeCAD-Addon-Prototyp gegen die neue `/api/`-Schnittstelle anhand `planning/FREECAD_ADDON_PLAN.md` bauen.
-- API-Authentifizierung fuer Addon-Nutzung spaeter von Session/CSRF-Ausnahme auf Token oder Personal Access Tokens umstellen.
 - Fehlende Suche fuer Projekte, Teile, Revisionen und Dateinamen entwerfen und umsetzen.
 - Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche entwerfen und umsetzen.
 - Folgeausbau fuer VarSet-Parameterbearbeitung und Neurendern planen.
@@ -88,6 +87,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Lokale PNG-Erzeugung mit Flatpak-FreeCAD-GUI-Binary verifiziert; Worker nutzt fuer PNG-Jobs automatisch `--command=FreeCAD`.
 - Docker-Compose-Grundlage mit Web, PostgreSQL, Media-Volume und FreeCAD-Worker angelegt.
 - JSON-API fuer FreeCAD-Addon-Grundworkflows angelegt.
+- API-Token-Modell fuer Addon-Nutzung angelegt: gehashte Tokens, Scopes, Admin, Management-Command und Bearer-Auth fuer `/api/`.
+- `/api/` auf token-only umgestellt; Django-Browser-Sessions reichen fuer API-Zugriff nicht mehr aus.
 - Exklusiver Checkout mit Manifest, Check-in und Cancel angelegt.
 - Objektbezogene Anmerkungen fuer Teile/Revisionen angelegt.
 - Addon-Uebergabeplan mit API-Vertrag und Implementierungsvorgaben in `planning/FREECAD_ADDON_PLAN.md` angelegt.

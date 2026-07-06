@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -16,9 +16,11 @@ from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
+from .auth import create_api_token
 from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
 from .models import (
     Annotation,
+    ApiToken,
     AuditEvent,
     Checkout,
     ExportJob,
@@ -2399,6 +2401,7 @@ class AddonApiWorkflowTests(TestCase):
             ALLOWED_HOSTS=["testserver"],
         )
         self.settings_override.enable()
+        call_command("setup_plm_roles", stdout=StringIO())
 
         self.user = get_user_model().objects.create_user(
             username="addon-user",
@@ -2416,8 +2419,14 @@ class AddonApiWorkflowTests(TestCase):
         self.settings_override.disable()
         self.media_root.cleanup()
 
-    def login(self):
-        self.client.force_login(self.user)
+    def authorize_token(self, scopes=None, user=None):
+        token, raw_token = create_api_token(
+            user=user or self.user,
+            name="FreeCAD Addon",
+            scopes=scopes or [ApiToken.Scope.READ],
+        )
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {raw_token}"
+        return token, raw_token
 
     def post_json(self, url, payload):
         return self.client.post(
@@ -2427,7 +2436,7 @@ class AddonApiWorkflowTests(TestCase):
         )
 
     def test_api_lists_projects_and_creates_parts(self):
-        self.login()
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])
 
         response = self.client.get(reverse("plm:api_projects"))
         self.assertEqual(response.status_code, 200)
@@ -2446,8 +2455,105 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(response.json()["part"]["number"], "P-002")
         self.assertTrue(Part.objects.filter(number="P-002").exists())
 
+    def test_api_rejects_missing_authentication(self):
+        response = self.client.get(reverse("plm:api_projects"))
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_api_rejects_browser_session_without_token(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:api_projects"))
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_read_token_lists_projects_and_updates_last_used(self):
+        token, raw_token = self.authorize_token([ApiToken.Scope.READ])
+
+        response = self.client.get(reverse("plm:api_projects"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["projects"][0]["code"], "PRJ")
+        token.refresh_from_db()
+        self.assertIsNotNone(token.last_used_at)
+        self.assertNotEqual(token.token_hash, raw_token)
+        self.assertTrue(token.token_hash)
+
+    def test_read_token_cannot_create_part(self):
+        self.authorize_token([ApiToken.Scope.READ])
+
+        response = self.post_json(
+            reverse("plm:api_project_parts", args=[self.project.id]),
+            {
+                "number": "P-002",
+                "name": "Nicht erlaubt",
+                "category": Part.Category.PART,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Part.objects.filter(number="P-002").exists())
+
+    def test_write_token_can_create_part_when_user_role_allows_it(self):
+        self.authorize_token([ApiToken.Scope.WRITE])
+
+        response = self.post_json(
+            reverse("plm:api_project_parts", args=[self.project.id]),
+            {
+                "number": "P-002",
+                "name": "Token-Teil",
+                "category": Part.Category.PART,
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(Part.objects.filter(number="P-002").exists())
+
+    def test_write_token_still_respects_django_roles(self):
+        reader = get_user_model().objects.create_user(username="api-reader")
+        reader.groups.add(Group.objects.get(name=ROLE_READER))
+        self.authorize_token([ApiToken.Scope.WRITE], user=reader)
+
+        response = self.post_json(
+            reverse("plm:api_project_parts", args=[self.project.id]),
+            {
+                "number": "P-002",
+                "name": "Nicht erlaubt",
+                "category": Part.Category.PART,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Part.objects.filter(number="P-002").exists())
+
+    def test_revoked_token_is_rejected(self):
+        token, _raw_token = self.authorize_token([ApiToken.Scope.READ])
+        token.revoked_at = timezone.now()
+        token.save(update_fields=["revoked_at", "updated_at"])
+
+        response = self.client.get(reverse("plm:api_projects"))
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_unknown_token_is_rejected(self):
+        self.client.defaults["HTTP_AUTHORIZATION"] = "Bearer plm_pat_unknown"
+
+        response = self.client.get(reverse("plm:api_projects"))
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_expired_token_is_rejected(self):
+        self.authorize_token([ApiToken.Scope.READ])
+        token = ApiToken.objects.get()
+        token.expires_at = timezone.now() - timedelta(minutes=1)
+        token.save(update_fields=["expires_at", "updated_at"])
+
+        response = self.client.get(reverse("plm:api_projects"))
+
+        self.assertEqual(response.status_code, 401)
+
     def test_checkout_manifest_contains_snapshot_exact_dependencies(self):
-        self.login()
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
         snapshot = import_project_snapshot(
             self.project,
             make_project_zip_upload(),
@@ -2472,7 +2578,7 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
 
     def test_second_active_checkout_for_same_part_is_rejected(self):
-        self.login()
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
         url = reverse("plm:api_revision_checkout", args=[revision.id])
 
@@ -2484,7 +2590,7 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(Checkout.objects.count(), 1)
 
     def test_checkin_creates_new_revision_and_completes_checkout(self):
-        self.login()
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
         create_revision_from_upload(self.part, make_zip_upload(), self.user)
         base_revision = Revision.objects.get(revision_code="R0001")
         checkout_response = self.post_json(
@@ -2513,7 +2619,7 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(revision.notes, "Geometrie angepasst.")
 
     def test_annotations_can_target_freecad_objects(self):
-        self.login()
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
 
         response = self.post_json(

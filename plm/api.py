@@ -1,6 +1,5 @@
 import json
 
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
@@ -10,7 +9,9 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from .auth import api_auth_required
 from .models import Annotation, AuditEvent, Checkout, Part, Project, ProjectSnapshot, Revision
+from .models import ApiToken
 from .permissions import can_upload_revision, is_plm_admin
 from .services import (
     cancel_checkout,
@@ -117,7 +118,7 @@ def user_can_mutate_models(user):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.ADMIN)
 @require_http_methods(["GET", "POST"])
 def projects_api(request):
     if request.method == "GET":
@@ -144,7 +145,7 @@ def projects_api(request):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.ADMIN)
 @require_http_methods(["GET", "POST"])
 def project_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
@@ -166,7 +167,7 @@ def project_api(request, project_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.WRITE)
 @require_http_methods(["GET", "POST"])
 def project_parts_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
@@ -198,7 +199,7 @@ def project_parts_api(request, project_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.WRITE)
 @require_http_methods(["GET", "POST"])
 def part_api(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
@@ -227,14 +228,14 @@ def part_api(request, part_id):
     return JsonResponse({"part": part_payload(part)})
 
 
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ)
 @require_http_methods(["GET"])
 def revision_api(request, revision_id):
     revision = get_object_or_404(Revision.objects.select_related("part"), id=revision_id)
     return JsonResponse({"revision": revision_payload(revision, request)})
 
 
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ)
 @require_http_methods(["GET"])
 def revision_file_api(request, revision_id):
     revision = get_object_or_404(Revision.objects.select_related("part"), id=revision_id)
@@ -258,7 +259,7 @@ def revision_file_api(request, revision_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(post=ApiToken.Scope.CHECKOUT)
 @require_http_methods(["POST"])
 def revision_checkout_api(request, revision_id):
     if not user_can_mutate_models(request.user):
@@ -289,7 +290,7 @@ def revision_checkout_api(request, revision_id):
     )
 
 
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ)
 @require_http_methods(["GET"])
 def checkout_manifest_api(request, checkout_id):
     checkout = get_object_or_404(
@@ -311,7 +312,7 @@ def checkout_manifest_api(request, checkout_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(post=ApiToken.Scope.CHECKOUT)
 @require_http_methods(["POST"])
 def checkout_cancel_api(request, checkout_id):
     checkout = get_object_or_404(Checkout, id=checkout_id)
@@ -325,7 +326,7 @@ def checkout_cancel_api(request, checkout_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(post=ApiToken.Scope.CHECKOUT)
 @require_http_methods(["POST"])
 def checkout_checkin_api(request, checkout_id):
     checkout = get_object_or_404(Checkout.objects.select_related("part"), id=checkout_id)
@@ -353,7 +354,7 @@ def checkout_checkin_api(request, checkout_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.WRITE)
 @require_http_methods(["GET", "POST"])
 def part_annotations_api(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
@@ -384,7 +385,7 @@ def part_annotations_api(request, part_id):
 
 
 @csrf_exempt
-@login_required
+@api_auth_required(post=ApiToken.Scope.WRITE)
 @require_http_methods(["POST"])
 def annotation_api(request, annotation_id):
     annotation = get_object_or_404(Annotation, id=annotation_id)

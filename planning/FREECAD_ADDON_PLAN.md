@@ -65,11 +65,11 @@ Zu speichern:
 
 - `server_url`, z.B. `http://127.0.0.1:8000`
 - `username`
-- Authentifizierungsdaten fuer die erste Version: Session-Cookie oder Basic-Login-Helfer, je nachdem was die Addon-Instanz implementieren kann.
+- `api_token`, erzeugt serverseitig mit `manage.py create_api_token`
 - `workspace_root`, Default: `~/FreeCAD-PLM`
 - letzter Projektkontext
 
-Wichtig: Die aktuelle Server-API nutzt Django-Login-Sessions und ist fuer mutierende API-Endpunkte CSRF-befreit. Fuer die erste Addon-Version darf die Codex-Instanz pragmatisch Session-Auth implementieren. Ein spaeterer Serverausbau soll Token/Auth sauberer machen.
+Wichtig: Die Server-API ist token-only. Die erste Addon-Version muss den Token als `Authorization: Bearer ...` senden. Django-Browser-Sessions reichen fuer `/api/` nicht aus.
 
 ## Server-API
 
@@ -78,6 +78,7 @@ Basis-URL in Beispielen: `http://127.0.0.1:8000`
 Alle JSON-Requests:
 
 - `Content-Type: application/json`
+- `Authorization: Bearer <api_token>`
 - Antworten sind JSON, ausser Datei-Downloads.
 - Bei Fehlern liefert der Server meist `{"error": "...", "messages": ["..."]}`.
 - Relevante Statuscodes:

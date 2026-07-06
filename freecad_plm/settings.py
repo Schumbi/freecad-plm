@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,14 +22,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-@fvj$f(1bqlf66ihs&bq$@+_tv0$8d^r4%*t_28tym3-6re8kl',
-)
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.lower() in {'1', 'true', 'yes', 'on'}
+
+
+def env_int(name, default):
+    value = os.environ.get(name)
+    if value in (None, ''):
+        return default
+    return int(value)
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
+DEBUG = env_bool('DJANGO_DEBUG', True)
+
+# SECURITY WARNING: keep the secret key used in production secret!
+DEFAULT_DEV_SECRET_KEY = (
+    'django-insecure-@fvj$f(1bqlf66ihs&bq$@+_tv0$8d^r4%*t_28tym3-6re8kl'
+)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', DEFAULT_DEV_SECRET_KEY)
+if not DEBUG and SECRET_KEY == DEFAULT_DEV_SECRET_KEY:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=0.')
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -41,6 +59,18 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
+SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
+SECURE_HSTS_SECONDS = env_int('DJANGO_SECURE_HSTS_SECONDS', 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    'DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS',
+    False,
+)
+SECURE_HSTS_PRELOAD = env_bool('DJANGO_SECURE_HSTS_PRELOAD', False)
+SESSION_COOKIE_SECURE = env_bool('DJANGO_SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = env_bool('DJANGO_CSRF_COOKIE_SECURE', not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = env_bool('DJANGO_CSRF_COOKIE_HTTPONLY', False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 # Application definition

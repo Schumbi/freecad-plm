@@ -42,6 +42,10 @@ In `.env` mindestens setzen:
 DJANGO_SECRET_KEY=replace-with-a-long-random-secret
 DJANGO_ALLOWED_HOSTS=plm.example.local,localhost,127.0.0.1
 DJANGO_CSRF_TRUSTED_ORIGINS=https://plm.example.local
+DJANGO_SECURE_SSL_REDIRECT=0
+DJANGO_SECURE_HSTS_SECONDS=0
+DJANGO_SESSION_COOKIE_SECURE=1
+DJANGO_CSRF_COOKIE_SECURE=1
 POSTGRES_PASSWORD=replace-with-a-strong-database-password
 PLM_IMAGE=git.home.schumbi.de/ralf/freecad-plm:latest
 PLM_USER=plm
@@ -204,7 +208,24 @@ Projektstand und naechste Schritte stehen in `planning/`.
 
 ## FreeCAD-Addon-API
 
-Das PLM stellt erste JSON-Endpunkte unter `/api/` bereit. Sie sind fuer ein vanilla-FreeCAD-Addon gedacht und nutzen zunaechst die bestehende Django-Anmeldung:
+Das PLM stellt JSON-Endpunkte unter `/api/` bereit. Sie sind fuer ein vanilla-FreeCAD-Addon gedacht und unterstuetzen Bearer Tokens:
+
+```bash
+.venv/bin/python manage.py create_api_token addon-user "FreeCAD Addon" --scope read --scope write --scope checkout
+```
+
+Der ausgegebene Token wird nur einmal angezeigt und danach als Header gesendet:
+
+```http
+Authorization: Bearer plm_pat_...
+```
+
+Token-Scopes:
+
+- `read`: Projekte, Teile, Revisionen und Dateien lesen
+- `write`: Teile bearbeiten/anlegen und Anmerkungen schreiben
+- `checkout`: Checkout, Check-in und Cancel
+- `admin`: Projektanlage/-bearbeitung ueber API
 
 - `GET/POST /api/projects/`
 - `GET/POST /api/projects/<id>/`

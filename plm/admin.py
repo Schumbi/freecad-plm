@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.utils import timezone
 from .models import (
     Annotation,
+    ApiToken,
     AuditEvent,
     Checkout,
     ExportJob,
@@ -195,6 +197,51 @@ class AnnotationAdmin(admin.ModelAdmin):
         "text",
     )
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(ApiToken)
+class ApiTokenAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "user",
+        "token_prefix",
+        "scope_list",
+        "created_at",
+        "last_used_at",
+        "expires_at",
+        "revoked_at",
+    )
+    list_filter = ("user", "revoked_at")
+    search_fields = ("name", "user__username", "token_prefix")
+    readonly_fields = (
+        "token_prefix",
+        "token_hash",
+        "created_at",
+        "updated_at",
+        "last_used_at",
+    )
+    fields = (
+        "user",
+        "name",
+        "token_prefix",
+        "token_hash",
+        "scopes",
+        "last_used_at",
+        "expires_at",
+        "revoked_at",
+        "created_at",
+        "updated_at",
+    )
+    actions = ("revoke_tokens",)
+
+    def scope_list(self, obj):
+        return ", ".join(obj.scopes or [])
+
+    scope_list.short_description = "Scopes"
+
+    @admin.action(description="Ausgewaehlte API-Tokens widerrufen")
+    def revoke_tokens(self, request, queryset):
+        queryset.filter(revoked_at__isnull=True).update(revoked_at=timezone.now())
 
 
 class ProjectSnapshotEntryInline(admin.TabularInline):

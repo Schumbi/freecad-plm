@@ -554,6 +554,45 @@ class Annotation(TimeStampedModel):
         return f"{target}: {self.text[:60]}"
 
 
+class ApiToken(TimeStampedModel):
+    class Scope(models.TextChoices):
+        READ = "read", "Lesen"
+        WRITE = "write", "Schreiben"
+        CHECKOUT = "checkout", "Checkout"
+        ADMIN = "admin", "Admin"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="api_tokens",
+    )
+    name = models.CharField(max_length=120)
+    token_prefix = models.CharField(max_length=24, unique=True)
+    token_hash = models.CharField(max_length=64, unique=True)
+    scopes = models.JSONField(default=list, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["user__username", "name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.user})"
+
+    @property
+    def is_revoked(self):
+        return self.revoked_at is not None
+
+    def is_expired(self, at_time=None):
+        if self.expires_at is None:
+            return False
+        return self.expires_at <= (at_time or timezone.now())
+
+    def is_active(self, at_time=None):
+        return not self.is_revoked and not self.is_expired(at_time=at_time)
+
+
 class ProjectSnapshot(models.Model):
     project = models.ForeignKey(
         Project,
