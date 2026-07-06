@@ -488,3 +488,12 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Bereits eingecheckte, abgebrochene und fremde Checkouts werden nicht ausgeliefert.
 - Jeder Eintrag enthaelt Projekt, Teil, Basisrevision, optionalen Snapshot, Workspace-Hinweis und `manifest_url`.
 - `planning/FREECAD_ADDON_PLAN.md` wurde um den aktiven-Checkout-Vertrag und den Verbindungsflow erweitert.
+
+### Manifest-basierter Multi-Datei-Check-in
+
+- `POST /api/checkouts/<checkout_id>/checkin/` akzeptiert zusaetzlich `files_metadata` plus `file_0`, `file_1`, ...
+- Der alte Single-File-Check-in mit `file` bleibt kompatibel.
+- Multi-Datei-Check-in validiert Manifest-Pfad, Basis-Revision, Basis-Hash, Root-Markierung, Upload-Hash und sichere relative Pfade.
+- Fuer jede hochgeladene geaenderte Datei wird eine neue Revision des zugehoerigen Teils erzeugt.
+- Checkouts werden auch abgeschlossen, wenn nur referenzierte Dateien geaendert wurden; die Antwort listet alle erzeugten Revisionen mit Manifest-Pfad.
+- Bei Konflikten bleibt der Checkout aktiv.

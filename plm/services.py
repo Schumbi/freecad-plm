@@ -1053,6 +1053,16 @@ def checkout_manifest(checkout):
     }
 
 
+def manifest_entries_by_path(checkout):
+    return {
+        entry["path"]: entry
+        for entry in manifest_entries_for_revision(
+            checkout.base_revision,
+            snapshot=checkout.snapshot,
+        )
+    }
+
+
 @transaction.atomic
 def create_checkout(base_revision, checked_out_by, snapshot=None, workspace_hint=""):
     part = base_revision.part
@@ -1101,18 +1111,10 @@ def cancel_checkout(checkout, actor):
     return checkout
 
 
-@transaction.atomic
-def checkin_checkout(checkout, uploaded_file, actor, notes=""):
-    if checkout.status != Checkout.Status.ACTIVE:
-        raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
-    revision = create_revision_from_upload(
-        part=checkout.part,
-        uploaded_file=uploaded_file,
-        created_by=actor,
-        notes=notes,
-    )
+def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
+    revisions = revisions or []
     checkout.status = Checkout.Status.COMPLETED
-    checkout.completed_revision = revision
+    checkout.completed_revision = completed_revision
     checkout.completed_at = timezone.now()
     checkout.save(
         update_fields=[
@@ -1130,11 +1132,107 @@ def checkin_checkout(checkout, uploaded_file, actor, notes=""):
             "checkout_id": checkout.id,
             "part_id": checkout.part_id,
             "base_revision_id": checkout.base_revision_id,
-            "completed_revision_id": revision.id,
-            "completed_revision_code": revision.revision_code,
+            "completed_revision_id": completed_revision.id if completed_revision else None,
+            "completed_revision_code": (
+                completed_revision.revision_code if completed_revision else ""
+            ),
+            "revisions": [
+                {
+                    "path": item["path"],
+                    "revision_id": item["revision"].id,
+                    "revision_code": item["revision"].revision_code,
+                }
+                for item in revisions
+            ],
         },
     )
+    return checkout
+
+
+@transaction.atomic
+def checkin_checkout(checkout, uploaded_file, actor, notes=""):
+    if checkout.status != Checkout.Status.ACTIVE:
+        raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
+    revision = create_revision_from_upload(
+        part=checkout.part,
+        uploaded_file=uploaded_file,
+        created_by=actor,
+        notes=notes,
+    )
+    complete_checkout(
+        checkout,
+        actor,
+        completed_revision=revision,
+        revisions=[
+            {
+                "path": checkout.base_revision.original_filename,
+                "revision": revision,
+            }
+        ],
+    )
     return revision
+
+
+@transaction.atomic
+def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, notes=""):
+    if checkout.status != Checkout.Status.ACTIVE:
+        raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
+    if not files_metadata:
+        raise ValidationError("Keine Dateien fuer den Check-in angegeben.")
+
+    manifest_by_path = manifest_entries_by_path(checkout)
+    revisions = []
+    root_revision = None
+
+    for item in files_metadata:
+        if not isinstance(item, dict):
+            raise ValidationError("files_metadata muss Objekte enthalten.")
+        field = (item.get("field") or "").strip()
+        path = safe_snapshot_path((item.get("path") or "").strip())
+        if path not in manifest_by_path:
+            raise ValidationError("Dateipfad ist nicht Teil des Checkout-Manifests.")
+
+        manifest_entry = manifest_by_path[path]
+        manifest_revision = manifest_entry["revision"]
+        if item.get("revision_id") != manifest_revision.id:
+            raise ValidationError("Revision passt nicht zum Checkout-Manifest.")
+        if item.get("base_sha256") != manifest_revision.sha256:
+            raise ValidationError("Basis-Hash passt nicht zum Checkout-Manifest.")
+        if bool(item.get("is_root")) != bool(manifest_entry["is_root"]):
+            raise ValidationError("Root-Markierung passt nicht zum Checkout-Manifest.")
+
+        uploaded_file = uploaded_files.get(field)
+        if uploaded_file is None:
+            raise ValidationError("Upload-Datei fehlt fuer files_metadata.")
+        uploaded_sha256, _size = upload_file_digest(uploaded_file)
+        if item.get("sha256") and item["sha256"] != uploaded_sha256:
+            raise ValidationError("Upload-Hash passt nicht zu files_metadata.")
+
+        revision = create_revision_from_upload(
+            part=manifest_revision.part,
+            uploaded_file=uploaded_file,
+            created_by=actor,
+            notes=notes,
+        )
+        revision_entry = {
+            "path": path,
+            "revision": revision,
+            "is_root": manifest_entry["is_root"],
+        }
+        revisions.append(revision_entry)
+        if manifest_entry["is_root"]:
+            root_revision = revision
+
+    complete_checkout(
+        checkout,
+        actor,
+        completed_revision=root_revision,
+        revisions=revisions,
+    )
+    return {
+        "root_revision": root_revision,
+        "revisions": revisions,
+    }
 
 
 def create_annotation(

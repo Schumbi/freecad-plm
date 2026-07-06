@@ -478,10 +478,45 @@ Antwort:
 
 `POST /api/checkouts/<checkout_id>/checkin/`
 
+Single-File-Multipart-Request fuer reine Root-Aenderungen:
+
 Multipart-Form-Request:
 
 - `file`: geaenderte Root-`.FCStd`
 - `change_summary`: Aenderungsnotiz
+
+Multi-Datei-Multipart-Request fuer Baugruppen mit geaenderten referenzierten Dateien:
+
+- `files_metadata`: JSON-Liste mit `field`, `path`, `revision_id`, `base_sha256`, `sha256`, `is_root`
+- `file_0`, `file_1`, ...: geaenderte `.FCStd`-Dateien
+- `change_summary`: Aenderungsnotiz
+
+Beispiel fuer `files_metadata`:
+
+```json
+[
+  {
+    "field": "file_0",
+    "path": "Assembly.FCStd",
+    "revision_id": 1,
+    "base_sha256": "...",
+    "sha256": "...",
+    "is_root": true
+  },
+  {
+    "field": "file_1",
+    "path": "parts/Child.FCStd",
+    "revision_id": 2,
+    "base_sha256": "...",
+    "sha256": "...",
+    "is_root": false
+  }
+]
+```
+
+Unveraenderte Dateien muessen nicht hochgeladen werden. Wenn nur referenzierte
+Dateien geaendert wurden, wird der Checkout trotzdem abgeschlossen; `revision`
+ist dann `null`, und die erzeugten Revisionen stehen in `revisions`.
 
 Antwort `201`:
 
@@ -505,7 +540,16 @@ Antwort `201`:
     "created_at": "2026-06-28T...",
     "released_at": null,
     "download_url": "http://127.0.0.1:8000/api/revisions/2/file/"
-  }
+  },
+  "revisions": [
+    {
+      "path": "Assembly.FCStd",
+      "revision": {
+        "id": 2,
+        "revision_code": "R0002"
+      }
+    }
+  ]
 }
 ```
 
@@ -693,6 +737,7 @@ Wichtig:
 - `get_active_checkouts()`
 - `get_checkout_manifest(checkout_id)`
 - `checkin(checkout_id, fcstd_path, change_summary)`
+- `checkin_files(checkout_id, files_metadata, files, change_summary)`
 - `cancel_checkout(checkout_id)`
 - `get_annotations(part_id)`
 - `create_annotation(part_id, data)`

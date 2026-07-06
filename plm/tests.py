@@ -1,5 +1,6 @@
 import json
 from datetime import date, timedelta
+from hashlib import sha256
 from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -2818,6 +2819,174 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(checkout.status, Checkout.Status.COMPLETED)
         self.assertEqual(checkout.completed_revision, revision)
         self.assertEqual(revision.notes, "Geometrie angepasst.")
+
+    def test_multi_file_checkin_can_update_referenced_file_only(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        box_revision = Revision.objects.get(part__name="Box")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        updated_box = fcstd_with_plm_revision(
+            make_fcstd_bytes("Box geaendert", xlinks=[("Chip.FCStd", "VarSet")]),
+            "R0002",
+        )
+        metadata = [
+            {
+                "field": "file_0",
+                "path": "Box.FCStd",
+                "revision_id": box_revision.id,
+                "base_sha256": box_revision.sha256,
+                "sha256": sha256(updated_box).hexdigest(),
+                "is_root": False,
+            }
+        ]
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": json.dumps(metadata),
+                "file_0": SimpleUploadedFile("Box.FCStd", updated_box),
+                "change_summary": "Box angepasst.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.status, Checkout.Status.COMPLETED)
+        self.assertIsNone(checkout.completed_revision)
+        payload = response.json()
+        self.assertIsNone(payload["revision"])
+        self.assertEqual(payload["revisions"][0]["path"], "Box.FCStd")
+        created_revision = Revision.objects.get(id=payload["revisions"][0]["revision"]["id"])
+        self.assertEqual(created_revision.part.name, "Box")
+        self.assertEqual(created_revision.revision_code, "R0002")
+        self.assertEqual(created_revision.notes, "Box angepasst.")
+
+    def test_multi_file_checkin_can_update_root_and_referenced_file(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        box_revision = Revision.objects.get(part__name="Box")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        updated_root = fcstd_with_plm_revision(
+            make_fcstd_bytes(
+                "Druck geaendert",
+                object_type="Assembly::AssemblyObject",
+                xlinks=[("Box.FCStd", "Body"), ("Deckel.FCStd", "Body")],
+            ),
+            "R0002",
+        )
+        updated_box = fcstd_with_plm_revision(
+            make_fcstd_bytes("Box geaendert", xlinks=[("Chip.FCStd", "VarSet")]),
+            "R0002",
+        )
+        metadata = [
+            {
+                "field": "file_0",
+                "path": "Druck.FCStd",
+                "revision_id": root_revision.id,
+                "base_sha256": root_revision.sha256,
+                "sha256": sha256(updated_root).hexdigest(),
+                "is_root": True,
+            },
+            {
+                "field": "file_1",
+                "path": "Box.FCStd",
+                "revision_id": box_revision.id,
+                "base_sha256": box_revision.sha256,
+                "sha256": sha256(updated_box).hexdigest(),
+                "is_root": False,
+            },
+        ]
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": json.dumps(metadata),
+                "file_0": SimpleUploadedFile("Druck.FCStd", updated_root),
+                "file_1": SimpleUploadedFile("Box.FCStd", updated_box),
+                "change_summary": "Baugruppe und Box angepasst.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.status, Checkout.Status.COMPLETED)
+        payload = response.json()
+        self.assertEqual(payload["revision"]["revision_code"], "R0002")
+        self.assertEqual(
+            [item["path"] for item in payload["revisions"]],
+            ["Druck.FCStd", "Box.FCStd"],
+        )
+        root_created = Revision.objects.get(id=payload["revision"]["id"])
+        self.assertEqual(checkout.completed_revision, root_created)
+        self.assertEqual(root_created.part.name, "Druck")
+        self.assertTrue(
+            Revision.objects.filter(part=box_revision.part, revision_code="R0002").exists()
+        )
+
+    def test_multi_file_checkin_rejects_unknown_manifest_path_and_keeps_checkout_active(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        box_revision = Revision.objects.get(part__name="Box")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        updated_box = fcstd_with_plm_revision(
+            make_fcstd_bytes("Box geaendert", xlinks=[("Chip.FCStd", "VarSet")]),
+            "R0002",
+        )
+        metadata = [
+            {
+                "field": "file_0",
+                "path": "../Box.FCStd",
+                "revision_id": box_revision.id,
+                "base_sha256": box_revision.sha256,
+                "sha256": sha256(updated_box).hexdigest(),
+                "is_root": False,
+            }
+        ]
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": json.dumps(metadata),
+                "file_0": SimpleUploadedFile("Box.FCStd", updated_box),
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.status, Checkout.Status.ACTIVE)
+        self.assertFalse(
+            Revision.objects.filter(part=box_revision.part, revision_code="R0002").exists()
+        )
 
     def test_annotations_can_target_freecad_objects(self):
         self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])

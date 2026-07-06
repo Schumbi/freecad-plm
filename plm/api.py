@@ -16,6 +16,7 @@ from .permissions import can_upload_revision, is_plm_admin
 from .services import (
     cancel_checkout,
     checkin_checkout,
+    checkin_checkout_files,
     checkout_manifest,
     create_annotation,
     create_checkout,
@@ -111,6 +112,13 @@ def checkout_payload(checkout):
         "created_at": checkout.created_at.isoformat(),
         "completed_at": checkout.completed_at.isoformat() if checkout.completed_at else None,
         "canceled_at": checkout.canceled_at.isoformat() if checkout.canceled_at else None,
+    }
+
+
+def revision_summary_payload(revision):
+    return {
+        "id": revision.id,
+        "revision_code": revision.revision_code,
     }
 
 
@@ -420,6 +428,43 @@ def checkout_checkin_api(request, checkout_id):
     checkout = get_object_or_404(Checkout.objects.select_related("part"), id=checkout_id)
     if checkout.checked_out_by_id != request.user.id and not is_plm_admin(request.user):
         return JsonResponse({"error": "Nur der Checkout-Besitzer darf einchecken."}, status=403)
+    files_metadata = request.POST.get("files_metadata")
+    if files_metadata is not None:
+        try:
+            parsed_metadata = json.loads(files_metadata)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "files_metadata muss gueltiges JSON sein."}, status=400)
+        if not isinstance(parsed_metadata, list):
+            return JsonResponse({"error": "files_metadata muss eine Liste sein."}, status=400)
+        try:
+            result = checkin_checkout_files(
+                checkout,
+                parsed_metadata,
+                request.FILES,
+                request.user,
+                notes=request.POST.get("change_summary", ""),
+            )
+        except ValidationError as exc:
+            return validation_error_response(exc, status=409)
+        checkout.refresh_from_db()
+        root_revision = result["root_revision"]
+        return JsonResponse(
+            {
+                "checkout": checkout_payload(checkout),
+                "revision": (
+                    revision_summary_payload(root_revision) if root_revision else None
+                ),
+                "revisions": [
+                    {
+                        "path": item["path"],
+                        "revision": revision_summary_payload(item["revision"]),
+                    }
+                    for item in result["revisions"]
+                ],
+            },
+            status=201,
+        )
+
     uploaded_file = request.FILES.get("file")
     if uploaded_file is None:
         return JsonResponse({"error": "FCStd-Datei fehlt."}, status=400)
@@ -436,6 +481,12 @@ def checkout_checkin_api(request, checkout_id):
         {
             "checkout": checkout_payload(checkout),
             "revision": revision_payload(revision, request),
+            "revisions": [
+                {
+                    "path": checkout.base_revision.original_filename,
+                    "revision": revision_summary_payload(revision),
+                }
+            ],
         },
         status=201,
     )
