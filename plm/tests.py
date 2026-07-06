@@ -45,6 +45,7 @@ from .permissions import (
 )
 from .services import (
     PLMRevisionConflict,
+    create_checkout,
     create_manufacturing_file_from_upload,
     create_revision_from_upload,
     import_project_snapshot,
@@ -2668,6 +2669,114 @@ class AddonApiWorkflowTests(TestCase):
             "Referenzierte Revisionen koennen nur mit Projektstand geladen werden.",
         )
         self.assertFalse(Checkout.objects.exists())
+
+    def test_checkout_token_lists_only_own_active_checkouts(self):
+        other_user = get_user_model().objects.create_user(username="other-addon-user")
+        active_revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload("active.FCStd"),
+            self.user,
+        )
+        active_checkout = create_checkout(
+            base_revision=active_revision,
+            checked_out_by=self.user,
+            workspace_hint="/home/ralf/FreeCAD-PLM",
+        )
+        other_part = Part.objects.create(
+            project=self.project,
+            number="P-002",
+            name="Fremdes Teil",
+        )
+        other_revision = create_revision_from_upload(
+            other_part,
+            make_zip_upload("other.FCStd"),
+            self.user,
+        )
+        other_checkout = create_checkout(
+            base_revision=other_revision,
+            checked_out_by=other_user,
+        )
+        completed_part = Part.objects.create(
+            project=self.project,
+            number="P-003",
+            name="Eingechecktes Teil",
+        )
+        completed_revision = create_revision_from_upload(
+            completed_part,
+            make_zip_upload("completed.FCStd"),
+            self.user,
+        )
+        completed_checkout = create_checkout(
+            base_revision=completed_revision,
+            checked_out_by=self.user,
+        )
+        completed_checkout.status = Checkout.Status.COMPLETED
+        completed_checkout.completed_at = timezone.now()
+        completed_checkout.save(update_fields=["status", "completed_at", "updated_at"])
+        canceled_part = Part.objects.create(
+            project=self.project,
+            number="P-004",
+            name="Abgebrochenes Teil",
+        )
+        canceled_revision = create_revision_from_upload(
+            canceled_part,
+            make_zip_upload("canceled.FCStd"),
+            self.user,
+        )
+        canceled_checkout = create_checkout(
+            base_revision=canceled_revision,
+            checked_out_by=self.user,
+        )
+        canceled_checkout.status = Checkout.Status.CANCELED
+        canceled_checkout.canceled_at = timezone.now()
+        canceled_checkout.save(update_fields=["status", "canceled_at", "updated_at"])
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
+
+        response = self.client.get(reverse("plm:api_active_checkouts"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["checkouts"]), 1)
+        checkout = payload["checkouts"][0]
+        self.assertEqual(checkout["id"], active_checkout.id)
+        self.assertEqual(checkout["status"], Checkout.Status.ACTIVE)
+        self.assertEqual(checkout["workspace_hint"], "/home/ralf/FreeCAD-PLM")
+        self.assertEqual(checkout["project"]["code"], "PRJ")
+        self.assertEqual(checkout["part"]["number"], "P-001")
+        self.assertEqual(checkout["revision"]["id"], active_revision.id)
+        self.assertEqual(
+            checkout["manifest_url"],
+            reverse("plm:api_checkout_manifest", args=[active_checkout.id]),
+        )
+        self.assertNotEqual(checkout["id"], other_checkout.id)
+        self.assertNotEqual(checkout["id"], completed_checkout.id)
+        self.assertNotEqual(checkout["id"], canceled_checkout.id)
+
+    def test_read_token_cannot_list_active_checkouts(self):
+        self.authorize_token([ApiToken.Scope.READ])
+
+        response = self.client.get(reverse("plm:api_active_checkouts"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_active_checkout_manifest_url_can_be_loaded(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        checkout = create_checkout(
+            base_revision=revision,
+            checked_out_by=self.user,
+        )
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+
+        active_response = self.client.get(reverse("plm:api_active_checkouts"))
+        manifest_url = active_response.json()["checkouts"][0]["manifest_url"]
+        manifest_response = self.client.get(manifest_url)
+
+        self.assertEqual(manifest_response.status_code, 200)
+        self.assertEqual(manifest_response.json()["checkout"]["id"], checkout.id)
+        self.assertEqual(
+            manifest_response.json()["manifest"]["files"][0]["is_root"],
+            True,
+        )
 
     def test_second_active_checkout_for_same_part_is_rejected(self):
         self.authorize_token([ApiToken.Scope.CHECKOUT])

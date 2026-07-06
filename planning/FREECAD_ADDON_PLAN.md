@@ -419,6 +419,50 @@ Wie oben: jedes Element in `manifest.files` enthaelt eine Download-URL.
 }
 ```
 
+### Aktive Checkouts
+
+`GET /api/checkouts/active/`
+
+Scope: `checkout`.
+
+Der Endpunkt liefert nur aktive Checkouts des aktuellen API-Users. Er erzeugt
+keine neuen Checkouts und veraendert keine Locks. Das Addon nutzt ihn beim
+Verbinden, um serverseitig aktive Checkout-Locks nach einem FreeCAD-Neustart
+wieder im Panel anzuzeigen.
+
+Antwort:
+
+```json
+{
+  "checkouts": [
+    {
+      "id": 1,
+      "status": "active",
+      "created_at": "2026-07-06T12:00:00+00:00",
+      "updated_at": "2026-07-06T12:10:00+00:00",
+      "workspace_hint": "/home/ralf/FreeCAD-PLM",
+      "project": {
+        "id": 1,
+        "code": "PRJ",
+        "name": "Projekt"
+      },
+      "part": {
+        "id": 1,
+        "number": "P-001",
+        "name": "Testteil"
+      },
+      "revision": {
+        "id": 1,
+        "revision_code": "R0001",
+        "original_filename": "Assembly.FCStd"
+      },
+      "snapshot": null,
+      "manifest_url": "/api/checkouts/1/manifest/"
+    }
+  ]
+}
+```
+
 `POST /api/checkouts/<checkout_id>/cancel/`
 
 Antwort:
@@ -561,7 +605,9 @@ Regeln:
 1. Nutzer oeffnet FreeCAD-PLM-Workbench.
 2. Panel fragt Server-URL und Login-Daten ab oder liest gespeicherte Werte.
 3. Addon ruft `GET /api/projects/`.
-4. Bei Erfolg zeigt das Panel Projekte.
+4. Addon ruft `GET /api/checkouts/active/`.
+5. Bei Erfolg zeigt das Panel Projekte und aktive Checkouts des Users.
+6. Wenn lokale Dateien fuer einen aktiven Checkout fehlen, kann das Addon ueber `manifest_url` das Manifest laden und die Dateien erneut herunterladen.
 
 ### Auschecken Und Oeffnen
 
@@ -644,6 +690,7 @@ Wichtig:
 - `get_revision_manifest(revision_id, snapshot_id=None)`
 - `download_revision_file(url, target_path, expected_sha256)`
 - `checkout_revision(revision_id, snapshot_id=None, workspace_hint="")`
+- `get_active_checkouts()`
 - `get_checkout_manifest(checkout_id)`
 - `checkin(checkout_id, fcstd_path, change_summary)`
 - `cancel_checkout(checkout_id)`

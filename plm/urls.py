@@ -171,6 +171,11 @@ urlpatterns = [
         name="api_revision_checkout",
     ),
     path(
+        "api/checkouts/active/",
+        api.active_checkouts_api,
+        name="api_active_checkouts",
+    ),
+    path(
         "api/checkouts/<int:checkout_id>/manifest/",
         api.checkout_manifest_api,
         name="api_checkout_manifest",

@@ -114,6 +114,40 @@ def checkout_payload(checkout):
     }
 
 
+def active_checkout_payload(checkout):
+    return {
+        "id": checkout.id,
+        "status": checkout.status,
+        "created_at": checkout.created_at.isoformat(),
+        "updated_at": checkout.updated_at.isoformat(),
+        "workspace_hint": checkout.workspace_hint,
+        "project": {
+            "id": checkout.part.project_id,
+            "code": checkout.part.project.code,
+            "name": checkout.part.project.name,
+        },
+        "part": {
+            "id": checkout.part_id,
+            "number": checkout.part.number,
+            "name": checkout.part.name,
+        },
+        "revision": {
+            "id": checkout.base_revision_id,
+            "revision_code": checkout.base_revision.revision_code,
+            "original_filename": checkout.base_revision.original_filename,
+        },
+        "snapshot": (
+            {
+                "id": checkout.snapshot_id,
+                "name": checkout.snapshot.name,
+            }
+            if checkout.snapshot_id
+            else None
+        ),
+        "manifest_url": reverse("plm:api_checkout_manifest", args=[checkout.id]),
+    }
+
+
 def add_manifest_download_urls(manifest, request):
     if "revision" in manifest:
         manifest["revision"]["download_url"] = request.build_absolute_uri(
@@ -323,6 +357,27 @@ def revision_checkout_api(request, revision_id):
             "manifest": add_manifest_download_urls(checkout_manifest(checkout), request),
         },
         status=201,
+    )
+
+
+@api_auth_required(get=ApiToken.Scope.CHECKOUT)
+@require_http_methods(["GET"])
+def active_checkouts_api(request):
+    checkouts = (
+        Checkout.objects.select_related(
+            "part",
+            "part__project",
+            "base_revision",
+            "snapshot",
+        )
+        .filter(
+            checked_out_by=request.user,
+            status=Checkout.Status.ACTIVE,
+        )
+        .order_by("-updated_at", "-created_at")
+    )
+    return JsonResponse(
+        {"checkouts": [active_checkout_payload(checkout) for checkout in checkouts]}
     )
 
 

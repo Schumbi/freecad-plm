@@ -480,3 +480,11 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Checkout-POST-Manifeste enthalten jetzt ebenfalls Download-URLs pro Datei.
 - `planning/FREECAD_ADDON_PLAN.md` wurde auf den neuen read-only Manifestvertrag aktualisiert.
 - `.venv/bin/python manage.py test plm` laeuft mit 121 Tests erfolgreich.
+
+### Aktive Checkouts Fuer Addon-Neustart
+
+- Neuer API-Endpunkt `GET /api/checkouts/active/` angelegt.
+- Der Endpunkt braucht Scope `checkout` und liefert nur aktive Checkouts des authentifizierten API-Users.
+- Bereits eingecheckte, abgebrochene und fremde Checkouts werden nicht ausgeliefert.
+- Jeder Eintrag enthaelt Projekt, Teil, Basisrevision, optionalen Snapshot, Workspace-Hinweis und `manifest_url`.
+- `planning/FREECAD_ADDON_PLAN.md` wurde um den aktiven-Checkout-Vertrag und den Verbindungsflow erweitert.
