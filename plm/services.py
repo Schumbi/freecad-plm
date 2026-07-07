@@ -564,11 +564,31 @@ def revision_metadata_from_validation(metadata, plm_revision=None):
         "zip_member_count": metadata["zip_member_count"],
         "has_document_xml": metadata["has_document_xml"],
         "has_gui_document_xml": metadata["has_gui_document_xml"],
+        "technical_signature": metadata["technical_signature"],
         "freecad_document": metadata["freecad_document"],
     }
     if plm_revision:
         extracted["plm_revision"] = plm_revision
     return extracted
+
+
+def revision_document_signature(revision):
+    signature = (revision.extracted_metadata or {}).get("technical_signature", {})
+    value = signature.get("document_xml_sha256")
+    if not value:
+        raise ValidationError("Basisrevision enthaelt keine technische FCStd-Signatur.")
+    return value
+
+
+def uploaded_document_signature(uploaded_file):
+    metadata = validate_fcstd_upload(uploaded_file)
+    return metadata["technical_signature"]["document_xml_sha256"]
+
+
+def fcstd_model_changed(base_revision, uploaded_file):
+    return revision_document_signature(base_revision) != uploaded_document_signature(
+        uploaded_file
+    )
 
 
 def freecad_plm_revision(metadata):
@@ -1195,6 +1215,18 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
 def checkin_checkout(checkout, uploaded_file, actor, notes=""):
     if checkout.status != Checkout.Status.ACTIVE:
         raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
+    if not fcstd_model_changed(checkout.base_revision, uploaded_file):
+        return {
+            "root_revision": None,
+            "revisions": [],
+            "ignored_files": [
+                {
+                    "path": checkout.base_revision.original_filename,
+                    "reason": "no_model_change",
+                }
+            ],
+        }
+
     revision = create_revision_from_upload(
         part=checkout.part,
         uploaded_file=uploaded_file,
@@ -1212,7 +1244,17 @@ def checkin_checkout(checkout, uploaded_file, actor, notes=""):
             }
         ],
     )
-    return revision
+    return {
+        "root_revision": revision,
+        "revisions": [
+            {
+                "path": checkout.base_revision.original_filename,
+                "revision": revision,
+                "is_root": True,
+            }
+        ],
+        "ignored_files": [],
+    }
 
 
 @transaction.atomic
@@ -1224,6 +1266,7 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
 
     manifest_by_path = manifest_entries_by_path(checkout)
     revisions = []
+    ignored_files = []
     root_revision = None
 
     for item in files_metadata:
@@ -1249,6 +1292,14 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
         uploaded_sha256, _size = upload_file_digest(uploaded_file)
         if item.get("sha256") and item["sha256"] != uploaded_sha256:
             raise ValidationError("Upload-Hash passt nicht zu files_metadata.")
+        if not fcstd_model_changed(manifest_revision, uploaded_file):
+            ignored_files.append(
+                {
+                    "path": path,
+                    "reason": "no_model_change",
+                }
+            )
+            continue
 
         revision = create_revision_from_upload(
             part=manifest_revision.part,
@@ -1265,15 +1316,17 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
         if manifest_entry["is_root"]:
             root_revision = revision
 
-    complete_checkout(
-        checkout,
-        actor,
-        completed_revision=root_revision,
-        revisions=revisions,
-    )
+    if revisions:
+        complete_checkout(
+            checkout,
+            actor,
+            completed_revision=root_revision,
+            revisions=revisions,
+        )
     return {
         "root_revision": root_revision,
         "revisions": revisions,
+        "ignored_files": ignored_files,
     }
 
 

@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from .auth import create_api_token
 from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
+from .fcstd_signature import fcstd_document_signature
 from .models import (
     Annotation,
     ApiToken,
@@ -230,6 +231,28 @@ def make_project_zip_upload(name="project.zip", members=None):
     return SimpleUploadedFile(name, buffer.getvalue())
 
 
+def fcstd_upload_from_bytes(data, name="part.FCStd"):
+    return SimpleUploadedFile(name, data)
+
+
+def noisy_fcstd_bytes(data, plm_revision="R0099"):
+    updated = fcstd_with_plm_revision(data, plm_revision)
+    buffer = BytesIO()
+    with ZipFile(BytesIO(updated)) as source, ZipFile(buffer, "w") as target:
+        for info in source.infolist():
+            content = source.read(info.filename)
+            if info.filename == "Document.xml":
+                content = content.replace(
+                    b"<Document",
+                    b'<Document status="1" stamp="2" Touched="1"',
+                    1,
+                )
+            write_zip_member(target, info.filename, content)
+        write_zip_member(target, "GuiDocument.xml", "<GuiDocument><Camera /></GuiDocument>")
+        write_zip_member(target, "Body.brp", b"rewritten-cache")
+    return buffer.getvalue()
+
+
 class FcstdValidationTests(SimpleTestCase):
     def test_accepts_fcstd_zip_and_returns_metadata(self):
         upload = make_zip_upload(
@@ -263,7 +286,29 @@ class FcstdValidationTests(SimpleTestCase):
         )
         self.assertEqual(metadata["freecad_document"]["program_version"], "1.1R1")
         self.assertEqual(len(metadata["sha256"]), 64)
+        self.assertEqual(
+            len(metadata["technical_signature"]["document_xml_sha256"]),
+            64,
+        )
         self.assertGreater(metadata["size_bytes"], 0)
+
+    def test_technical_signature_ignores_gui_plm_revision_and_brep_cache(self):
+        base = make_fcstd_bytes("Druck", xlinks=[("Box.FCStd", "Body")])
+        noisy = noisy_fcstd_bytes(base)
+
+        self.assertEqual(
+            fcstd_document_signature(base),
+            fcstd_document_signature(noisy),
+        )
+
+    def test_technical_signature_changes_for_model_relevant_document_xml(self):
+        base = make_fcstd_bytes("Druck")
+        changed = make_fcstd_bytes("Druck geaendert")
+
+        self.assertNotEqual(
+            fcstd_document_signature(base),
+            fcstd_document_signature(changed),
+        )
 
     def test_can_set_plm_revision_in_document_xml(self):
         upload = make_zip_upload(members={"Document.xml": "<Document />"})
@@ -2820,6 +2865,38 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(checkout.completed_revision, revision)
         self.assertEqual(revision.notes, "Geometrie angepasst.")
 
+    def test_checkin_ignores_technical_only_single_file_change(self):
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
+        create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        base_revision = Revision.objects.get(revision_code="R0001")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[base_revision.id]),
+            {},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        noisy_data = noisy_fcstd_bytes(make_zip_upload().read(), plm_revision="R0002")
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "file": SimpleUploadedFile("updated.FCStd", noisy_data),
+                "change_summary": "Nur gespeichert.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.status, Checkout.Status.ACTIVE)
+        self.assertIsNone(checkout.completed_revision)
+        self.assertEqual(Revision.objects.count(), 1)
+        payload = response.json()
+        self.assertIsNone(payload["revision"])
+        self.assertEqual(payload["revisions"], [])
+        self.assertEqual(
+            payload["ignored_files"],
+            [{"path": "part.FCStd", "reason": "no_model_change"}],
+        )
+
     def test_multi_file_checkin_can_update_referenced_file_only(self):
         self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
         snapshot = import_project_snapshot(
@@ -2957,6 +3034,122 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(
             next_checkout.json()["manifest"]["snapshot"]["id"],
             new_snapshot.id,
+        )
+
+    def test_multi_file_checkin_ignores_technical_only_files_and_keeps_real_changes(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        box_revision = Revision.objects.get(part__name="Box")
+        deckel_revision = Revision.objects.get(part__name="Deckel")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        updated_box = fcstd_with_plm_revision(
+            make_fcstd_bytes("Box geaendert", xlinks=[("Chip.FCStd", "VarSet")]),
+            "R0002",
+        )
+        noisy_deckel = noisy_fcstd_bytes(deckel_revision.file.read(), plm_revision="R0002")
+        metadata = [
+            {
+                "field": "file_0",
+                "path": "Box.FCStd",
+                "revision_id": box_revision.id,
+                "base_sha256": box_revision.sha256,
+                "sha256": sha256(updated_box).hexdigest(),
+                "is_root": False,
+            },
+            {
+                "field": "file_1",
+                "path": "Deckel.FCStd",
+                "revision_id": deckel_revision.id,
+                "base_sha256": deckel_revision.sha256,
+                "sha256": sha256(noisy_deckel).hexdigest(),
+                "is_root": False,
+            },
+        ]
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": json.dumps(metadata),
+                "file_0": SimpleUploadedFile("Box.FCStd", updated_box),
+                "file_1": SimpleUploadedFile("Deckel.FCStd", noisy_deckel),
+                "change_summary": "Box angepasst, Deckel nur gespeichert.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual([item["path"] for item in payload["revisions"]], ["Box.FCStd"])
+        self.assertEqual(
+            payload["ignored_files"],
+            [{"path": "Deckel.FCStd", "reason": "no_model_change"}],
+        )
+        self.assertTrue(
+            Revision.objects.filter(part=box_revision.part, revision_code="R0002").exists()
+        )
+        self.assertFalse(
+            Revision.objects.filter(part=deckel_revision.part, revision_code="R0002").exists()
+        )
+        new_snapshot = ProjectSnapshot.objects.exclude(id=snapshot.id).get()
+        self.assertEqual(new_snapshot.entries.get(path="Deckel.FCStd").revision, deckel_revision)
+
+    def test_multi_file_checkin_with_only_technical_changes_keeps_checkout_active(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        box_revision = Revision.objects.get(part__name="Box")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        noisy_box = noisy_fcstd_bytes(box_revision.file.read(), plm_revision="R0002")
+        metadata = [
+            {
+                "field": "file_0",
+                "path": "Box.FCStd",
+                "revision_id": box_revision.id,
+                "base_sha256": box_revision.sha256,
+                "sha256": sha256(noisy_box).hexdigest(),
+                "is_root": False,
+            }
+        ]
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": json.dumps(metadata),
+                "file_0": SimpleUploadedFile("Box.FCStd", noisy_box),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.status, Checkout.Status.ACTIVE)
+        payload = response.json()
+        self.assertIsNone(payload["revision"])
+        self.assertEqual(payload["revisions"], [])
+        self.assertEqual(
+            payload["ignored_files"],
+            [{"path": "Box.FCStd", "reason": "no_model_change"}],
+        )
+        self.assertEqual(ProjectSnapshot.objects.count(), 1)
+        self.assertFalse(
+            Revision.objects.filter(part=box_revision.part, revision_code="R0002").exists()
         )
 
     def test_multi_file_checkin_rejects_unknown_manifest_path_and_keeps_checkout_active(self):

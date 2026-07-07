@@ -497,3 +497,13 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Fuer jede hochgeladene geaenderte Datei wird eine neue Revision des zugehoerigen Teils erzeugt.
 - Checkouts werden auch abgeschlossen, wenn nur referenzierte Dateien geaendert wurden; die Antwort listet alle erzeugten Revisionen mit Manifest-Pfad.
 - Bei Konflikten bleibt der Checkout aktiv.
+
+## 2026-07-07
+
+### FCStd-Technische Signatur Im Server
+
+- Neue serverseitige FCStd-Signatur normalisiert `Document.xml` und ignoriert technische Speicherartefakte wie `PLMRevision`, `LastModified*`, `status`, `stamp`, `Touched`, `GuiDocument.xml` und BREP-Cache-Dateien.
+- Neue Revisionen speichern die Signatur direkt in `extracted_metadata["technical_signature"]`; es gibt keine Migration und keinen Altbestand-Fallback.
+- Single-File- und Multi-File-Check-in erzeugen nur noch Revisionen fuer modellrelevante Signaturaenderungen.
+- Technisch unveraenderte Check-in-Dateien erscheinen in `ignored_files` mit `reason: no_model_change`.
+- Wenn ein Check-in ausschliesslich technische Aenderungen enthaelt, bleibt der Checkout aktiv und der Server antwortet mit JSON statt eine leere Revision zu erzeugen.

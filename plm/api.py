@@ -461,15 +461,16 @@ def checkout_checkin_api(request, checkout_id):
                     }
                     for item in result["revisions"]
                 ],
+                "ignored_files": result["ignored_files"],
             },
-            status=201,
+            status=201 if result["revisions"] else 200,
         )
 
     uploaded_file = request.FILES.get("file")
     if uploaded_file is None:
         return JsonResponse({"error": "FCStd-Datei fehlt."}, status=400)
     try:
-        revision = checkin_checkout(
+        result = checkin_checkout(
             checkout,
             uploaded_file,
             request.user,
@@ -477,18 +478,22 @@ def checkout_checkin_api(request, checkout_id):
         )
     except ValidationError as exc:
         return validation_error_response(exc, status=409)
+    checkout.refresh_from_db()
+    revision = result["root_revision"]
     return JsonResponse(
         {
             "checkout": checkout_payload(checkout),
-            "revision": revision_payload(revision, request),
+            "revision": revision_payload(revision, request) if revision else None,
             "revisions": [
                 {
-                    "path": checkout.base_revision.original_filename,
-                    "revision": revision_summary_payload(revision),
+                    "path": item["path"],
+                    "revision": revision_summary_payload(item["revision"]),
                 }
+                for item in result["revisions"]
             ],
+            "ignored_files": result["ignored_files"],
         },
-        status=201,
+        status=201 if result["revisions"] else 200,
     )
 
 

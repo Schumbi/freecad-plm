@@ -6,6 +6,8 @@ from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError
 
+from .fcstd_signature import fcstd_technical_signature
+
 
 FREECAD_STRING_PROPERTIES = (
     "Label",
@@ -184,6 +186,7 @@ def validate_fcstd_upload(uploaded_file):
         "zip_member_count": len(members),
         "has_document_xml": "Document.xml" in member_names,
         "has_gui_document_xml": "GuiDocument.xml" in member_names,
+        "technical_signature": fcstd_technical_signature(data),
         "freecad_document": (
             extract_document_xml_metadata(document_xml) if document_xml else {}
         ),
