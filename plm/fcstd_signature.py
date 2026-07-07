@@ -1,6 +1,7 @@
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+import re
 from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
@@ -17,7 +18,13 @@ IGNORED_XML_ATTRIBUTES = {
     "stamp",
     "status",
 }
-SIGNATURE_RULES_VERSION = 1
+CHECKOUT_FILE_REFERENCE_RE = re.compile(
+    r"(?P<prefix>'?)(?:[A-Za-z]:)?[/\\][^'\"<>]*[/\\]checkout-\d+[/\\]files[/\\]"
+    r"(?P<filename>[^'\"<>]+?\.FCStd)",
+    re.IGNORECASE,
+)
+FLOAT_RE = re.compile(r"^[+-]?(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?$")
+SIGNATURE_RULES_VERSION = 2
 
 
 def read_file_or_path(file_or_path):
@@ -75,6 +82,34 @@ def remove_ignored_properties(root):
     properties_node.attrib["Count"] = str(len(properties_node.findall("./Property")))
 
 
+def normalize_checkout_file_references(value):
+    return CHECKOUT_FILE_REFERENCE_RE.sub(
+        lambda match: f"{match.group('prefix')}{match.group('filename')}",
+        value,
+    )
+
+
+def normalize_attribute_value(value):
+    value = normalize_checkout_file_references(value)
+    if not FLOAT_RE.match(value):
+        return value
+
+    try:
+        number = float(value)
+    except ValueError:
+        return value
+    if abs(number) < 1e-9:
+        return "0"
+    return format(number, ".12g")
+
+
+def normalize_attribute_values(element):
+    for name, value in list(element.attrib.items()):
+        element.attrib[name] = normalize_attribute_value(value)
+    for child in list(element):
+        normalize_attribute_values(child)
+
+
 def normalized_document_xml(document_xml):
     try:
         root = ElementTree.fromstring(document_xml)
@@ -83,6 +118,7 @@ def normalized_document_xml(document_xml):
 
     remove_ignored_properties(root)
     remove_ignored_attributes(root)
+    normalize_attribute_values(root)
     normalize_whitespace(root)
     sort_attributes(root)
     return ElementTree.tostring(root, encoding="utf-8")

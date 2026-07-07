@@ -96,6 +96,17 @@ def write_zip_member(archive, name, content):
     archive.writestr(info, content)
 
 
+def replace_zip_member(data, member_name, transform):
+    buffer = BytesIO()
+    with ZipFile(BytesIO(data)) as source, ZipFile(buffer, "w") as target:
+        for info in source.infolist():
+            content = source.read(info.filename)
+            if info.filename == member_name:
+                content = transform(content)
+            write_zip_member(target, info.filename, content)
+    return buffer.getvalue()
+
+
 def make_zip_upload(name="part.FCStd", members=None):
     members = members or {
         "Document.xml": FREECAD_DOCUMENT_XML,
@@ -290,6 +301,7 @@ class FcstdValidationTests(SimpleTestCase):
             len(metadata["technical_signature"]["document_xml_sha256"]),
             64,
         )
+        self.assertEqual(metadata["technical_signature"]["rules_version"], 2)
         self.assertGreater(metadata["size_bytes"], 0)
 
     def test_technical_signature_ignores_gui_plm_revision_and_brep_cache(self):
@@ -299,6 +311,79 @@ class FcstdValidationTests(SimpleTestCase):
         self.assertEqual(
             fcstd_document_signature(base),
             fcstd_document_signature(noisy),
+        )
+
+    def test_technical_signature_ignores_checkout_path_rewrites(self):
+        base = make_zip_upload(
+            members={
+                "Document.xml": """
+                    <Document>
+                        <ObjectData>
+                            <Object name="Bill_of_Materials">
+                                <Properties>
+                                    <Property name="cells">
+                                        <Cells>
+                                            <Cell address="D2" content="'/home/ralf/FreeCAD-PLM/localhost-8000/CB/checkout-2/files/Box.FCStd" />
+                                        </Cells>
+                                    </Property>
+                                </Properties>
+                            </Object>
+                        </ObjectData>
+                    </Document>
+                """,
+            }
+        ).read()
+        rewritten = replace_zip_member(
+            base,
+            "Document.xml",
+            lambda content: content.replace(
+                b"checkout-2/files/Box.FCStd",
+                b"checkout-3/files/Box.FCStd",
+            ),
+        )
+
+        self.assertEqual(
+            fcstd_document_signature(base),
+            fcstd_document_signature(rewritten),
+        )
+
+    def test_technical_signature_ignores_tiny_placement_rounding_noise(self):
+        base = make_zip_upload(
+            members={
+                "Document.xml": """
+                    <Document>
+                        <ObjectData>
+                            <Object name="Body_Deckel">
+                                <Properties>
+                                    <Property name="Placement">
+                                        <PropertyPlacement
+                                            Px="0.0000000000045562"
+                                            Py="-0.0000000000000167"
+                                            Pz="26.6250000000000000"
+                                            Q3="1.0000000000000000" />
+                                    </Property>
+                                </Properties>
+                            </Object>
+                        </ObjectData>
+                    </Document>
+                """,
+            }
+        ).read()
+        rewritten = replace_zip_member(
+            base,
+            "Document.xml",
+            lambda content: content.replace(
+                b"0.0000000000045562",
+                b"0.0000000000045567",
+            ).replace(
+                b"-0.0000000000000167",
+                b"-0.0000000000000191",
+            ),
+        )
+
+        self.assertEqual(
+            fcstd_document_signature(base),
+            fcstd_document_signature(rewritten),
         )
 
     def test_technical_signature_changes_for_model_relevant_document_xml(self):

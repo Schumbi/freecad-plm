@@ -507,3 +507,12 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Single-File- und Multi-File-Check-in erzeugen nur noch Revisionen fuer modellrelevante Signaturaenderungen.
 - Technisch unveraenderte Check-in-Dateien erscheinen in `ignored_files` mit `reason: no_model_change`.
 - Wenn ein Check-in ausschliesslich technische Aenderungen enthaelt, bleibt der Checkout aktiv und der Server antwortet mit JSON statt eine leere Revision zu erzeugen.
+
+### FCStd-Signaturregeln Gegen FreeCAD-Speicherrauschen Erweitert
+
+- Praxisbefund aus `/home/ralf/FreeCAD-PLM/localhost-8000/CB/checkout-2` zu `checkout-3`: direktes Oeffnen/Speichern ohne Nutzer-Aenderung schrieb alle FCStd-Dateien byteweise neu.
+- `Box`, `Chip` und `Deckel` unterschieden sich nach Normalisierung nur durch GUI-/ZIP-/Appearance-Rauschen.
+- `Druck` unterschied sich nur durch lokale BOM-/XML-Pfade wie `.../checkout-1/files/Box.FCStd` zu `.../checkout-2/files/Box.FCStd`.
+- `Zusammenbau` unterschied sich nur durch winzige Placement-Floating-Point-Abweichungen im Bereich von etwa `1e-12`.
+- Signatur-Regelversion 2 normalisiert deshalb lokale Checkout-Dateipfade auf den `.FCStd`-Dateinamen und kanonisiert numerische Attributwerte; Werte nahe `0` werden als `0` behandelt.
+- `planning/FCSTD_TECHNICAL_SIGNATURE_PLAN.md` und Root-`README.md` dokumentieren diese Regeln.

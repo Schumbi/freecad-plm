@@ -518,6 +518,22 @@ Unveraenderte Dateien muessen nicht hochgeladen werden. Wenn nur referenzierte
 Dateien geaendert wurden, wird der Checkout trotzdem abgeschlossen; `revision`
 ist dann `null`, und die erzeugten Revisionen stehen in `revisions`.
 
+Der Server prueft jede hochgeladene FCStd-Datei zusaetzlich mit seiner
+technischen Signatur. Reine FreeCAD-Speicherartefakte zaehlen nicht als
+modellrelevante Aenderung:
+
+- `GuiDocument.xml`
+- `ShapeAppearance*`
+- BREP-/Shape-Cache-Dateien als alleiniger Unterschied
+- `LastModified*`, `PLMRevision`, `status`, `stamp`, `Touched`
+- lokale Checkout-Pfade in BOM-/XML-Attributen wie
+  `.../checkout-2/files/Box.FCStd`
+- winziges Placement-Floating-Point-Rauschen nahe `0`
+
+Wenn nach dieser Filterung keine modellrelevante Datei uebrig bleibt, antwortet
+der Server mit `200`, laesst den Checkout aktiv und listet die ignorierten
+Dateien in `ignored_files`.
+
 Antwort `201`:
 
 ```json

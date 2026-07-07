@@ -47,6 +47,11 @@ berechnen:
     - `status`
     - `stamp`
     - `Touched`
+  - Absolute lokale Checkout-Pfade in XML-Attributen auf den referenzierten
+    `.FCStd`-Dateinamen normalisieren, z.B. aus
+    `.../checkout-2/files/Box.FCStd` wird `Box.FCStd`.
+  - Numerische XML-Attributwerte kanonisch formatieren; sehr kleine
+    Floating-Point-Rundungsartefakte nahe `0` werden als `0` behandelt.
   - Attribute deterministisch sortieren.
   - rein formatierenden Whitespace in `text`/`tail` normalisieren.
   - `Properties/@Count` nach entfernten Properties aktualisieren.
@@ -61,9 +66,10 @@ Basisrevision vergleichen:
 
 - Ist die normalisierte `Document.xml`-Signatur unveraendert, wird fuer diese
   Datei keine neue Revision angelegt.
-- Ist nur `GuiDocument.xml`, ZIP-Metadaten, `.FCBak`, `LastModified*`,
-  `PLMRevision`, `status`, `stamp`, `Touched` oder BREP-Cache betroffen, wird
-  keine neue Revision angelegt.
+- Ist nur `GuiDocument.xml`, `ShapeAppearance*`, ZIP-Metadaten, `.FCBak`,
+  `LastModified*`, `PLMRevision`, `status`, `stamp`, `Touched`, BREP-Cache,
+  lokaler Checkout-Pfad in BOM-/XML-Attributen oder winziges Placement-
+  Floating-Point-Rauschen betroffen, wird keine neue Revision angelegt.
 - Ist die normalisierte `Document.xml`-Signatur geaendert, wird wie bisher eine
   neue Revision erzeugt.
 - Bei einem Multi-File-Check-in koennen einzelne Dateien herausgefiltert werden.
