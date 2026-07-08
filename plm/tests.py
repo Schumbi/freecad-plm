@@ -3307,6 +3307,25 @@ class AddonApiWorkflowTests(TestCase):
         )
         self.assertEqual(response.json()["annotations"][0]["object_name"], "Body")
 
+    def test_annotation_create_ignores_non_string_optional_targets(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        response = self.post_json(
+            reverse("plm:api_part_annotations", args=[self.part.id]),
+            {
+                "revision_id": revision.id,
+                "object_name": False,
+                "subelement": None,
+                "text": "Panel-Button ohne Selektion.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        annotation = Annotation.objects.get()
+        self.assertEqual(annotation.object_name, "")
+        self.assertEqual(annotation.subelement, "")
+
     def test_api_can_update_revision_notes_without_new_revision(self):
         self.authorize_token([ApiToken.Scope.WRITE])
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)

@@ -1339,12 +1339,14 @@ def create_annotation(
     object_name="",
     subelement="",
 ):
+    object_name = object_name.strip() if isinstance(object_name, str) else ""
+    subelement = subelement.strip() if isinstance(subelement, str) else ""
     annotation = Annotation.objects.create(
         project=part.project,
         part=part,
         revision=revision,
-        object_name=object_name.strip(),
-        subelement=subelement.strip(),
+        object_name=object_name,
+        subelement=subelement,
         text=text.strip(),
         created_by=created_by,
     )
