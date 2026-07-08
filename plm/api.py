@@ -290,6 +290,25 @@ def revision_api(request, revision_id):
     return JsonResponse({"revision": revision_payload(revision, request)})
 
 
+@csrf_exempt
+@api_auth_required(post=ApiToken.Scope.WRITE)
+@require_http_methods(["POST"])
+def revision_notes_api(request, revision_id):
+    revision = get_object_or_404(Revision.objects.select_related("part"), id=revision_id)
+    if not user_can_mutate_models(request.user):
+        return JsonResponse({"error": "Keine Berechtigung fuer Revisionsnotizen."}, status=403)
+    data = json_body(request)
+    revision.notes = data.get("notes", "").strip()
+    revision.save(update_fields=["notes", "updated_at"])
+    AuditEvent.objects.create(
+        actor=request.user,
+        action=AuditEvent.Action.REVISION_NOTES_UPDATED,
+        object_repr=str(revision),
+        metadata={"part_id": revision.part_id, "revision_id": revision.id},
+    )
+    return JsonResponse({"revision": revision_payload(revision, request)})
+
+
 @api_auth_required(get=ApiToken.Scope.READ)
 @require_http_methods(["GET"])
 def revision_file_api(request, revision_id):
@@ -529,12 +548,24 @@ def part_annotations_api(request, part_id):
 
 
 @csrf_exempt
-@api_auth_required(post=ApiToken.Scope.WRITE)
-@require_http_methods(["POST"])
+@api_auth_required(post=ApiToken.Scope.WRITE, delete=ApiToken.Scope.WRITE)
+@require_http_methods(["POST", "DELETE"])
 def annotation_api(request, annotation_id):
     annotation = get_object_or_404(Annotation, id=annotation_id)
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung fuer Anmerkungen."}, status=403)
+    if request.method == "DELETE":
+        metadata = {"annotation_id": annotation.id, "part_id": annotation.part_id}
+        object_repr = str(annotation)
+        annotation.delete()
+        AuditEvent.objects.create(
+            actor=request.user,
+            action=AuditEvent.Action.ANNOTATION_DELETED,
+            object_repr=object_repr,
+            metadata=metadata,
+        )
+        return JsonResponse({}, status=204)
+
     data = json_body(request)
     if "text" in data:
         annotation.text = data["text"].strip()

@@ -232,12 +232,14 @@ Token-Scopes:
 - `GET/POST /api/projects/<id>/parts/`
 - `GET/POST /api/parts/<id>/`
 - `GET /api/revisions/<id>/`
+- `POST /api/revisions/<id>/notes/`
 - `GET /api/revisions/<id>/file/`
 - `POST /api/revisions/<id>/checkout/`
 - `GET /api/checkouts/<id>/manifest/`
 - `POST /api/checkouts/<id>/checkin/`
 - `POST /api/checkouts/<id>/cancel/`
 - `GET/POST /api/parts/<id>/annotations/`
+- `POST/DELETE /api/annotations/<id>/`
 
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 

@@ -156,6 +156,11 @@ urlpatterns = [
         name="api_revision",
     ),
     path(
+        "api/revisions/<int:revision_id>/notes/",
+        api.revision_notes_api,
+        name="api_revision_notes",
+    ),
+    path(
         "api/revisions/<int:revision_id>/file/",
         api.revision_file_api,
         name="api_revision_file",

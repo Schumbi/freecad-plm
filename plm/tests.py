@@ -3306,3 +3306,47 @@ class AddonApiWorkflowTests(TestCase):
             reverse("plm:api_part_annotations", args=[self.part.id])
         )
         self.assertEqual(response.json()["annotations"][0]["object_name"], "Body")
+
+    def test_api_can_update_revision_notes_without_new_revision(self):
+        self.authorize_token([ApiToken.Scope.WRITE])
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        response = self.post_json(
+            reverse("plm:api_revision_notes", args=[revision.id]),
+            {"notes": "  In Baugruppe pruefen.  "},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        revision.refresh_from_db()
+        self.assertEqual(revision.notes, "In Baugruppe pruefen.")
+        self.assertEqual(Revision.objects.count(), 1)
+        self.assertEqual(response.json()["revision"]["notes"], "In Baugruppe pruefen.")
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.REVISION_NOTES_UPDATED,
+                metadata__revision_id=revision.id,
+            ).exists()
+        )
+
+    def test_api_can_delete_annotation_without_new_revision(self):
+        self.authorize_token([ApiToken.Scope.WRITE])
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        annotation = Annotation.objects.create(
+            project=self.project,
+            part=self.part,
+            revision=revision,
+            created_by=self.user,
+            text="Nicht mehr relevant.",
+        )
+
+        response = self.client.delete(reverse("plm:api_annotation", args=[annotation.id]))
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Annotation.objects.filter(id=annotation.id).exists())
+        self.assertEqual(Revision.objects.count(), 1)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.ANNOTATION_DELETED,
+                metadata__annotation_id=annotation.id,
+            ).exists()
+        )

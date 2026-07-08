@@ -516,3 +516,13 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `Zusammenbau` unterschied sich nur durch winzige Placement-Floating-Point-Abweichungen im Bereich von etwa `1e-12`.
 - Signatur-Regelversion 2 normalisiert deshalb lokale Checkout-Dateipfade auf den `.FCStd`-Dateinamen und kanonisiert numerische Attributwerte; Werte nahe `0` werden als `0` behandelt.
 - `planning/FCSTD_TECHNICAL_SIGNATURE_PLAN.md` und Root-`README.md` dokumentieren diese Regeln.
+
+## 2026-07-08
+
+### Revisionsnotizen Und Anmerkungs-CRUD Fuer Addon
+
+- Neuer API-Endpunkt `POST /api/revisions/<revision_id>/notes/` aktualisiert `Revision.notes` mit Scope `write`.
+- Der Endpunkt erzeugt keine neue Revision und schreibt ein AuditEvent `revision_notes_updated`.
+- `DELETE /api/annotations/<annotation_id>/` ergaenzt den bestehenden Anmerkungs-Endpunkt.
+- Das Loeschen erzeugt keine neue Revision und schreibt ein AuditEvent `annotation_deleted`.
+- `planning/FREECAD_ADDON_PLAN.md` und Root-`README.md` dokumentieren die neuen Addon-Endpunkte.

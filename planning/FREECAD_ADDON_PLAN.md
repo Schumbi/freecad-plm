@@ -269,6 +269,31 @@ Antwort:
 
 Antwort: Datei-Download der `.FCStd`-Datei.
 
+`POST /api/revisions/<revision_id>/notes/`
+
+Request:
+
+```json
+{
+  "notes": "Vor Serienfreigabe in Baugruppe pruefen."
+}
+```
+
+Antwort:
+
+```json
+{
+  "revision": {
+    "id": 1,
+    "revision_code": "R0001",
+    "notes": "Vor Serienfreigabe in Baugruppe pruefen."
+  }
+}
+```
+
+Der Endpunkt aktualisiert nur `Revision.notes`, erzeugt keine neue Revision und
+schreibt ein AuditEvent `revision_notes_updated`. Leere Notizen sind erlaubt.
+
 Das Addon muss den Download nach dem Speichern lokal per SHA-256 gegen `sha256` aus Revision oder Manifest pruefen.
 
 ### Read-only Manifest
@@ -623,6 +648,17 @@ Request:
 ```
 
 `status` ist `open` oder `resolved`.
+
+`DELETE /api/annotations/<annotation_id>/`
+
+Antwort:
+
+```http
+204 No Content
+```
+
+Der Endpunkt loescht die Anmerkung, erzeugt keine Revision und schreibt ein
+AuditEvent `annotation_deleted`.
 
 ## Lokale Workspace-Regeln
 

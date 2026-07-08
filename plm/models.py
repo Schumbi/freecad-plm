@@ -664,6 +664,7 @@ class AuditEvent(models.Model):
         CHECKOUT_COMPLETED = "checkout_completed", "Checkout eingecheckt"
         ANNOTATION_CREATED = "annotation_created", "Anmerkung angelegt"
         ANNOTATION_UPDATED = "annotation_updated", "Anmerkung geaendert"
+        ANNOTATION_DELETED = "annotation_deleted", "Anmerkung geloescht"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
