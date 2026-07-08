@@ -2615,6 +2615,100 @@ class AddonApiWorkflowTests(TestCase):
             ).exists()
         )
 
+    def test_api_imports_project_snapshot_into_existing_project(self):
+        self.authorize_token([ApiToken.Scope.WRITE])
+
+        response = self.client.post(
+            reverse("plm:api_project_snapshot_import", args=[self.project.id]),
+            {
+                "name": "Arbeitsstand",
+                "file": make_project_zip_upload(
+                    members={
+                        "Box.FCStd": make_fcstd_bytes("Box"),
+                        "Assembly.FCStd": make_fcstd_bytes(
+                            "Assembly",
+                            object_type="Assembly::AssemblyObject",
+                            xlinks=[("Box.FCStd", "Body")],
+                        ),
+                    }
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["project"]["id"], self.project.id)
+        self.assertEqual(payload["snapshot"]["name"], "Arbeitsstand")
+        self.assertEqual(payload["import_summary"]["created_parts"], 2)
+        self.assertEqual(payload["import_summary"]["created_revisions"], 2)
+        self.assertEqual(
+            sorted(entry["path"] for entry in payload["snapshot"]["entries"]),
+            ["Assembly.FCStd", "Box.FCStd"],
+        )
+        self.assertTrue(
+            Part.objects.filter(
+                project=self.project,
+                name="Assembly",
+                category=Part.Category.ASSEMBLY,
+            ).exists()
+        )
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.PROJECT_SNAPSHOT_CREATED,
+                metadata__project_id=self.project.id,
+            ).exists()
+        )
+
+    def test_api_creates_project_and_imports_snapshot(self):
+        self.authorize_token([ApiToken.Scope.ADMIN])
+
+        response = self.client.post(
+            reverse("plm:api_project_import"),
+            {
+                "code": " imp ",
+                "name": "Importprojekt",
+                "status": Project.Status.ORDER,
+                "project_date": "2026-07-08",
+                "description": "Via Addon",
+                "snapshot_name": "Initial",
+                "file": make_project_zip_upload(
+                    members={
+                        "parts/Box.FCStd": make_fcstd_bytes("Box", freecad_id="BOX-001"),
+                        "Assembly.FCStd": make_fcstd_bytes(
+                            "Assembly",
+                            object_type="Assembly::AssemblyObject",
+                            xlinks=[("parts/Box.FCStd", "Body")],
+                        ),
+                    }
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        project = Project.objects.get(code="IMP")
+        self.assertEqual(project.name, "Importprojekt")
+        self.assertEqual(project.status, Project.Status.ORDER)
+        self.assertEqual(project.project_date.isoformat(), "2026-07-08")
+        self.assertEqual(project.description, "Via Addon")
+        self.assertEqual(payload["project"]["id"], project.id)
+        self.assertEqual(payload["snapshot"]["name"], "Initial")
+        self.assertEqual(
+            sorted(entry["path"] for entry in payload["snapshot"]["entries"]),
+            ["Assembly.FCStd", "parts/Box.FCStd"],
+        )
+        self.assertTrue(project.parts.filter(number="BOX-001").exists())
+
+    def test_api_snapshot_import_requires_write_scope(self):
+        self.authorize_token([ApiToken.Scope.READ])
+
+        response = self.client.post(
+            reverse("plm:api_project_snapshot_import", args=[self.project.id]),
+            {"name": "Arbeitsstand", "file": make_project_zip_upload()},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_api_rejects_missing_authentication(self):
         response = self.client.get(reverse("plm:api_projects"))
 

@@ -138,7 +138,13 @@ urlpatterns = [
         name="download_project_snapshot",
     ),
     path("api/projects/", api.projects_api, name="api_projects"),
+    path("api/projects/import/", api.project_import_api, name="api_project_import"),
     path("api/projects/<int:project_id>/", api.project_api, name="api_project"),
+    path(
+        "api/projects/<int:project_id>/snapshots/import/",
+        api.project_snapshot_import_api,
+        name="api_project_snapshot_import",
+    ),
     path(
         "api/projects/<int:project_id>/parts/",
         api.project_parts_api,

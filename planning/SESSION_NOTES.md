@@ -535,3 +535,16 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
   Beschreibung und Archivstatus.
 - Das Addon spiegelt Code, Name, Status, Datum und Beschreibung im Projekttab,
   damit diese WebUI-Felder direkt aus FreeCAD gepflegt werden koennen.
+
+### Addon-Projektimport
+
+- Neue API-Endpunkte:
+  - `POST /api/projects/<project_id>/snapshots/import/` importiert ein
+    ZIP als Projektstand in ein vorhandenes Projekt mit Scope `write`.
+  - `POST /api/projects/import/` legt ein Projekt an und importiert ein
+    ZIP atomar mit Scope `admin`.
+- Die API verwendet `import_project_snapshot()` wieder und liefert Projekt,
+  Snapshot-Eintraege und `import_summary` als JSON.
+- Das Addon baut aus einem lokalen Ordner ein ZIP mit relativen `.FCStd`-Pfaden,
+  kann neue Projekte inklusive Stammdaten anlegen und aktualisiert danach die
+  Projekt-/Teilelisten.

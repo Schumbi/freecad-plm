@@ -228,7 +228,9 @@ Token-Scopes:
 - `admin`: Projektanlage/-bearbeitung ueber API
 
 - `GET/POST /api/projects/`
+- `POST /api/projects/import/`
 - `GET/POST /api/projects/<id>/`
+- `POST /api/projects/<id>/snapshots/import/`
 - `GET/POST /api/projects/<id>/parts/`
 - `GET/POST /api/parts/<id>/`
 - `GET /api/revisions/<id>/`
@@ -244,6 +246,12 @@ Token-Scopes:
 Projektbearbeitung ueber `POST /api/projects/<id>/` braucht Scope `admin` und
 akzeptiert dieselben Stammdaten wie das WebUI: `code`, `name`, `status`,
 `project_date`, `description` und `is_archived`.
+
+Lokale FreeCAD-Dateisets koennen als Projektstand importiert werden. Das Addon
+sendet dafuer ein ZIP mit relativen `.FCStd`-Pfaden an
+`POST /api/projects/<id>/snapshots/import/` mit Scope `write`. Fuer den
+Kombiflow "Projekt anlegen und ZIP importieren" nutzt es
+`POST /api/projects/import/` mit Scope `admin`.
 
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 

@@ -169,6 +169,74 @@ Das Addon spiegelt diese WebUI-Felder in einem Projekttab, damit Code, Name,
 Status, Datum und Beschreibung direkt im FreeCAD-Kontext gepflegt werden
 koennen.
 
+### Projektstand-Import
+
+`POST /api/projects/<project_id>/snapshots/import/`
+
+Scope: `write`
+
+Multipart-Felder:
+
+- `file`: ZIP mit `.FCStd`-Dateien und relativen Pfaden
+- `name`: Name des Projektstands
+
+Der Server nutzt dieselbe Importlogik wie das WebUI: Alle `.FCStd`-Dateien im
+ZIP werden validiert, Teile/Baugruppen werden aus FreeCAD-Metadaten abgeleitet,
+Revisionen werden angelegt oder wiederverwendet, und ein `ProjectSnapshot`
+speichert die relativen Pfade.
+
+`POST /api/projects/import/`
+
+Scope: `admin`
+
+Multipart-Felder:
+
+- `file`: ZIP mit `.FCStd`-Dateien und relativen Pfaden
+- `code`, `name`, `status`, `project_date`, `description`: Projektdaten
+- `snapshot_name`: Name des initialen Projektstands
+
+Dieser Kombiflow legt das Projekt an und importiert das ZIP atomar. Wenn der
+Import fehlschlaegt, bleibt kein leeres Projekt zurueck.
+
+Antwort:
+
+```json
+{
+  "project": {"id": 1, "code": "PRJ", "name": "Projekt"},
+  "snapshot": {
+    "id": 3,
+    "project_id": 1,
+    "name": "Initial",
+    "entries": [
+      {
+        "path": "Assembly.FCStd",
+        "part_id": 7,
+        "part_number": "P-001",
+        "part_category": "assembly",
+        "revision_id": 11,
+        "revision_code": "R0001"
+      }
+    ]
+  },
+  "import_summary": {
+    "created_parts": 1,
+    "created_revisions": 1,
+    "reused_revisions": 0,
+    "files": []
+  }
+}
+```
+
+Addon-Verhalten:
+
+```text
+Projekt importieren
+-> Ordner auswaehlen
+-> alle .FCStd unterhalb des Ordners als ZIP mit relativen Pfaden packen
+-> vorhandenes Projekt importieren oder neues Projekt plus Import anlegen
+-> Projekt-/Teileliste aktualisieren
+```
+
 ### Teile/Baugruppen
 
 `GET /api/projects/<project_id>/parts/`

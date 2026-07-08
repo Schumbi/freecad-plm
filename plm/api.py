@@ -1,6 +1,7 @@
 import json
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -20,6 +21,7 @@ from .services import (
     checkout_manifest,
     create_annotation,
     create_checkout,
+    import_project_snapshot,
     next_part_number,
     revision_manifest,
 )
@@ -122,6 +124,37 @@ def revision_summary_payload(revision):
     }
 
 
+def snapshot_payload(snapshot):
+    return {
+        "id": snapshot.id,
+        "project_id": snapshot.project_id,
+        "name": snapshot.name,
+        "created_by": snapshot.created_by.username,
+        "created_at": snapshot.created_at.isoformat(),
+        "entries": [
+            {
+                "id": entry.id,
+                "path": entry.path,
+                "revision_id": entry.revision_id,
+                "revision_code": entry.revision.revision_code,
+                "part_id": entry.revision.part_id,
+                "part_number": entry.revision.part.number,
+                "part_name": entry.revision.part.name,
+                "part_category": entry.revision.part.category,
+            }
+            for entry in snapshot.entries.select_related("revision", "revision__part").order_by("path")
+        ],
+    }
+
+
+def project_import_payload(project, snapshot):
+    return {
+        "project": project_payload(project),
+        "snapshot": snapshot_payload(snapshot),
+        "import_summary": getattr(snapshot, "import_summary", {}),
+    }
+
+
 def active_checkout_payload(checkout):
     return {
         "id": checkout.id,
@@ -200,6 +233,45 @@ def projects_api(request):
 
 
 @csrf_exempt
+@api_auth_required(post=ApiToken.Scope.ADMIN)
+@require_http_methods(["POST"])
+def project_import_api(request):
+    if not is_plm_admin(request.user):
+        return JsonResponse({"error": "Keine Berechtigung zum Anlegen von Projekten."}, status=403)
+
+    uploaded_file = request.FILES.get("file")
+    if uploaded_file is None:
+        return JsonResponse({"error": "Projekt-ZIP fehlt."}, status=400)
+
+    try:
+        with transaction.atomic():
+            project = Project.objects.create(
+                code=request.POST.get("code", "").strip().upper(),
+                name=request.POST.get("name", "").strip(),
+                description=request.POST.get("description", "").strip(),
+                status=request.POST.get("status", Project.Status.RUNNING),
+                project_date=parse_date(request.POST.get("project_date", ""))
+                or timezone.localdate(),
+            )
+            AuditEvent.objects.create(
+                actor=request.user,
+                action=AuditEvent.Action.PROJECT_CREATED,
+                object_repr=str(project),
+                metadata={"project_id": project.id, "project_code": project.code},
+            )
+            snapshot = import_project_snapshot(
+                project=project,
+                uploaded_zip=uploaded_file,
+                created_by=request.user,
+                name=request.POST.get("snapshot_name", ""),
+            )
+    except ValidationError as exc:
+        return validation_error_response(exc)
+
+    return JsonResponse(project_import_payload(project, snapshot), status=201)
+
+
+@csrf_exempt
 @api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.ADMIN)
 @require_http_methods(["GET", "POST"])
 def project_api(request, project_id):
@@ -227,6 +299,31 @@ def project_api(request, project_id):
         metadata={"project_id": project.id, "project_code": project.code},
     )
     return JsonResponse({"project": project_payload(project)})
+
+
+@csrf_exempt
+@api_auth_required(post=ApiToken.Scope.WRITE)
+@require_http_methods(["POST"])
+def project_snapshot_import_api(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if not can_upload_revision(request.user):
+        return JsonResponse({"error": "Keine Berechtigung zum Importieren von Projektstaenden."}, status=403)
+
+    uploaded_file = request.FILES.get("file")
+    if uploaded_file is None:
+        return JsonResponse({"error": "Projekt-ZIP fehlt."}, status=400)
+
+    try:
+        snapshot = import_project_snapshot(
+            project=project,
+            uploaded_zip=uploaded_file,
+            created_by=request.user,
+            name=request.POST.get("name", ""),
+        )
+    except ValidationError as exc:
+        return validation_error_response(exc)
+
+    return JsonResponse(project_import_payload(project, snapshot), status=201)
 
 
 @csrf_exempt
