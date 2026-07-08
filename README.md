@@ -241,6 +241,10 @@ Token-Scopes:
 - `GET/POST /api/parts/<id>/annotations/`
 - `POST/DELETE /api/annotations/<id>/`
 
+Projektbearbeitung ueber `POST /api/projects/<id>/` braucht Scope `admin` und
+akzeptiert dieselben Stammdaten wie das WebUI: `code`, `name`, `status`,
+`project_date`, `description` und `is_archived`.
+
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 
 ## FreeCADCmd

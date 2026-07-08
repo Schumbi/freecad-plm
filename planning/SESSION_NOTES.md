@@ -526,3 +526,12 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `DELETE /api/annotations/<annotation_id>/` ergaenzt den bestehenden Anmerkungs-Endpunkt.
 - Das Loeschen erzeugt keine neue Revision und schreibt ein AuditEvent `annotation_deleted`.
 - `planning/FREECAD_ADDON_PLAN.md` und Root-`README.md` dokumentieren die neuen Addon-Endpunkte.
+
+### Projektmetadaten Fuer Addon
+
+- `POST /api/projects/<project_id>/` akzeptiert jetzt auch `code` und schreibt
+  bei API-Aenderungen ein AuditEvent `project_updated`.
+- Der Addon-Vertrag fuer Projekte umfasst Code, Name, Status, Datum,
+  Beschreibung und Archivstatus.
+- Das Addon spiegelt Code, Name, Status, Datum und Beschreibung im Projekttab,
+  damit diese WebUI-Felder direkt aus FreeCAD gepflegt werden koennen.

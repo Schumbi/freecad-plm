@@ -210,6 +210,8 @@ def project_api(request, project_id):
     if not is_plm_admin(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Bearbeiten von Projekten."}, status=403)
     data = json_body(request)
+    if "code" in data:
+        project.code = data["code"].strip().upper()
     for field in ("name", "description", "status"):
         if field in data:
             setattr(project, field, data[field].strip())
@@ -218,6 +220,12 @@ def project_api(request, project_id):
     if "is_archived" in data:
         project.is_archived = bool(data["is_archived"])
     project.save()
+    AuditEvent.objects.create(
+        actor=request.user,
+        action=AuditEvent.Action.PROJECT_UPDATED,
+        object_repr=str(project),
+        metadata={"project_id": project.id, "project_code": project.code},
+    )
     return JsonResponse({"project": project_payload(project)})
 
 

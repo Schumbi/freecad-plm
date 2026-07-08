@@ -2587,6 +2587,34 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(response.json()["part"]["number"], "P-002")
         self.assertTrue(Part.objects.filter(number="P-002").exists())
 
+    def test_api_admin_token_can_update_project_metadata(self):
+        self.authorize_token([ApiToken.Scope.ADMIN])
+
+        response = self.post_json(
+            reverse("plm:api_project", args=[self.project.id]),
+            {
+                "code": " neu ",
+                "name": " Aktualisiert ",
+                "status": Project.Status.ORDER,
+                "project_date": "2026-07-08",
+                "description": " Via Addon ",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.code, "NEU")
+        self.assertEqual(self.project.name, "Aktualisiert")
+        self.assertEqual(self.project.status, Project.Status.ORDER)
+        self.assertEqual(self.project.project_date.isoformat(), "2026-07-08")
+        self.assertEqual(self.project.description, "Via Addon")
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.PROJECT_UPDATED,
+                metadata__project_id=self.project.id,
+            ).exists()
+        )
+
     def test_api_rejects_missing_authentication(self):
         response = self.client.get(reverse("plm:api_projects"))
 

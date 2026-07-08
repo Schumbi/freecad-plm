@@ -103,6 +103,8 @@ Antwort:
       "code": "PRJ",
       "name": "Projekt",
       "description": "",
+      "status": "running",
+      "project_date": "2026-07-08",
       "is_archived": false
     }
   ]
@@ -130,6 +132,8 @@ Antwort `201`:
     "code": "PRJ",
     "name": "Projekt",
     "description": "Optional",
+    "status": "running",
+    "project_date": "2026-07-08",
     "is_archived": false
   }
 }
@@ -146,6 +150,8 @@ Antwort:
     "code": "PRJ",
     "name": "Projekt",
     "description": "",
+    "status": "running",
+    "project_date": "2026-07-08",
     "is_archived": false
   }
 }
@@ -153,7 +159,15 @@ Antwort:
 
 `POST /api/projects/<project_id>/`
 
-Request-Felder optional: `name`, `description`, `is_archived`.
+Request-Felder optional: `code`, `name`, `description`, `status`,
+`project_date`, `is_archived`. Projektbearbeitung braucht Scope `admin`.
+`code` wird serverseitig auf Grossbuchstaben normalisiert. `status` nutzt
+dieselben Werte wie das WebUI: `running`, `completed`, `idea`, `important`,
+`order`.
+
+Das Addon spiegelt diese WebUI-Felder in einem Projekttab, damit Code, Name,
+Status, Datum und Beschreibung direkt im FreeCAD-Kontext gepflegt werden
+koennen.
 
 ### Teile/Baugruppen
 
