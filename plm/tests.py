@@ -1306,6 +1306,62 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(response["Content-Type"], "model/3mf")
         response.close()
 
+    def test_user_export_jobs_status_lists_active_jobs_for_current_user(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        job = create_export_job(
+            revision=revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        response = self.client.get(reverse("plm:user_export_jobs_status"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["active_count"], 1)
+        self.assertTrue(payload["poll"])
+        self.assertEqual(len(payload["jobs"]), 1)
+        self.assertEqual(payload["jobs"][0]["id"], job.id)
+        self.assertEqual(payload["jobs"][0]["revision_code"], revision.revision_code)
+        self.assertEqual(
+            payload["jobs"][0]["part_url"],
+            reverse("plm:part_detail", args=[self.part.id]),
+        )
+
+    def test_user_export_jobs_status_excludes_other_users_jobs(self):
+        other_user = get_user_model().objects.create_user(
+            username="other",
+            password="secret",
+        )
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        create_export_job(
+            revision=revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=other_user,
+        )
+        own_job = create_export_job(
+            revision=revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:user_export_jobs_status"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["active_count"], 1)
+        self.assertEqual([job["id"] for job in payload["jobs"]], [own_job.id])
+
+    def test_base_template_includes_export_jobs_panel(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:project_list"))
+
+        self.assertContains(response, 'id="export-jobs-panel"')
+        self.assertContains(response, reverse("plm:user_export_jobs_status"))
+
     def test_revision_compare_queues_missing_png_views_for_selected_revisions(self):
         self.client.force_login(self.user)
         left = create_revision_from_upload(self.part, make_zip_upload(), self.user)

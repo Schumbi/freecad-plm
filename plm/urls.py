@@ -16,6 +16,11 @@ urlpatterns = [
     ),
     path("", views.project_list, name="project_list"),
     path("logout/", views.logout_view, name="logout"),
+    path(
+        "jobs/status/",
+        views.user_export_jobs_status,
+        name="user_export_jobs_status",
+    ),
     path("verwaltung/", views.user_management_list, name="user_management"),
     path("verwaltung/users/new/", views.create_user, name="create_user"),
     path("verwaltung/users/<int:user_id>/edit/", views.edit_user, name="edit_user"),

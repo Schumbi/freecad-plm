@@ -34,6 +34,19 @@
           {% endif %}
         </ul>
       </nav>
+      {% if request.user.is_authenticated %}
+        <section
+          class="export-jobs-panel"
+          id="export-jobs-panel"
+          data-export-jobs-status="{% url 'plm:user_export_jobs_status' %}"
+          hidden>
+          <div class="export-jobs-header">
+            <p class="nav-section-label">Hintergrundjobs</p>
+            <span class="export-jobs-badge" id="export-jobs-badge" hidden>0</span>
+          </div>
+          <ul class="export-jobs-list" id="export-jobs-list" aria-live="polite"></ul>
+        </section>
+      {% endif %}
     </aside>
     <div class="app-main">
       <header class="topbar">

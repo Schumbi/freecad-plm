@@ -124,9 +124,112 @@
     });
   }
 
+  function jobStatusClass(status) {
+    if (status === "running") return "job-running";
+    if (status === "queued") return "job-queued";
+    if (status === "failed") return "job-failed";
+    if (status === "succeeded") return "job-succeeded";
+    return "";
+  }
+
+  function renderExportJobs(panel, payload) {
+    var badge = document.getElementById("export-jobs-badge");
+    var list = document.getElementById("export-jobs-list");
+    if (!badge || !list) return;
+
+    var activeCount = payload.active_count || 0;
+    var jobs = payload.jobs || [];
+    var hasJobs = jobs.length > 0;
+
+    panel.hidden = !hasJobs;
+    badge.hidden = activeCount === 0;
+    badge.textContent = String(activeCount);
+
+    list.innerHTML = "";
+    jobs.forEach(function (job) {
+      var item = document.createElement("li");
+      item.className = "export-jobs-item";
+
+      var link = document.createElement("a");
+      link.className = "export-jobs-link";
+      link.href = job.part_url;
+      link.textContent =
+        job.project_code +
+        " · " +
+        job.part_number +
+        " · " +
+        job.revision_code;
+
+      var meta = document.createElement("span");
+      meta.className = "export-jobs-meta";
+      meta.textContent = job.job_type_label;
+
+      var status = document.createElement("span");
+      status.className =
+        "job-status-pill " + jobStatusClass(job.status);
+      status.textContent = job.status_label;
+
+      item.appendChild(link);
+      item.appendChild(meta);
+      item.appendChild(status);
+
+      if (job.error) {
+        var error = document.createElement("span");
+        error.className = "export-jobs-error";
+        error.textContent = job.error;
+        item.appendChild(error);
+      }
+
+      list.appendChild(item);
+    });
+  }
+
+  function setupExportJobsPolling() {
+    var panel = document.getElementById("export-jobs-panel");
+    if (!panel) return;
+
+    var statusUrl = panel.getAttribute("data-export-jobs-status");
+    if (!statusUrl) return;
+
+    var timer = null;
+    var pollIntervalMs = 8000;
+
+    function scheduleNext(shouldPoll) {
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+      if (!shouldPoll) return;
+      timer = window.setTimeout(fetchStatus, pollIntervalMs);
+    }
+
+    function fetchStatus() {
+      fetch(statusUrl, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("status request failed");
+          }
+          return response.json();
+        })
+        .then(function (payload) {
+          renderExportJobs(panel, payload);
+          scheduleNext(Boolean(payload.poll));
+        })
+        .catch(function () {
+          scheduleNext(true);
+        });
+    }
+
+    fetchStatus();
+  }
+
   setupDialogs();
   setupActionMenus();
   setupMessages();
   setupListFilters();
   setupSidebarToggle();
+  setupExportJobsPolling();
 })();
