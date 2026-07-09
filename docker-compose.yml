@@ -58,6 +58,18 @@ services:
       context: .
       args:
         INSTALL_FREECAD: "1"
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    mem_limit: ${WORKER_MEM_LIMIT:-2g}
+    cpus: ${WORKER_CPUS:-2.0}
+    pids_limit: ${WORKER_PIDS_LIMIT:-256}
     command: >
       sh -c "while true; do
              python manage.py process_export_jobs --limit 1;
@@ -79,6 +91,7 @@ services:
       FREECADCMD_COMMAND: ${FREECADCMD_COMMAND:-freecadcmd}
       PREVIEW_PNG_WIDTH: ${PREVIEW_PNG_WIDTH:-400}
       PREVIEW_PNG_HEIGHT: ${PREVIEW_PNG_HEIGHT:-300}
+      TMPDIR: /tmp
     volumes:
       - media-data:/app/storage
     depends_on:

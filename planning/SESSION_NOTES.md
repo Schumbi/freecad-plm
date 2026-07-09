@@ -609,3 +609,8 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - `FCStd`-Uploads werden jetzt vor dem Einlesen auf Dateigroesse, ZIP-Mitgliederzahl, maximale Einzelmitgliedsgroesse und unkomprimierte Gesamtsumme begrenzt.
 - Projekt-ZIP-Import und 3MF-Inventarisierung nutzen dieselbe ZIP-Budget-Schutzschicht.
 - Tests fuer zu grosse `FCStd`-Uploads, zu viele ZIP-Mitglieder im `FCStd`, im Projekt-ZIP und in 3MF wurden ergaenzt.
+
+### Worker-Haertung Im Compose
+
+- Der Compose-Worker laeuft jetzt mit `cap_drop: ALL`, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp` sowie einfachen CPU-/RAM-/PID-Limits.
+- Die Compose-Dateien setzen dafuer `TMPDIR=/tmp`, damit FreeCADCmd und die Jobverarbeitung im temporären Arbeitsspeicher landen.

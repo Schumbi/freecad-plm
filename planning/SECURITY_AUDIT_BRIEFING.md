@@ -235,7 +235,7 @@ Vorheriger Audit-Bericht: `planning/SECURITY_ARCHITECTURE_AUDIT_2026-07-06.md`
 |------------|-------------------|
 | API-Token-Auth statt Session-API | **Erledigt** |
 | Upload-/ZIP-Budgets (`PLM_MAX_*`) | **Erledigt 2026-07-09** – Settings + Validierung + Tests |
-| Worker-Haertung (cap_drop, read_only, Limits) | **Offen** – Compose ohne Security-Opts |
+| Worker-Haertung (cap_drop, read_only, Limits) | **Erledigt 2026-07-09** – Compose gehärtet |
 | Getrennte Web-/Worker-Images (Web ohne FreeCAD) | **Offen** – `INSTALL_FREECAD` existiert, Default `1` |
 | `planning/PRODUCTION_CHECKLIST.md` | **Offen** – Datei fehlt |
 | Basic Auth nur als aeussere Schranke | Betriebsentscheidung |
@@ -351,7 +351,7 @@ Tests (ohne FreeCAD): `python3 -m unittest discover -s tests`
 - Services: `db`, `web`, `worker`
 - `web` exponiert Port 8000
 - `worker` hat **keinen** Port, aber gleiches Image und Storage-Zugriff
-- Keine `security_opt`, `cap_drop`, `read_only`, Memory-Limits
+- `worker` laeuft mit `cap_drop: ["ALL"]`, `security_opt: ["no-new-privileges:true"]`, `read_only: true`, `tmpfs` fuer `/tmp` und `/var/tmp` sowie CPU-/RAM-/PID-Limits
 
 ### Umgebungsvariablen (`.env.example`)
 

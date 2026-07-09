@@ -6,7 +6,7 @@
 **Grundlage:** `planning/SECURITY_AUDIT_BRIEFING.md` und Code-Review.
 **Teststand:** `manage.py test plm` = 150 Tests, alle OK. `manage.py check` = 0 Issues.
 
-> Hinweis: Es wurde bewusst **nur ein** kleiner Fix umgesetzt (siehe Abschnitt 0). Alles andere sind Vorschlaege.
+> Hinweis: Es wurden inzwischen zwei kleine Sofortpunkte umgesetzt (siehe Abschnitt 0). Alles andere sind Vorschlaege.
 
 ---
 
@@ -27,6 +27,11 @@ Verifikation: `manage.py check` weiterhin fehlerfrei. Kein Verhalten der App bet
 Update 2026-07-09: Der erste Sofortpunkt der Roadmap ist inzwischen umgesetzt:
 Upload-/ZIP-Budgets sind als Settings und Validierung in `plm/` vorhanden und
 mit Tests abgesichert.
+
+Update 2026-07-09: Der zweite Sofortpunkt der Roadmap ist ebenfalls umgesetzt:
+der Compose-Worker laeuft jetzt mit `cap_drop: ALL`, `no-new-privileges`,
+read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp` sowie einfachen
+CPU-/RAM-/PID-Limits.
 
 ---
 
@@ -279,7 +284,7 @@ Jeder eingeloggte Nutzer sieht/lädt alle Projekte/Teile/Revisionen. Für ein kl
 
 **Sofort (klein, hoher Nutzen):**
 1. Upload-/ZIP-Budgets (4.1) — umgesetzt; Settings, Validierung und Tests fuer zu grosse Datei / zu viele Member.
-2. Worker-Härtung im Compose (4.2 / A2).
+2. Worker-Härtung im Compose (4.2 / A2) — umgesetzt; Worker mit `cap_drop`, `read_only`, `tmpfs`, `no-new-privileges`, Limits.
 3. Snapshot-Projektprüfung in `revision_checkout_api` (4.3) — Einzeiler + Test.
 4. `defusedxml` einführen (4.4).
 5. CI-Test-Job (A7).

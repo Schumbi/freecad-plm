@@ -67,6 +67,7 @@ PLM_MAX_ZIP_MEMBER_BYTES=200000000
 Das Runtime-Image enthaelt den User `plm` mit UID/GID `1000:1000`. `PLM_USER` sollte deshalb auf `plm` bleiben. `PLM_UID` und `PLM_GID` dokumentieren, wem die lokalen Verzeichnisse auf dem Host gehoeren sollen; die Werte zeigt `id` oder `id <user>`.
 
 Die `PLM_MAX_*`-Werte begrenzen `FCStd`-, Projekt-ZIP- und 3MF-Uploads gegen sehr grosse Dateien und ZIP-Bomben. Die Defaults sind fuer ein LAN-Team konservativ und koennen bei Bedarf hoeher gesetzt werden.
+Der Compose-Worker laeuft zusaetzlich mit `cap_drop: ALL`, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp` sowie einfachen CPU-/RAM-/PID-Grenzen.
 
 Lokale Verzeichnisse fuer Modelle/Uploads und statische Dateien anlegen:
 
