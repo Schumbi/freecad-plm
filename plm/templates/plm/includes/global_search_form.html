@@ -1,0 +1,9 @@
+<form class="global-search" action="{% url 'plm:global_search' %}" method="get" role="search" aria-label="PLM durchsuchen">
+  <svg class="global-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  <input
+    type="search"
+    name="q"
+    value="{{ query|default:'' }}"
+    placeholder="Projekte, Teile, Revisionen und Dateinamen …"
+    autocomplete="off">
+</form>

@@ -1,17 +1,5 @@
 {% extends "plm/base.html" %}
 
-{% block topbar_search %}
-  <div class="global-search" aria-label="Projekte filtern">
-    <svg class="global-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input
-      type="search"
-      placeholder="Projekte nach Code, Name oder Status filtern …"
-      data-filter-input="#project-list"
-      data-filter-count="#project-filter-count"
-      data-filter-empty="#project-filter-empty">
-  </div>
-{% endblock %}
-
 {% block breadcrumbs %}
   <nav class="breadcrumbs" aria-label="Brotkrumen">
     <ol>
@@ -37,6 +25,16 @@
   <div class="toolbar">
     <div class="toolbar-group">
       <span class="muted" id="project-filter-count" data-filter-default="{{ projects|length }} Projekte">{{ projects|length }} Projekte</span>
+    </div>
+    <div class="toolbar-group">
+      <input
+        type="search"
+        class="filter-input"
+        placeholder="In dieser Liste filtern …"
+        aria-label="Projekte in dieser Liste filtern"
+        data-filter-input="#project-list"
+        data-filter-count="#project-filter-count"
+        data-filter-empty="#project-filter-empty">
     </div>
     <div class="toolbar-group">
       <span class="status-badge status-running">Laufend</span>

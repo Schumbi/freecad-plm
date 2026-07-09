@@ -648,6 +648,7 @@ class AuditEvent(models.Model):
         PART_CREATED = "part_created", "Teil angelegt"
         REVISION_UPLOADED = "revision_uploaded", "Revision hochgeladen"
         REVISION_RELEASED = "revision_released", "Revision freigegeben"
+        REVISION_OBSOLETED = "revision_obsoleted", "Revision obsolet gesetzt"
         REVISION_DOWNLOADED = "revision_downloaded", "Revision heruntergeladen"
         REVISION_NOTES_UPDATED = "revision_notes_updated", "Revisionsnotiz geaendert"
         PROJECT_SNAPSHOT_CREATED = "project_snapshot_created", "Projektstand angelegt"

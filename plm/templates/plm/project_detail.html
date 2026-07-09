@@ -1,17 +1,5 @@
 {% extends "plm/base.html" %}
 
-{% block topbar_search %}
-  <div class="global-search" aria-label="Teile filtern">
-    <svg class="global-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input
-      type="search"
-      placeholder="Teile nach Nummer, Name oder Typ filtern …"
-      data-filter-input="#part-list"
-      data-filter-count="#part-filter-count"
-      data-filter-empty="#part-filter-empty">
-  </div>
-{% endblock %}
-
 {% block breadcrumbs %}
   <nav class="breadcrumbs" aria-label="Brotkrumen">
     <ol>
@@ -61,7 +49,17 @@
 
       <div class="section-header">
         <h2>Teile und Baugruppen</h2>
-        <span class="muted" id="part-filter-count" data-filter-default="{{ parts|length }} Einträge">{{ parts|length }} Einträge</span>
+        <div class="section-header-actions">
+          <input
+            type="search"
+            class="filter-input"
+            placeholder="In dieser Liste filtern …"
+            aria-label="Teile in dieser Liste filtern"
+            data-filter-input="#part-list"
+            data-filter-count="#part-filter-count"
+            data-filter-empty="#part-filter-empty">
+          <span class="muted" id="part-filter-count" data-filter-default="{{ parts|length }} Einträge">{{ parts|length }} Einträge</span>
+        </div>
       </div>
       {% if parts %}
         <div class="table-wrap" id="part-list">

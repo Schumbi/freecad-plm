@@ -1,0 +1,170 @@
+{% extends "plm/base.html" %}
+
+{% block title %}Suche · FreeCAD-PLM{% endblock %}
+
+{% block topbar_search %}
+  {% include "plm/includes/global_search_form.html" %}
+{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><span aria-current="page">Suche</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">Arbeitsbereich</span>
+      <h1>Suche</h1>
+      <p class="lead-text">
+        {% if query %}
+          {% if total_hits %}
+            {{ total_hits }} Treffer für „{{ query }}“.
+          {% else %}
+            Keine Treffer für „{{ query }}“.
+          {% endif %}
+        {% else %}
+          Suche nach Projektcode, Teilenummer, Revisionscode oder Dateiname.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% if not query %}
+    <div class="empty-state">
+      <strong>Suchbegriff eingeben</strong>
+      Nutze das Suchfeld oben, um Projekte, Teile, Revisionen und Dateipfade zu finden.
+    </div>
+  {% elif total_hits == 0 %}
+    <div class="empty-state">
+      <strong>Keine Treffer</strong>
+      Für „{{ query }}“ wurden keine passenden Einträge gefunden.
+    </div>
+  {% else %}
+    {% if results.projects %}
+      <section class="search-section">
+        <div class="section-header">
+          <h2>Projekte</h2>
+          <span class="muted">{{ results.projects|length }} Treffer</span>
+        </div>
+        <div class="project-grid">
+          {% for project in results.projects %}
+            <article class="project-card">
+              <div class="project-card-top">
+                <span class="project-code">{{ project.code }}</span>
+                <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
+              </div>
+              <h3 class="project-card-title">
+                <a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a>
+              </h3>
+              <p class="project-card-desc">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    {% if results.parts %}
+      <section class="search-section">
+        <div class="section-header">
+          <h2>Teile und Baugruppen</h2>
+          <span class="muted">{{ results.parts|length }} Treffer</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Projekt</th>
+                <th>Nummer</th>
+                <th>Name</th>
+                <th>Typ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for part in results.parts %}
+                <tr>
+                  <td><a href="{% url 'plm:project_detail' part.project_id %}">{{ part.project.code }}</a></td>
+                  <td><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
+                  <td>{{ part.name }}</td>
+                  <td>{{ part.get_category_display }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if results.revisions %}
+      <section class="search-section">
+        <div class="section-header">
+          <h2>Revisionen</h2>
+          <span class="muted">{{ results.revisions|length }} Treffer</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Projekt</th>
+                <th>Teil</th>
+                <th>Revision</th>
+                <th>Dateiname</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for revision in results.revisions %}
+                <tr>
+                  <td><a href="{% url 'plm:project_detail' revision.part.project_id %}">{{ revision.part.project.code }}</a></td>
+                  <td><a href="{% url 'plm:part_detail' revision.part_id %}">{{ revision.part.number }}</a></td>
+                  <td>{{ revision.revision_code }}</td>
+                  <td>{{ revision.original_filename }}</td>
+                  <td><span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if results.snapshot_paths %}
+      <section class="search-section">
+        <div class="section-header">
+          <h2>Dateipfade in Projektständen</h2>
+          <span class="muted">{{ results.snapshot_paths|length }} Treffer</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Projekt</th>
+                <th>Stand</th>
+                <th>Pfad</th>
+                <th>Revision</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in results.snapshot_paths %}
+                <tr>
+                  <td><a href="{% url 'plm:project_detail' entry.snapshot.project_id %}">{{ entry.snapshot.project.code }}</a></td>
+                  <td>{{ entry.snapshot.name }}</td>
+                  <td>{{ entry.path }}</td>
+                  <td>
+                    <a href="{% url 'plm:part_detail' entry.revision.part_id %}">
+                      {{ entry.revision.part.number }} {{ entry.revision.revision_code }}
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

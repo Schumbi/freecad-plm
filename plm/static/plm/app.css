@@ -718,6 +718,25 @@ main {
   margin: var(--space-5) 0 var(--space-3);
 }
 
+.section-header-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.search-section + .search-section {
+  margin-top: var(--space-6);
+}
+
+.search-section .project-grid {
+  margin-top: var(--space-3);
+}
+
+.search-section .table-wrap {
+  margin-top: var(--space-3);
+}
+
 .panel,
 .data-card,
 .properties-panel,

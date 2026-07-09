@@ -66,8 +66,10 @@ from .services import (
     delete_project_tree,
     import_project_snapshot,
     next_part_number,
+    obsolete_revision,
     release_revision,
     revision_reference_files,
+    search_plm,
     snapshot_entries_with_references,
 )
 from .auth import create_api_token
@@ -612,6 +614,29 @@ def revoke_api_token(request, token_id):
 
 
 @login_required
+def global_search(request):
+    query = request.GET.get("q", "").strip()
+    results = search_plm(query) if query else None
+    total_hits = 0
+    if results is not None:
+        total_hits = (
+            len(results.projects)
+            + len(results.parts)
+            + len(results.revisions)
+            + len(results.snapshot_paths)
+        )
+    return render(
+        request,
+        "plm/search.html",
+        {
+            "query": query,
+            "results": results,
+            "total_hits": total_hits,
+        },
+    )
+
+
+@login_required
 def project_list(request):
     projects = Project.objects.filter(is_archived=False).order_by("code")
     return render(
@@ -1139,6 +1164,31 @@ def release_revision_view(request, revision_id):
         messages.success(
             request,
             f"Revision {revision.revision_code} wurde freigegeben.",
+        )
+    return redirect("plm:part_detail", part_id=revision.part_id)
+
+
+@login_required
+def obsolete_revision_view(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "created_by"),
+        id=revision_id,
+    )
+    if not can_release_revision(request.user):
+        return HttpResponseForbidden(
+            "Keine Berechtigung zum Markieren von Revisionen als obsolet."
+        )
+    if request.method != "POST":
+        return redirect("plm:part_detail", part_id=revision.part_id)
+
+    try:
+        obsolete_revision(revision, request.user)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        messages.success(
+            request,
+            f"Revision {revision.revision_code} wurde als obsolet markiert.",
         )
     return redirect("plm:part_detail", part_id=revision.part_id)
 

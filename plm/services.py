@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .fcstd import (
@@ -37,6 +38,7 @@ from .models import (
     ManufacturingRun,
     ManufacturingRunAttachment,
     Part,
+    Project,
     ProjectSnapshot,
     ProjectSnapshotEntry,
     Revision,
@@ -1535,6 +1537,75 @@ def create_revision_from_upload(
     return revision
 
 
+PLM_SEARCH_RESULT_LIMIT = 50
+
+
+@dataclass(frozen=True)
+class PlmSearchResults:
+    projects: list
+    parts: list
+    revisions: list
+    snapshot_paths: list
+
+
+def search_plm(query, *, limit=PLM_SEARCH_RESULT_LIMIT):
+    term = (query or "").strip()
+    if not term:
+        return PlmSearchResults(projects=[], parts=[], revisions=[], snapshot_paths=[])
+
+    projects = list(
+        Project.objects.filter(is_archived=False)
+        .filter(
+            Q(code__icontains=term)
+            | Q(name__icontains=term)
+            | Q(description__icontains=term)
+        )
+        .order_by("code")[:limit]
+    )
+    parts = list(
+        Part.objects.filter(is_archived=False)
+        .filter(
+            Q(number__icontains=term)
+            | Q(name__icontains=term)
+            | Q(description__icontains=term)
+            | Q(project__code__icontains=term)
+            | Q(project__name__icontains=term)
+        )
+        .select_related("project")
+        .order_by("project__code", "number")[:limit]
+    )
+    revisions = list(
+        Revision.objects.filter(
+            Q(revision_code__icontains=term)
+            | Q(original_filename__icontains=term)
+            | Q(notes__icontains=term)
+            | Q(part__number__icontains=term)
+            | Q(part__name__icontains=term)
+            | Q(part__project__code__icontains=term)
+            | Q(part__project__name__icontains=term)
+        )
+        .select_related("part", "part__project", "created_by")
+        .order_by("-created_at")[:limit]
+    )
+    snapshot_paths = list(
+        ProjectSnapshotEntry.objects.filter(path__icontains=term)
+        .select_related(
+            "snapshot",
+            "snapshot__project",
+            "revision",
+            "revision__part",
+            "revision__part__project",
+        )
+        .order_by("snapshot__project__code", "path")[:limit]
+    )
+    return PlmSearchResults(
+        projects=projects,
+        parts=parts,
+        revisions=revisions,
+        snapshot_paths=snapshot_paths,
+    )
+
+
 @transaction.atomic
 def release_revision(revision, released_by):
     if revision.status == Revision.Status.RELEASED:
@@ -1549,6 +1620,33 @@ def release_revision(revision, released_by):
     AuditEvent.objects.create(
         actor=released_by,
         action=AuditEvent.Action.REVISION_RELEASED,
+        object_repr=str(revision),
+        metadata={
+            "part_id": revision.part_id,
+            "revision_id": revision.id,
+            "revision_code": revision.revision_code,
+            "sha256": revision.sha256,
+            "original_filename": revision.original_filename,
+        },
+    )
+    return revision
+
+
+@transaction.atomic
+def obsolete_revision(revision, actor):
+    if revision.status == Revision.Status.OBSOLETE:
+        raise ValidationError("Diese Revision ist bereits obsolet.")
+    if revision.status != Revision.Status.RELEASED:
+        raise ValidationError(
+            "Nur freigegebene Revisionen koennen als obsolet markiert werden."
+        )
+
+    revision.status = Revision.Status.OBSOLETE
+    revision.save(update_fields=["status", "updated_at"])
+
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.REVISION_OBSOLETED,
         object_repr=str(revision),
         metadata={
             "part_id": revision.part_id,

@@ -53,7 +53,9 @@ from .services import (
     create_revision_from_upload,
     import_project_snapshot,
     next_revision_code,
+    obsolete_revision,
     release_revision,
+    search_plm,
     snapshot_base_name,
 )
 from .freecadcmd import (
@@ -879,6 +881,34 @@ class RevisionUploadServiceTests(TestCase):
 
         with self.assertRaises(ValidationError):
             release_revision(revision, self.user)
+
+    def test_obsolete_revision_sets_status_and_audit(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        release_revision(revision, self.user)
+        AuditEvent.objects.all().delete()
+
+        obsolete_revision(revision, self.user)
+
+        revision.refresh_from_db()
+        self.assertEqual(revision.status, Revision.Status.OBSOLETE)
+        self.assertEqual(
+            AuditEvent.objects.get().action,
+            AuditEvent.Action.REVISION_OBSOLETED,
+        )
+
+    def test_obsolete_revision_rejects_draft(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+
+        with self.assertRaises(ValidationError):
+            obsolete_revision(revision, self.user)
+
+    def test_obsolete_revision_rejects_already_obsolete(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        release_revision(revision, self.user)
+        obsolete_revision(revision, self.user)
+
+        with self.assertRaises(ValidationError):
+            obsolete_revision(revision, self.user)
 
 
 class RevisionUploadViewTests(TestCase):
@@ -2035,6 +2065,49 @@ class RolePermissionTests(TestCase):
         self.assertEqual(response.status_code, 403)
         revision.refresh_from_db()
         self.assertEqual(revision.status, Revision.Status.DRAFT)
+
+    def test_admin_can_obsolete_released_revision(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        release_revision(revision, self.admin)
+        AuditEvent.objects.all().delete()
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("plm:obsolete_revision", args=[revision.id]))
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision.refresh_from_db()
+        self.assertEqual(revision.status, Revision.Status.OBSOLETE)
+        self.assertEqual(
+            AuditEvent.objects.get().action,
+            AuditEvent.Action.REVISION_OBSOLETED,
+        )
+
+    def test_editor_cannot_obsolete_revision(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
+        release_revision(revision, self.admin)
+
+        self.client.force_login(self.editor)
+        response = self.client.post(reverse("plm:obsolete_revision", args=[revision.id]))
+
+        self.assertEqual(response.status_code, 403)
+        revision.refresh_from_db()
+        self.assertEqual(revision.status, Revision.Status.RELEASED)
+
+    def test_reader_can_use_global_search(self):
+        revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(name="Sonderteil.FCStd"),
+            self.editor,
+        )
+        revision.original_filename = "Sonderteil.FCStd"
+        revision.save(update_fields=["original_filename"])
+
+        self.client.force_login(self.reader)
+        response = self.client.get(reverse("plm:global_search"), {"q": "Sonderteil"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sonderteil.FCStd")
+        self.assertContains(response, self.part.number)
 
     def test_editor_can_update_revision_notes(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.editor)
@@ -4063,3 +4136,78 @@ class AddonApiWorkflowTests(TestCase):
                 metadata__annotation_id=annotation.id,
             ).exists()
         )
+
+
+class GlobalSearchTests(TestCase):
+    def setUp(self):
+        self.media_root = TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.settings_override.enable()
+
+        self.user = get_user_model().objects.create_user(
+            username="searcher",
+            password="test",
+            is_superuser=True,
+        )
+        self.project = Project.objects.create(code="RODEL", name="Sommerrodelbahn")
+        self.part = Part.objects.create(
+            project=self.project,
+            number="P-001",
+            name="Chipbox",
+        )
+        self.revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(name="Chipbox.FCStd"),
+            self.user,
+        )
+        self.revision.original_filename = "Chipbox.FCStd"
+        self.revision.save(update_fields=["original_filename"])
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def test_search_plm_finds_project_part_revision_and_filename(self):
+        results = search_plm("RODEL")
+        self.assertEqual(len(results.projects), 1)
+        self.assertEqual(results.projects[0].code, "RODEL")
+
+        results = search_plm("P-001")
+        self.assertEqual(len(results.parts), 1)
+        self.assertEqual(results.parts[0].number, "P-001")
+
+        results = search_plm("R0001")
+        self.assertEqual(len(results.revisions), 1)
+        self.assertEqual(results.revisions[0].revision_code, "R0001")
+
+        results = search_plm("Chipbox.FCStd")
+        self.assertEqual(len(results.revisions), 1)
+        self.assertEqual(results.revisions[0].original_filename, "Chipbox.FCStd")
+
+    def test_search_plm_finds_snapshot_path(self):
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload("import.zip"),
+            self.user,
+        )
+        entry = snapshot.entries.get(path="Box.FCStd")
+
+        results = search_plm("Box.FCStd")
+
+        self.assertEqual(len(results.snapshot_paths), 1)
+        self.assertEqual(results.snapshot_paths[0].id, entry.id)
+
+    def test_global_search_requires_login(self):
+        response = self.client.get(reverse("plm:global_search"), {"q": "RODEL"})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("plm:login"), response["Location"])
+
+    def test_global_search_page_lists_matches(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("plm:global_search"), {"q": "Chipbox"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "RODEL")
+        self.assertContains(response, "P-001")
+        self.assertContains(response, "R0001")
+        self.assertContains(response, "Chipbox.FCStd")

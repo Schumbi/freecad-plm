@@ -14,6 +14,7 @@ urlpatterns = [
         ),
         name="login",
     ),
+    path("search/", views.global_search, name="global_search"),
     path("", views.project_list, name="project_list"),
     path("logout/", views.logout_view, name="logout"),
     path(
@@ -94,6 +95,11 @@ urlpatterns = [
         "revisions/<int:revision_id>/release/",
         views.release_revision_view,
         name="release_revision",
+    ),
+    path(
+        "revisions/<int:revision_id>/obsolete/",
+        views.obsolete_revision_view,
+        name="obsolete_revision",
     ),
     path(
         "revisions/<int:revision_id>/notes/",
