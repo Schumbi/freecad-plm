@@ -3034,6 +3034,29 @@ class AddonApiWorkflowTests(TestCase):
         )
         self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
 
+    def test_checkout_rejects_snapshot_from_different_project(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        other_project = Project.objects.create(code="OTHER", name="Anderes Projekt")
+        foreign_snapshot = import_project_snapshot(
+            other_project,
+            make_project_zip_upload("foreign.zip"),
+            self.user,
+            name="Fremdstand",
+        )
+        root_revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(),
+            self.user,
+        )
+
+        response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": foreign_snapshot.id},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Checkout.objects.exists())
+
     def test_read_token_fetches_single_revision_manifest_without_checkout(self):
         self.authorize_token([ApiToken.Scope.READ])
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)

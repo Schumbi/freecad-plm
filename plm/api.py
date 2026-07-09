@@ -473,7 +473,11 @@ def revision_checkout_api(request, revision_id):
     data = json_body(request)
     snapshot = None
     if data.get("snapshot_id"):
-        snapshot = get_object_or_404(ProjectSnapshot, id=data["snapshot_id"])
+        snapshot = get_object_or_404(
+            ProjectSnapshot,
+            id=data["snapshot_id"],
+            project=revision.part.project,
+        )
     try:
         checkout = create_checkout(
             base_revision=revision,

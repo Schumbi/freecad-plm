@@ -614,3 +614,8 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 
 - Der Compose-Worker laeuft jetzt mit `cap_drop: ALL`, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp` sowie einfachen CPU-/RAM-/PID-Limits.
 - Die Compose-Dateien setzen dafuer `TMPDIR=/tmp`, damit FreeCADCmd und die Jobverarbeitung im temporären Arbeitsspeicher landen.
+
+### Snapshot-Checkout-Schutz
+
+- `revision_checkout_api` prueft jetzt `snapshot_id` gegen das Projekt der angeforderten Revision.
+- Ein Checkout mit Snapshot aus einem anderen Projekt bricht mit `404` ab und legt keinen Lock an.

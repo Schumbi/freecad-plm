@@ -97,3 +97,4 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Schwebenden 3D-Viewer fuer Revisionen, Artefakte und Fertigungsdateien angelegt; STL/3MF werden direkt angezeigt, FCStd/STEP nutzen ein gespeichertes STL-Preview-Artefakt.
 - Upload-/ZIP-Budgets fuer FCStd, Projekt-ZIP und 3MF eingefuehrt; grobe DoS-/Zip-Bomb-Grenzen liegen jetzt als konfigurierbare `PLM_MAX_*`-Werte in den Settings.
 - Worker-Container im Compose gehärtet: keine Linux-Caps, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp`, sowie einfache CPU-/RAM-/PID-Limits.
+- Snapshot-Projektprüfung im Checkout-API-Pfad umgesetzt; fremde `snapshot_id`-Werte liefern jetzt `404`.

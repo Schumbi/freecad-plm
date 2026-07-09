@@ -285,7 +285,7 @@ Jeder eingeloggte Nutzer sieht/lädt alle Projekte/Teile/Revisionen. Für ein kl
 **Sofort (klein, hoher Nutzen):**
 1. Upload-/ZIP-Budgets (4.1) — umgesetzt; Settings, Validierung und Tests fuer zu grosse Datei / zu viele Member.
 2. Worker-Härtung im Compose (4.2 / A2) — umgesetzt; Worker mit `cap_drop`, `read_only`, `tmpfs`, `no-new-privileges`, Limits.
-3. Snapshot-Projektprüfung in `revision_checkout_api` (4.3) — Einzeiler + Test.
+3. Snapshot-Projektprüfung in `revision_checkout_api` (4.3) — umgesetzt; Checkout akzeptiert nur Snapshots aus dem gleichen Projekt wie die Revision.
 4. `defusedxml` einführen (4.4).
 5. CI-Test-Job (A7).
 
