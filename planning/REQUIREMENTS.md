@@ -21,6 +21,9 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Benutzer koennen sich anmelden.
 - Rollenmodell mit mindestens `admin`, `editor`, `reader`.
 - Admins koennen Benutzer verwalten.
+- Admins koennen Benutzer in der PLM-Weboberflaeche anlegen, aktivieren/deaktivieren, Rollen setzen und Passwoerter neu setzen.
+- Admins koennen API-Tokens fuer das FreeCAD-Addon in der PLM-Weboberflaeche anlegen, bearbeiten und widerrufen.
+- API-Token-Rechte werden ueber Presets vergeben: Nur Lesen, Addon Standard und Admin/Vollzugriff.
 - Projekte koennen angelegt, bearbeitet und archiviert werden.
 - Teile oder Baugruppen koennen einem Projekt zugeordnet werden.
 - `FCStd`-Dateien koennen manuell ueber die Weboberflaeche hochgeladen werden.

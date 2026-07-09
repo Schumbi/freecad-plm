@@ -1,5 +1,5 @@
 <!doctype html>
-{% load static %}
+{% load static plm_permissions %}
 <html lang="de">
 <head>
   <meta charset="utf-8">
@@ -909,6 +909,9 @@
         <p class="nav-section-label">Arbeitsbereiche</p>
         <ul class="nav-link-list">
           <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+          {% if request.user.is_authenticated and request.user|can_manage_plm %}
+            <li><a href="{% url 'plm:user_management' %}">Verwaltung</a></li>
+          {% endif %}
           <li><span class="nav-muted">Zuletzt bearbeitet</span></li>
         </ul>
       </nav>

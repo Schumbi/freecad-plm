@@ -6,6 +6,29 @@ app_name = "plm"
 
 urlpatterns = [
     path("", views.project_list, name="project_list"),
+    path("verwaltung/", views.user_management_list, name="user_management"),
+    path("verwaltung/users/new/", views.create_user, name="create_user"),
+    path("verwaltung/users/<int:user_id>/edit/", views.edit_user, name="edit_user"),
+    path(
+        "verwaltung/users/<int:user_id>/password/",
+        views.set_user_password,
+        name="set_user_password",
+    ),
+    path(
+        "verwaltung/users/<int:user_id>/tokens/new/",
+        views.create_user_token,
+        name="create_user_token",
+    ),
+    path(
+        "verwaltung/tokens/<int:token_id>/edit/",
+        views.edit_api_token,
+        name="edit_api_token",
+    ),
+    path(
+        "verwaltung/tokens/<int:token_id>/revoke/",
+        views.revoke_api_token,
+        name="revoke_api_token",
+    ),
     path("projects/new/", views.create_project, name="create_project"),
     path("projects/<int:project_id>/", views.project_detail, name="project_detail"),
     path(

@@ -239,6 +239,26 @@ Die V1-Rollen werden als Django-Gruppen angelegt:
 - `editor`: ansehen, herunterladen und Revisionen hochladen
 - `admin`: volle PLM-Verwaltung
 
+PLM-Admins koennen Benutzer und Addon-Tokens in der normalen Weboberflaeche
+unter `Verwaltung` pflegen. Der Django-Admin unter `/admin/` bleibt als
+technische Fallback-Verwaltung erhalten.
+
+Die Web-Verwaltung kann:
+
+- Benutzer anlegen, aktivieren/deaktivieren und Rollen setzen.
+- Passwoerter fuer Benutzer neu setzen.
+- API-Tokens fuer Benutzer anlegen, bearbeiten und widerrufen.
+
+Token-Rechte werden ueber Presets vergeben:
+
+- `Nur Lesen`: `read`
+- `Addon Standard`: `read`, `write`, `checkout`
+- `Admin/Vollzugriff`: `read`, `write`, `checkout`, `admin`
+
+`Admin/Vollzugriff` kann nur fuer Benutzer mit PLM-Admin-Rolle oder Superuser
+vergeben werden. Der Klartext eines API-Tokens wird nur direkt nach dem
+Anlegen angezeigt; danach bleibt nur der Prefix sichtbar.
+
 ## Kurzworkflow
 
 1. Projekt als `admin`/Superuser in der PLM-Oberflaeche anlegen oder vorhandenes Projekt oeffnen.

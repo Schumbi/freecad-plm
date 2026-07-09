@@ -585,3 +585,20 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
   relevanten Request- und Exception-Kontext zeigt.
 - Root-`README.md` dokumentiert die Debug-Kommandos fuer Serverbetrieb und die
   lokale Testing-Instanz unter `~/freecad-plm-testing`.
+
+### Benutzer- Und Tokenverwaltung Im WebUI
+
+- Neue PLM-WebUI-Verwaltung fuer Benutzer und API-Tokens geplant und umgesetzt.
+- PLM-Admins koennen Benutzer anlegen, aktivieren/deaktivieren, Rollen setzen
+  und Passwoerter neu setzen.
+- Django-User und Django-Gruppen bleiben die technische Grundlage; die Rollen
+  bleiben `reader`, `editor`, `admin`.
+- API-Tokens nutzen weiterhin das bestehende gehashte `ApiToken`-Modell.
+- Token-Rechte werden ueber Presets vergeben:
+  - `Nur Lesen`: `read`
+  - `Addon Standard`: `read`, `write`, `checkout`
+  - `Admin/Vollzugriff`: `read`, `write`, `checkout`, `admin`
+- Admin/Vollzugriff ist nur fuer PLM-Admins oder Superuser erlaubt.
+- Self-Lockout-Regeln verhindern, dass ein Admin sich selbst deaktiviert oder
+  den letzten aktiven Admin entfernt.
+- Root-`README.md` dokumentiert Bedienung und Token-Presets.

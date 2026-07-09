@@ -1,0 +1,42 @@
+{% extends "plm/base.html" %}
+
+{% block content %}
+  <a class="back-link" href="{% url 'plm:user_management' %}">Zurueck zur Verwaltung</a>
+
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">API-Token</span>
+      <h1>{{ title }}</h1>
+      <p class="lead-text">Addon-Zugriffe fuer {{ managed_user.username }} verwalten.</p>
+    </div>
+  </div>
+
+  {% if raw_token %}
+    <div class="data-card mb-4">
+      <h2>Token nur jetzt sichtbar</h2>
+      <p class="lead-text">Diesen Wert in das FreeCAD-Addon uebernehmen. Spaeter ist nur noch der Prefix sichtbar.</p>
+      <p><input readonly value="{{ raw_token }}"></p>
+    </div>
+  {% endif %}
+
+  <div class="data-card">
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
+        <p>
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+          {% if field.errors %}<span class="errors">{{ field.errors }}</span>{% endif %}
+        </p>
+      {% endfor %}
+      <div class="toolbar-group">
+        <button type="submit">{{ submit_label }}</button>
+        <a class="btn btn-outline-secondary" href="{% url 'plm:user_management' %}">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

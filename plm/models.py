@@ -665,6 +665,12 @@ class AuditEvent(models.Model):
         ANNOTATION_CREATED = "annotation_created", "Anmerkung angelegt"
         ANNOTATION_UPDATED = "annotation_updated", "Anmerkung geaendert"
         ANNOTATION_DELETED = "annotation_deleted", "Anmerkung geloescht"
+        USER_CREATED = "user_created", "Benutzer angelegt"
+        USER_UPDATED = "user_updated", "Benutzer geaendert"
+        USER_PASSWORD_SET = "user_password_set", "Benutzerpasswort gesetzt"
+        API_TOKEN_CREATED = "api_token_created", "API-Token angelegt"
+        API_TOKEN_UPDATED = "api_token_updated", "API-Token geaendert"
+        API_TOKEN_REVOKED = "api_token_revoked", "API-Token widerrufen"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

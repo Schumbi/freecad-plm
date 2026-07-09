@@ -1586,6 +1586,164 @@ class RolePermissionTests(TestCase):
         self.assertContains(response, "existiert bereits", status_code=400)
         self.assertEqual(Project.objects.filter(code="PRJ").count(), 1)
 
+    def test_admin_sees_management_navigation(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("plm:project_list"))
+
+        self.assertContains(response, "Verwaltung")
+        self.assertContains(response, reverse("plm:user_management"))
+
+    def test_reader_cannot_access_user_management(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("plm:user_management"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_create_user_with_role(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:create_user"),
+            {
+                "username": "new-user",
+                "first_name": "New",
+                "last_name": "User",
+                "email": "new@example.test",
+                "is_active": "on",
+                "role": ROLE_EDITOR,
+                "password": "SehrSicher123!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:user_management"))
+        user = get_user_model().objects.get(username="new-user")
+        self.assertTrue(user.check_password("SehrSicher123!"))
+        self.assertTrue(user.groups.filter(name=ROLE_EDITOR).exists())
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.USER_CREATED).count(),
+            1,
+        )
+
+    def test_admin_can_edit_user_role_and_status(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:edit_user", args=[self.reader.id]),
+            {
+                "username": self.reader.username,
+                "first_name": "Read",
+                "last_name": "Only",
+                "email": "reader@example.test",
+                "is_active": "on",
+                "role": ROLE_EDITOR,
+                "password": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:user_management"))
+        self.reader.refresh_from_db()
+        self.assertEqual(self.reader.email, "reader@example.test")
+        self.assertTrue(self.reader.groups.filter(name=ROLE_EDITOR).exists())
+        self.assertFalse(self.reader.groups.filter(name=ROLE_READER).exists())
+
+    def test_admin_cannot_deactivate_self(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:edit_user", args=[self.admin.id]),
+            {
+                "username": self.admin.username,
+                "first_name": "",
+                "last_name": "",
+                "email": "",
+                "role": ROLE_ADMIN,
+                "password": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+
+    def test_admin_can_set_user_password(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:set_user_password", args=[self.reader.id]),
+            {
+                "new_password1": "NeuesPasswort123!",
+                "new_password2": "NeuesPasswort123!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:user_management"))
+        self.reader.refresh_from_db()
+        self.assertTrue(self.reader.check_password("NeuesPasswort123!"))
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.USER_PASSWORD_SET).count(),
+            1,
+        )
+
+    def test_admin_can_create_addon_token(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:create_user_token", args=[self.editor.id]),
+            {
+                "name": "FreeCAD Addon",
+                "preset": "addon",
+                "expires_at": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertContains(response, "plm_pat_", status_code=201)
+        token = ApiToken.objects.get(user=self.editor)
+        self.assertEqual(
+            token.scopes,
+            [ApiToken.Scope.READ, ApiToken.Scope.WRITE, ApiToken.Scope.CHECKOUT],
+        )
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.API_TOKEN_CREATED).count(),
+            1,
+        )
+
+    def test_admin_preset_requires_admin_user(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("plm:create_user_token", args=[self.editor.id]),
+            {
+                "name": "Zu viel",
+                "preset": "admin",
+                "expires_at": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Admin/Vollzugriff", status_code=400)
+        self.assertFalse(ApiToken.objects.filter(user=self.editor).exists())
+
+    def test_admin_can_revoke_token(self):
+        token, _raw_token = create_api_token(
+            user=self.editor,
+            name="FreeCAD Addon",
+            scopes=[ApiToken.Scope.READ],
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("plm:revoke_api_token", args=[token.id]))
+
+        self.assertRedirects(response, reverse("plm:user_management"))
+        token.refresh_from_db()
+        self.assertTrue(token.is_revoked)
+        self.assertEqual(
+            AuditEvent.objects.filter(action=AuditEvent.Action.API_TOKEN_REVOKED).count(),
+            1,
+        )
+
     def test_editor_can_upload_revision(self):
         self.assertTrue(can_upload_revision(self.editor))
 
