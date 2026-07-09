@@ -930,7 +930,23 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:project_list"))
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn(reverse("plm:login"), response["Location"])
+
+    def test_login_uses_plm_page_and_redirects_to_webui(self):
+        response = self.client.get(reverse("plm:login"))
+
+        self.assertContains(response, "FreeCAD-PLM")
+        self.assertContains(response, "Django-Admin")
+
+        response = self.client.post(
+            reverse("plm:login"),
+            {
+                "username": self.user.username,
+                "password": "test",
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:project_list"))
 
     def test_logged_in_user_can_logout_from_topbar(self):
         self.client.force_login(self.user)
@@ -944,9 +960,9 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.post(reverse("plm:logout"))
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertEqual(response["Location"], reverse("plm:login"))
         response = self.client.get(reverse("plm:project_list"))
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn(reverse("plm:login"), response["Location"])
 
     def test_part_detail_shows_upload_form(self):
         self.client.force_login(self.user)
@@ -1102,7 +1118,7 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:download_revision", args=[revision.id]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn(reverse("plm:login"), response["Location"])
 
     def test_download_revision_returns_file_and_audits_download(self):
         self.client.force_login(self.user)
@@ -1208,7 +1224,7 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn(reverse("plm:login"), response["Location"])
 
     def test_revision_viewer_source_returns_preview_stl_inline(self):
         self.client.force_login(self.user)
@@ -1421,7 +1437,7 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.post(reverse("plm:release_revision", args=[revision.id]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn(reverse("plm:login"), response["Location"])
 
     def test_superuser_can_release_revision(self):
         self.client.force_login(self.user)

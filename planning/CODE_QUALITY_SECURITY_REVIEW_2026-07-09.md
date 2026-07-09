@@ -232,13 +232,13 @@ snapshot = get_object_or_404(
 
 **Vorschlag:** `django-axes` (Login-Lockout) und/oder `django-ratelimit` für `/api/` und Login. Alternativ Rate-Limiting im Reverse Proxy (nginx `limit_req`).
 
-### 4.6 Web-UI-Login hängt am Django-Admin (Mittel, Architektur)
+### 4.6 Web-UI-Login hängt am Django-Admin (Mittel, Architektur, umgesetzt)
 
-`settings.py`: `LOGIN_URL = 'admin:login'`, `LOGIN_REDIRECT_URL = 'admin:index'`.
+Frueher: `settings.py`: `LOGIN_URL = 'admin:login'`, `LOGIN_REDIRECT_URL = 'admin:index'`.
 
-Der Django-Admin-Login weist nicht-`is_staff`-Nutzer ab bzw. leitet sie in den Admin. Das koppelt die PLM-Anmeldung an das Admin-Interface und macht `/admin/` zur zentralen Login-Fläche — genau die Fläche, die man hinter einem Reverse Proxy am ehesten zusätzlich schützen will.
+Der Django-Admin-Login weist nicht-`is_staff`-Nutzer ab bzw. leitet sie in den Admin. Das koppelte die PLM-Anmeldung an das Admin-Interface und machte `/admin/` zur zentralen Login-Fläche.
 
-**Vorschlag:** Eigene, schlichte Login-View/Template (`django.contrib.auth.views.LoginView`) mit `LOGIN_REDIRECT_URL='plm:project_list'`. Entkoppelt PLM-Nutzung vom Admin und erlaubt, `/admin/` separat (z.B. per Proxy-IP-Allowlist) abzuschotten. **Bitte prüfen:** ob aktuell angelegte PLM-Nutzer `is_staff` gesetzt bekommen — sonst können `reader`/`editor` sich über den Admin-Login evtl. nicht anmelden.
+**Status:** umgesetzt. `/login/` nutzt eine eigene PLM-Login-Seite (`LoginView`) und `LOGIN_REDIRECT_URL='plm:project_list'`. `/admin/` bleibt als technischer Fallback verlinkt, ist aber nicht mehr der normale PLM-Login.
 
 ### 4.7 Media-Auslieferung (Niedrig, aber Betriebsfalle)
 
@@ -290,7 +290,7 @@ Jeder eingeloggte Nutzer sieht/lädt alle Projekte/Teile/Revisionen. Für ein kl
 5. CI-Test-Job (A7).
 
 **Kurzfristig:**
-6. Eigene Login-View, `/admin/` separat absichern (4.6).
+6. Eigene Login-View, `/admin/` separat absichern (4.6) -- Login-View umgesetzt; Admin-Absicherung bleibt Betriebs-/Proxy-Thema.
 7. Web-Image ohne FreeCAD (A1).
 8. Rate-Limiting/Lockout (4.5).
 9. Audit-Events um Request-Kontext erweitern (3.1).

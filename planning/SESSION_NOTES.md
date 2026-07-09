@@ -71,6 +71,7 @@ Bei einer neuen Session zuerst `planning/README.md` lesen und danach die dort ge
 - Betroffen sind `plm/fcstd.py`, `plm/fcstd_signature.py` und `plm/services.py`.
 - Eine gefaehrliche `Document.xml` wird jetzt per Regressionstest mit `ValidationError` abgefangen.
 - Nachreview-Fixes: `PLM_MAX_*` werden in `settings.py` aus ENV gelesen, `defusedxml` ist echte Dependency statt lokalem Shim, der Compose-Worker nutzt auch im Build-Compose den User `plm`, und Projekt-ZIP/3MF pruefen die gelesene Byte-Laenge erneut.
+- Web-Login entkoppelt: `/login/` ist jetzt die normale PLM-Anmeldung, leitet nach erfolgreichem Login in die Projektliste und verlinkt `/admin/` nur noch als technischen Fallback.
 
 ### Naechster Kleiner Schritt
 

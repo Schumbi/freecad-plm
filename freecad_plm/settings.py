@@ -187,8 +187,9 @@ STORAGES = {
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'storage'
 
-LOGIN_URL = 'admin:login'
-LOGIN_REDIRECT_URL = 'admin:index'
+LOGIN_URL = 'plm:login'
+LOGIN_REDIRECT_URL = 'plm:project_list'
+LOGOUT_REDIRECT_URL = 'plm:login'
 
 FREECADCMD_COMMAND = os.environ.get('FREECADCMD_COMMAND', 'FreeCADCmd')
 FREECADCMD_PATH = FREECADCMD_COMMAND

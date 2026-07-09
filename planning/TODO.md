@@ -99,3 +99,4 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Worker-Container im Compose gehärtet: keine Linux-Caps, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp`, sowie einfache CPU-/RAM-/PID-Limits.
 - Snapshot-Projektprüfung im Checkout-API-Pfad umgesetzt; fremde `snapshot_id`-Werte liefern jetzt `404`.
 - XML-Parserpfade fuer FCStd, technische Signaturen und 3MF-Configs auf `defusedxml` umgestellt; gefaehrliche `Document.xml`-Inhalte werden jetzt mit `ValidationError` abgewiesen.
+- Eigene PLM-Login-Seite unter `/login/` umgesetzt; Logout und Login fuehren in das PLM-WebUI statt in den Django-Admin.

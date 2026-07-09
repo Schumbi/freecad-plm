@@ -13,8 +13,9 @@ python3 -m venv .venv
 .venv/bin/python manage.py runserver
 ```
 
-Die Admin-Oberflaeche liegt unter <http://127.0.0.1:8000/admin/>.
-Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/>.
+Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/> und nutzt
+<http://127.0.0.1:8000/login/> fuer die normale Anmeldung. Die technische
+Django-Admin-Oberflaeche liegt weiterhin unter <http://127.0.0.1:8000/admin/>.
 
 ## Serverbetrieb Mit Docker Compose
 
@@ -248,8 +249,9 @@ Die V1-Rollen werden als Django-Gruppen angelegt:
 - `admin`: volle PLM-Verwaltung
 
 PLM-Admins koennen Benutzer und Addon-Tokens in der normalen Weboberflaeche
-unter `Verwaltung` pflegen. Der Django-Admin unter `/admin/` bleibt als
-technische Fallback-Verwaltung erhalten.
+unter `Verwaltung` pflegen. Die normale Anmeldung fuehrt direkt in das PLM-WebUI.
+Der Django-Admin unter `/admin/` bleibt als technische Fallback-Verwaltung
+erhalten und ist von der Login-Seite aus verlinkt.
 
 Die Web-Verwaltung kann:
 

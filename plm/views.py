@@ -100,7 +100,7 @@ VIEWER_CONTENT_TYPES = {
 @require_POST
 def logout_view(request):
     logout(request)
-    return redirect("admin:login")
+    return redirect("plm:login")
 
 
 def admin_required_response(request):

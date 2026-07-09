@@ -103,10 +103,10 @@ Ausfuehrlicher Kontext: `planning/README.md` bis `planning/BULK_IMPORT_PLAN.md`.
 | Aspekt | Implementierung |
 |--------|-----------------|
 | Auth | Django-Session via `@login_required` auf allen PLM-Views |
-| Login-URL | `LOGIN_URL = 'admin:login'` → Nutzer loggen sich ueber Django-Admin-Login ein |
+| Login-URL | `LOGIN_URL = 'plm:login'`; Nutzer melden sich ueber `/login/` an und landen im PLM-WebUI |
 | CSRF | Aktiv fuer Web-Forms (`CsrfViewMiddleware`) |
 | Rollen | Django-Gruppen `reader`, `editor`, `admin`; Logik in `plm/permissions.py` |
-| Admin-UI | Django `/admin/` bleibt als technischer Fallback aktiv |
+| Admin-UI | Django `/admin/` bleibt als technischer Fallback aktiv und ist von der PLM-Login-Seite verlinkt |
 | Benutzerverwaltung | `/verwaltung/` – nur PLM-Admins; Self-Lockout-Schutz fuer letzten Admin |
 
 Relevante Dateien:

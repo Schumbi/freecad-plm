@@ -1,3 +1,4 @@
+from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from . import api, views
@@ -5,6 +6,14 @@ from . import api, views
 app_name = "plm"
 
 urlpatterns = [
+    path(
+        "login/",
+        auth_views.LoginView.as_view(
+            template_name="plm/login.html",
+            redirect_authenticated_user=True,
+        ),
+        name="login",
+    ),
     path("", views.project_list, name="project_list"),
     path("logout/", views.logout_view, name="logout"),
     path("verwaltung/", views.user_management_list, name="user_management"),
