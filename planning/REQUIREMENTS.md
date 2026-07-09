@@ -30,6 +30,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Jeder Upload erzeugt eine neue unveraenderliche Revision.
 - Revisionen haben Status, mindestens `draft`, `released`, `obsolete`.
 - Freigegebene Revisionen duerfen nicht ueberschrieben werden.
+- Admins koennen freigegebene Revisionen in der Web-UI als `obsolete` markieren; die Datei bleibt downloadbar.
 - Dateien werden im Dateisystem abgelegt.
 - Metadaten und Beziehungen werden in der Datenbank gespeichert.
 - Downloads sind nur fuer angemeldete Benutzer moeglich.
@@ -58,6 +59,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - STEP-, STL- und 3MF-Dateien koennen als abgeleitete Artefakte zu einer Revision erzeugt, gespeichert und heruntergeladen werden.
 - PNG-Ansichten koennen als abgeleitete Artefakte zu einer Revision erzeugt und als Galerie angezeigt werden.
 - Zwei Revisionen desselben Teils koennen anhand gleichnamiger PNG-Ansichten nebeneinander verglichen werden.
+- Globale Suche nach Projekten, Teilen, Revisionen und Dateinamen (inkl. Pfade in Projektstaenden) ist in der Topbar erreichbar.
 - Beim Upload einer Revision kann eine Aenderungsnotiz erfasst werden.
 - Das FreeCAD-Addon kann lokale Ordner mit einer oder mehreren `.FCStd`-Dateien als Projektstand importieren.
 - Das FreeCAD-Addon kann optional ein neues Projekt mit Code, Name, Status, Datum und Beschreibung anlegen und direkt mit dem Import befuellen.

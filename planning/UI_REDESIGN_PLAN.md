@@ -47,17 +47,16 @@ Nicht empfohlen fuer diesen Schritt:
 
 Jede Seite nutzt dieselbe Desktop-Shell:
 
-- Obere Leiste: Produktname, globale Suche, angemeldeter Nutzer.
-- Linke Seitenleiste: Hauptnavigation.
+- Obere Leiste: Produktname, globale Suche (`/search/`), angemeldeter Nutzer.
+- Linke Seitenleiste: Hauptnavigation inkl. Hintergrundjobs-Panel.
 - Inhaltsbereich: arbeitsbezogene Ansicht.
 - Rechte Kontextleiste: Eigenschaften, Status, letzte Aktionen, relevante Nebeninformationen.
 
 Navigation links:
 
 - Projekte
-- Zuletzt bearbeitet
-- Wartende Jobs
-- optional spaeter: Suche, Einstellungen
+- Verwaltung (Admins)
+- Hintergrundjobs (Sidebar-Panel mit Live-Polling)
 
 Die linke Navigation ist auf Desktop dauerhaft sichtbar. Mobil darf sie einklappen, ist aber nicht der Hauptfall.
 
@@ -319,6 +318,8 @@ Akzeptanz:
   - Revision hochladen.
   - Revision herunterladen.
   - Revision freigeben.
+  - Revision als obsolet markieren.
+  - Globale Suche und Listenfilter nutzen.
   - Anmerkung bearbeiten.
   - Objekte auslesen / Exportjob anlegen.
   - Projektstand importieren und herunterladen.

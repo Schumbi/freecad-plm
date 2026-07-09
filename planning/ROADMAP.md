@@ -53,3 +53,7 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 - Externe API.
 - Backup-/Restore-Werkzeuge.
 - Internationalisierung.
+
+## Implementierungsstand 2026-07-10
+
+Die V1-Roadmap ist im Code umgesetzt. Docker Compose, Worker, Addon-API und modernisiertes Web-UI sind vorhanden. Vor einem formalen V1.0-Release fehlt die dokumentierte Browser-Abnahme (`planning/V1_ACCEPTANCE.md`) und die Betriebsabnahme auf dem Zielserver.

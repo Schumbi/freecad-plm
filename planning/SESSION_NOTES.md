@@ -627,3 +627,12 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 
 - `revision_checkout_api` prueft jetzt `snapshot_id` gegen das Projekt der angeforderten Revision.
 - Ein Checkout mit Snapshot aus einem anderen Projekt bricht mit `404` ab und legt keinen Lock an.
+
+### V1-Luecken Geschlossen: Suche Und Revisions-Obsolet
+
+- Globale PLM-Suche unter `/search/` mit Treffern fuer Projekte, Teile, Revisionen und Dateipfade in Projektstaenden.
+- Suchfeld in der Topbar auf allen Seiten; seitenlokale Listenfilter bleiben in den Toolbars der jeweiligen Listen.
+- Service `search_plm()` und View `global_search` mit Tests (`GlobalSearchTests`).
+- Freigegebene Revisionen koennen in der Web-UI als obsolet markiert werden (`obsolete_revision`, Audit `revision_obsoleted`).
+- Commit `e8c14c5`; `manage.py test plm` laeuft mit 184 Tests erfolgreich.
+- Abnahme-Checkliste in `planning/V1_ACCEPTANCE.md` angelegt; Browser-Abnahme steht noch aus.

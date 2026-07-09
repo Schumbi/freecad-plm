@@ -22,9 +22,9 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 
 - Das vorhandene nanoPLM wurde grob analysiert.
 - Der alte nanoPLM-Code wurde nach `old/` verschoben.
-- Flask wurde als Default-Technologie infrage gestellt.
-- Django ist aktuell der bevorzugte Kandidat, weil Auth, Admin, Rollen, Migrationen und Datei-Handling Kernfunktionen fuer ein PLM sind.
-- Docker Compose ist ein spaeteres Ziel, soll aber bei der Architektur von Anfang an mitgedacht werden.
+- Django ist die technische Basis; Docker Compose mit PostgreSQL, Media-Volume und FreeCADCmd-Worker ist umgesetzt.
+- V1-Funktionsumfang ist im Code weitgehend vollstaendig (Stand 2026-07-10, 184 Tests).
+- Offen fuer V1.0: dokumentierte Browser-Abnahme gemaess `planning/V1_ACCEPTANCE.md`, Betriebsabnahme auf Zielserver und optional Addon-E2E mit echtem FreeCAD.
 
 ## Lesereihenfolge
 
@@ -40,6 +40,7 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 10. `planning/UI_REDESIGN_PLAN.md`
 11. `planning/MANUFACTURING_FILES_PLAN.md`
 12. `planning/BULK_IMPORT_PLAN.md`
+13. `planning/V1_ACCEPTANCE.md`
 
 ## Arbeitsregel
 

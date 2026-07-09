@@ -47,6 +47,7 @@ V1 ist erreicht, wenn ein kleines LAN-Team Projekte, Teile/Baugruppen und refere
 - Jede neue Revision erhaelt zentral den naechsten kanonischen Code `R0001`, `R0002`, ...
 - Revisionen haben mindestens die Status `draft`, `released` und `obsolete`.
 - Nur Admins und Superuser koennen eine Revision von `draft` nach `released` freigeben.
+- Nur Admins und Superuser koennen eine freigegebene Revision als `obsolete` markieren.
 - Freigegebene Revisionen bleiben unveraenderlich; Aenderungen erfolgen durch neue Revisionen.
 - FreeCAD-`PLMRevision` wird gegen den erwarteten PLM-Revisionscode geprueft.
 - Bei fehlender oder abweichender `PLMRevision` kann der Nutzer den Upload verwerfen oder eine normalisierte Kopie speichern.
@@ -73,3 +74,4 @@ V1 ist erreicht, wenn ein kleines LAN-Team Projekte, Teile/Baugruppen und refere
 - FreeCADCmd-Analyse mit echter `.FCStd`-Datei ausfuehren.
 - STEP-, STL-, 3MF- und PNG-Artefakte mit echtem FreeCADCmd erzeugen und herunterladen.
 - Suche mit mindestens Projektcode, Teilenummer, Revisionscode und Dateiname pruefen.
+- Freigegebene Revision als obsolet markieren (nur Admin).

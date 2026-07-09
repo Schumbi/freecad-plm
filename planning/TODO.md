@@ -6,22 +6,17 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Jetzt
 
-- V0-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` durchgehen.
-- V1-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` starten, soweit die jeweilige Funktion bereits implementiert ist.
-- Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit Flatpak-FreeCADCmd oder gesetztem `FREECADCMD_COMMAND` testen.
-- PNG-Ansichten und 3D-Preview-Erzeugung auf dem Zielserver mit echtem FreeCADCmd-Worker pruefen.
-- Management-Command `process_export_jobs` mit echten FCStd-Testdateien ausfuehren.
-- Docker-Compose-Stack auf dem Zielserver mit echtem Media-Volume und PostgreSQL testen.
-- Fehlende Suche fuer Projekte, Teile, Revisionen und Dateinamen entwerfen und umsetzen.
-- Folgeausbau fuer VarSet-Parameterbearbeitung und Neurendern planen.
-- ManufacturingRun-UI und Maschinenintegration fuer Bambu/andere Herstellungsmaschinen planen und umsetzen.
-- 3D-Viewer im Browser mit echten FCStd-, STEP-, STL- und 3MF-Dateien auf der laufenden Instanz testen.
-- STEP-/FCStd-Viewer-Preview-Erzeugung auf dem Server mit echtem FreeCADCmd-Worker gegen reale Dateien pruefen.
+- V1-Browser-Abnahme gemaess `planning/V1_ACCEPTANCE.md` durchgehen und dokumentieren.
+- V0-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` mitlaufen lassen, falls noch nicht erledigt.
+- Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit FreeCADCmd auf dem Zielserver abhaken.
+- PNG-Ansichten, 3D-Preview und Revisionsvergleich auf der laufenden Instanz mit echtem Worker pruefen.
+- FreeCAD-Addon End-to-End gegen die laufende Instanz einmal durchspielen.
+- Docker-Compose-Stack und Backup-Strategie fuer `storage/` und PostgreSQL auf dem Zielserver festhalten.
 
 ## Als Naechstes
 
-- Browser-Abnahme mit lokalen Testnutzern dokumentieren.
-- Danach V0-Status gegen die Akzeptanzkriterien bewerten.
+- Nach erfolgreicher Abnahme: Git-Tag `v1.0.0` und kurze Release-Notiz.
+- VarSet-Parameterbearbeitung und ManufacturingRun-UI planen (V2/spaeter).
 
 ## Spaeter
 
@@ -100,3 +95,10 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Snapshot-Projektprüfung im Checkout-API-Pfad umgesetzt; fremde `snapshot_id`-Werte liefern jetzt `404`.
 - XML-Parserpfade fuer FCStd, technische Signaturen und 3MF-Configs auf `defusedxml` umgestellt; gefaehrliche `Document.xml`-Inhalte werden jetzt mit `ValidationError` abgewiesen.
 - Eigene PLM-Login-Seite unter `/login/` umgesetzt; Logout und Login fuehren in das PLM-WebUI statt in den Django-Admin.
+- Web-UI modernisiert: App-Shell, Sidebar, Job-Panel, seitenlokale Listenfilter.
+- Hintergrundjobs des Nutzers in der Sidebar mit Live-Polling (`GET /jobs/status/`).
+- Revisionsvergleich mit Live-Status und Auto-Reload bei laufenden PNG-Jobs.
+- Auto-Queue fuer Analyse- und PNG-Jobs nach Upload, Import und API-Check-in (`plm/derivatives.py`).
+- Recovery haengengebliebener Exportjobs (`EXPORT_JOB_STALE_SECONDS`).
+- Globale PLM-Suche unter `/search/` fuer Projekte, Teile, Revisionen und Dateipfade in Projektstaenden.
+- Freigegebene Revisionen koennen in der Web-UI als obsolet markiert werden (`revision_obsoleted` im Audit-Trail).

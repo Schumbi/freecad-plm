@@ -277,7 +277,13 @@ Anlegen angezeigt; danach bleibt nur der Prefix sichtbar.
 4. Neue Revisionen werden automatisch kanonisch als `R0001`, `R0002`, ... vergeben; alte oder testweise abweichende Codes werden bei der naechsten Nummer ignoriert.
 5. Beim Hochladen einer neuen Revision fehlende oder abweichende FreeCAD-Property `PLMRevision` verwerfen oder als PLM-normalisierte Kopie speichern.
 6. Optional Anmerkungen ergaenzen.
-7. Optional Revision freigeben.
+7. Optional Revision freigeben (nur `admin`/Superuser).
+8. Aeltere freigegebene Revision als obsolet markieren (nur `admin`/Superuser), wenn eine neuere Revision gueltig ist.
+9. Globale Suche in der Topbar nutzen: Projekte, Teile, Revisionen und Dateipfade finden (`/search/?q=...`).
+
+## Suche
+
+Die globale Suche in der Topbar durchsucht Projekte, Teile, Revisionen und Dateipfade in Projektstaenden. Auf Listen-Seiten (Projekte, Teile, Revisionen) gibt es zusaetzlich einen lokalen Filter in der jeweiligen Toolbar.
 
 ## Projektstaende
 
@@ -285,7 +291,7 @@ FreeCAD-Projekte mit mehreren referenzierten `.FCStd`-Dateien koennen als ZIP im
 
 Der normale Download einer Revision liefert eine einzelne `.FCStd` nur dann, wenn sie keine FreeCAD-Referenzen enthaelt. Hat eine Datei Referenzen, liefert der Download automatisch ein ZIP mit der Datei und ihren rekursiv referenzierten Dateien aus demselben Projektstand.
 
-Projektstand und naechste Schritte stehen in `planning/`.
+Projektstand, Planung und V1-Abnahme-Checkliste stehen in `planning/`; fuer die manuelle V1-Abnahme siehe `planning/V1_ACCEPTANCE.md`.
 
 ## FreeCAD-Addon-API
 
