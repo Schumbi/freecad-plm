@@ -1392,6 +1392,64 @@ class RevisionUploadViewTests(TestCase):
         )
         process.assert_not_called()
 
+    def test_revision_compare_status_reports_pending_jobs(self):
+        self.client.force_login(self.user)
+        left = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        right = self.create_second_revision()
+        create_export_job(
+            revision=left,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            reverse("plm:revision_compare_status", args=[self.part.id]),
+            {"left": left.id, "right": right.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["comparisons_count"], 0)
+        self.assertTrue(payload["poll"])
+        self.assertEqual(
+            payload["revisions"][str(left.id)]["status"],
+            ExportJob.Status.QUEUED,
+        )
+
+    def test_revision_compare_status_reports_ready_when_pngs_exist(self):
+        self.client.force_login(self.user)
+        left = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        right = self.create_second_revision()
+        self.create_png_artifacts(left)
+        self.create_png_artifacts(right)
+
+        response = self.client.get(
+            reverse("plm:revision_compare_status", args=[self.part.id]),
+            {"left": left.id, "right": right.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ready"])
+        self.assertGreater(payload["comparisons_count"], 0)
+        self.assertFalse(payload["poll"])
+
+    def test_revision_compare_includes_live_status_banner(self):
+        self.client.force_login(self.user)
+        left = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        right = self.create_second_revision()
+
+        response = self.client.get(
+            reverse("plm:revision_compare", args=[self.part.id]),
+            {"left": left.id, "right": right.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="revision-compare-status"')
+        self.assertContains(response, "/parts/1/compare/status/")
+        self.assertContains(response, "left=1")
+        self.assertContains(response, "right=2")
+
     def test_revision_compare_uses_existing_png_views_without_new_jobs(self):
         self.client.force_login(self.user)
         left = create_revision_from_upload(self.part, make_zip_upload(), self.user)

@@ -50,6 +50,30 @@
   </div>
 
   {% if left_revision and right_revision %}
+    {% if compare_status_url %}
+      <div
+        class="compare-status"
+        id="revision-compare-status"
+        data-compare-status="{{ compare_status_url }}"
+        data-compare-initial-count="{{ comparisons|length }}"
+        aria-live="polite">
+        <div class="compare-status-header">
+          <strong>PNG-Status</strong>
+          <span class="compare-status-spinner" id="revision-compare-spinner" hidden aria-hidden="true"></span>
+        </div>
+        <ul class="compare-status-list" id="revision-compare-status-list">
+          <li>
+            <span class="compare-status-revision">{{ left_revision.revision_code }}</span>
+            <span class="compare-status-message" data-compare-revision="{{ left_revision.id }}">Wird geprüft …</span>
+          </li>
+          <li>
+            <span class="compare-status-revision">{{ right_revision.revision_code }}</span>
+            <span class="compare-status-message" data-compare-revision="{{ right_revision.id }}">Wird geprüft …</span>
+          </li>
+        </ul>
+      </div>
+    {% endif %}
+
     <div class="section-header">
       <h2>{{ left_revision.revision_code }} gegen {{ right_revision.revision_code }}</h2>
       <span class="muted">{{ comparisons|length }} Ansichten</span>

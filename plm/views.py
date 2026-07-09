@@ -1288,6 +1288,88 @@ def revision_has_pending_png_job(revision):
     ).exists()
 
 
+def revision_png_status_payload(revision):
+    if revision_has_complete_png_views(revision):
+        return {
+            "status": "ready",
+            "message": "PNG-Ansichten bereit.",
+            "views_count": len(revision_png_view_names(revision)),
+        }
+
+    pending_job = (
+        revision.export_jobs.filter(
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            status__in=EXPORT_JOB_ACTIVE_STATUSES,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if pending_job:
+        if pending_job.status == ExportJob.Status.RUNNING:
+            message = "PNG-Ansichten werden erzeugt."
+        else:
+            message = "PNG-Ansichten sind eingeplant."
+        return {
+            "status": pending_job.status,
+            "message": message,
+            "job_id": pending_job.id,
+        }
+
+    failed_job = (
+        revision.export_jobs.filter(
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            status=ExportJob.Status.FAILED,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if failed_job:
+        return {
+            "status": "failed",
+            "message": failed_job.error or "PNG-Ansichten konnten nicht erzeugt werden.",
+            "job_id": failed_job.id,
+        }
+
+    return {
+        "status": "missing",
+        "message": "PNG-Ansichten fehlen noch.",
+    }
+
+
+def build_revision_compare_pairs(left_revision, right_revision):
+    left_pngs = {
+        artifact.view_name: artifact
+        for artifact in left_revision.artifacts.filter(
+            artifact_type=RevisionArtifact.ArtifactType.PNG
+        )
+    }
+    right_pngs = {
+        artifact.view_name: artifact
+        for artifact in right_revision.artifacts.filter(
+            artifact_type=RevisionArtifact.ArtifactType.PNG
+        )
+    }
+    comparisons = []
+    for view_name in sorted(set(left_pngs) & set(right_pngs)):
+        comparisons.append(
+            {
+                "view_name": view_name,
+                "left": left_pngs[view_name],
+                "right": right_pngs[view_name],
+            }
+        )
+    return comparisons
+
+
+def revision_png_status_needs_poll(status_payload):
+    return status_payload["status"] in {
+        "queued",
+        "running",
+        "missing",
+        "pending",
+    }
+
+
 def revision_has_freecadcmd_metadata(revision):
     return bool((revision.extracted_metadata or {}).get("freecadcmd"))
 
@@ -1636,26 +1718,7 @@ def revision_compare(request, part_id):
             left_revision.refresh_from_db()
             right_revision.refresh_from_db()
 
-        left_pngs = {
-            artifact.view_name: artifact
-            for artifact in left_revision.artifacts.filter(
-                artifact_type=RevisionArtifact.ArtifactType.PNG
-            )
-        }
-        right_pngs = {
-            artifact.view_name: artifact
-            for artifact in right_revision.artifacts.filter(
-                artifact_type=RevisionArtifact.ArtifactType.PNG
-            )
-        }
-        for view_name in sorted(set(left_pngs) & set(right_pngs)):
-            comparisons.append(
-                {
-                    "view_name": view_name,
-                    "left": left_pngs[view_name],
-                    "right": right_pngs[view_name],
-                }
-            )
+        comparisons = build_revision_compare_pairs(left_revision, right_revision)
         if any(status in {"queued", "pending"} for status in png_statuses.values()):
             messages.info(
                 request,
@@ -1667,6 +1730,13 @@ def revision_compare(request, part_id):
                 "PNG-Ansichten konnten fuer mindestens eine Revision nicht erzeugt werden.",
             )
 
+    compare_status_url = None
+    if left_revision and right_revision:
+        compare_status_url = (
+            reverse("plm:revision_compare_status", args=[part.id])
+            + f"?left={left_revision.id}&right={right_revision.id}"
+        )
+
     return render(
         request,
         "plm/revision_compare.html",
@@ -1677,7 +1747,53 @@ def revision_compare(request, part_id):
             "right_revision": right_revision,
             "comparisons": comparisons,
             "png_statuses": png_statuses,
+            "compare_status_url": compare_status_url,
         },
+    )
+
+
+@login_required
+def revision_compare_status(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    left_id = request.GET.get("left")
+    right_id = request.GET.get("right")
+    revisions = part.revisions.prefetch_related("artifacts", "export_jobs")
+    left_revision = revisions.filter(id=left_id).first() if left_id else None
+    right_revision = revisions.filter(id=right_id).first() if right_id else None
+
+    if not left_revision or not right_revision:
+        return JsonResponse(
+            {
+                "ready": False,
+                "comparisons_count": 0,
+                "revisions": {},
+                "poll": False,
+            }
+        )
+
+    comparisons = build_revision_compare_pairs(left_revision, right_revision)
+    left_status = revision_png_status_payload(left_revision)
+    right_status = revision_png_status_payload(right_revision)
+    revisions_payload = {
+        str(left_revision.id): {
+            **left_status,
+            "revision_code": left_revision.revision_code,
+        },
+        str(right_revision.id): {
+            **right_status,
+            "revision_code": right_revision.revision_code,
+        },
+    }
+    poll = revision_png_status_needs_poll(left_status) or revision_png_status_needs_poll(
+        right_status
+    )
+    return JsonResponse(
+        {
+            "ready": bool(comparisons),
+            "comparisons_count": len(comparisons),
+            "revisions": revisions_payload,
+            "poll": poll,
+        }
     )
 
 

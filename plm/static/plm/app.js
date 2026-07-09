@@ -226,10 +226,78 @@
     fetchStatus();
   }
 
+  function setupCompareStatusPolling() {
+    var panel = document.getElementById("revision-compare-status");
+    if (!panel) return;
+
+    var statusUrl = panel.getAttribute("data-compare-status");
+    if (!statusUrl) return;
+
+    var spinner = document.getElementById("revision-compare-spinner");
+    var initialCount = Number(panel.getAttribute("data-compare-initial-count") || "0");
+    var timer = null;
+    var pollIntervalMs = 5000;
+
+    function updateRevisionMessages(revisions) {
+      Object.keys(revisions || {}).forEach(function (revisionId) {
+        var entry = revisions[revisionId];
+        var target = panel.querySelector(
+          '[data-compare-revision="' + revisionId + '"]'
+        );
+        if (!target || !entry) return;
+        target.textContent = entry.message;
+        target.className =
+          "compare-status-message compare-status-" + (entry.status || "missing");
+      });
+    }
+
+    function scheduleNext(shouldPoll) {
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+      if (spinner) {
+        spinner.hidden = !shouldPoll;
+      }
+      if (!shouldPoll) return;
+      timer = window.setTimeout(fetchStatus, pollIntervalMs);
+    }
+
+    function fetchStatus() {
+      fetch(statusUrl, {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("compare status request failed");
+          }
+          return response.json();
+        })
+        .then(function (payload) {
+          updateRevisionMessages(payload.revisions);
+          if (
+            payload.comparisons_count > initialCount &&
+            payload.comparisons_count > 0
+          ) {
+            window.location.reload();
+            return;
+          }
+          scheduleNext(Boolean(payload.poll));
+        })
+        .catch(function () {
+          scheduleNext(true);
+        });
+    }
+
+    fetchStatus();
+  }
+
   setupDialogs();
   setupActionMenus();
   setupMessages();
   setupListFilters();
   setupSidebarToggle();
   setupExportJobsPolling();
+  setupCompareStatusPolling();
 })();

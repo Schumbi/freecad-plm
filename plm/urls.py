@@ -171,6 +171,11 @@ urlpatterns = [
         name="revision_compare",
     ),
     path(
+        "parts/<int:part_id>/compare/status/",
+        views.revision_compare_status,
+        name="revision_compare_status",
+    ),
+    path(
         "snapshots/<int:snapshot_id>/download/",
         views.download_project_snapshot,
         name="download_project_snapshot",
