@@ -2,7 +2,7 @@ from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 import re
-from xml.etree import ElementTree
+from defusedxml import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError

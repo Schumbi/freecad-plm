@@ -65,6 +65,13 @@ Bei einer neuen Session zuerst `planning/README.md` lesen und danach die dort ge
 - `requirements.txt`, `.gitignore` und eine kurze Root-`README.md` wurden angelegt.
 - `manage.py check`, `makemigrations plm` und `migrate` liefen erfolgreich.
 
+### 2026-07-09
+
+- XML-Hardening auf `defusedxml` umgestellt.
+- Betroffen sind `plm/fcstd.py`, `plm/fcstd_signature.py` und `plm/services.py`.
+- Eine gefaehrliche `Document.xml` wird jetzt per Regressionstest mit `ValidationError` abgefangen.
+- Nachreview-Fixes: `PLM_MAX_*` werden in `settings.py` aus ENV gelesen, `defusedxml` ist echte Dependency statt lokalem Shim, der Compose-Worker nutzt auch im Build-Compose den User `plm`, und Projekt-ZIP/3MF pruefen die gelesene Byte-Laenge erneut.
+
 ### Naechster Kleiner Schritt
 
 Superuser anlegen und im Admin pruefen, ob Projekt, Teil/Baugruppe und Revision sinnvoll erfassbar sind. Danach `FCStd`-Validierung und Upload-Service bauen.

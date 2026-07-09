@@ -151,7 +151,7 @@ Tests bestaetigen: Ein API-Token mit Scope `write` reicht nicht aus, wenn der ge
    - `validate_fcstd_upload()` liest komplette Uploads in den Speicher (`read_uploaded_file` → `BytesIO`)
    - `fcstd_with_plm_revision()` liest alle ZIP-Member
    - Projekt-ZIP-Import iteriert alle `.FCStd`-Member vollstaendig
-   - **Keine** `PLM_MAX_*`-Limits in `settings.py` implementiert (nur im Audit vom 2026-07-06 empfohlen)
+   - `PLM_MAX_*`-Limits sind in `settings.py` implementiert und werden aus ENV gelesen.
    - Risiko: Zip-Bomb, Speicher-DoS, CPU-Last
 
 2. **FreeCADCmd-Verarbeitung nicht vertrauenswuerdiger CAD-Dateien**
@@ -173,9 +173,9 @@ Tests bestaetigen: Ein API-Token mit Scope `write` reicht nicht aus, wenn der ge
    - Fail-Fast wenn `DEBUG=0` ohne `DJANGO_SECRET_KEY`
 
 5. **XML-Verarbeitung in User-Uploads**
-   - `xml.etree.ElementTree` auf `Document.xml` aus FCStd-ZIPs
-   - Kein expliziter Schutz gegen sehr grosse/deeply nested XML (Billion-Laughs-artig)
-   - XXE: Python ElementTree verarbeitet standardmaessig keine externen Entities – dennoch pruefen
+   - `Document.xml` und 3MF-Configs werden serverseitig geparst.
+   - Die Parserpfade nutzen inzwischen die echte `defusedxml`-Dependency.
+   - Gefaehrliche `Document.xml`-Inhalte sind per Regressionstest abgedeckt.
 
 6. **Pfad-Traversal in Snapshots/Manifesten**
    - Server: `safe_snapshot_path()` in `plm/services.py` blockiert `..` und absolute Pfade

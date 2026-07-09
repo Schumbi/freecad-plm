@@ -118,6 +118,21 @@ def make_zip_upload(name="part.FCStd", members=None):
     return SimpleUploadedFile(name, buffer.getvalue())
 
 
+class UploadWithoutReportedSize(BytesIO):
+    def __init__(self, name, data):
+        super().__init__(data)
+        self.name = name
+
+    def chunks(self, chunk_size=64 * 1024):
+        self.seek(0)
+        while True:
+            chunk = self.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+        self.seek(0)
+
+
 def make_3mf_upload(name="plate.3mf", members=None):
     members = members or {
         "3D/3dmodel.model": "<model unit=\"millimeter\"></model>",
@@ -326,6 +341,21 @@ class FcstdValidationTests(SimpleTestCase):
             validate_fcstd_upload(upload)
 
         self.assertIn("zu viele ZIP-Mitglieder", str(context.exception))
+
+    def test_rejects_fcstd_upload_with_dangerous_xml(self):
+        upload = make_zip_upload(
+            members={
+                "Document.xml": """<!DOCTYPE foo [
+                    <!ENTITY xxe SYSTEM "file:///etc/passwd">
+                ]>
+                <Document />""",
+            },
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            validate_fcstd_upload(upload)
+
+        self.assertIn("Document.xml konnte nicht gelesen werden", str(context.exception))
 
     def test_technical_signature_ignores_gui_plm_revision_and_brep_cache(self):
         base = make_fcstd_bytes("Druck", xlinks=[("Box.FCStd", "Body")])
@@ -791,6 +821,16 @@ class RevisionUploadServiceTests(TestCase):
             )
 
         self.assertIn("zu viele ZIP-Mitglieder", str(context.exception))
+
+    def test_import_project_snapshot_rejects_zip_above_size_budget_without_size_attribute(self):
+        data = make_project_zip_upload().read()
+        upload = UploadWithoutReportedSize("project.zip", data)
+
+        with override_settings(PLM_MAX_PROJECT_ZIP_BYTES=len(data) - 1):
+            with self.assertRaises(ValidationError) as context:
+                import_project_snapshot(self.project, upload, self.user)
+
+        self.assertIn("Upload-Budget", str(context.exception))
 
     def test_release_revision_sets_status_timestamp_and_audit(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -2182,6 +2222,20 @@ class ManufacturingFileTests(TestCase):
             )
 
         self.assertIn("zu viele ZIP-Mitglieder", str(context.exception))
+
+    def test_service_rejects_3mf_above_size_budget_without_size_attribute(self):
+        data = make_3mf_upload().read()
+        upload = UploadWithoutReportedSize("plate.3mf", data)
+
+        with override_settings(PLM_MAX_PROJECT_ZIP_BYTES=len(data) - 1):
+            with self.assertRaises(ValidationError) as context:
+                create_manufacturing_file_from_upload(
+                    revision=self.revision,
+                    uploaded_file=upload,
+                    uploaded_by=self.editor,
+                )
+
+        self.assertIn("Upload-Budget", str(context.exception))
 
     def test_duplicate_manufacturing_file_for_revision_is_rejected(self):
         content = make_3mf_upload().read()

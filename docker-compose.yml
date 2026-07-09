@@ -54,6 +54,7 @@ services:
 
   worker:
     image: ${PLM_IMAGE:-freecad-plm:local}
+    user: "${PLM_USER:-plm}"
     build:
       context: .
       args:

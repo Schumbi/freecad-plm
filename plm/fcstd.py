@@ -1,11 +1,13 @@
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
-from xml.etree import ElementTree
+from xml.etree import ElementTree as StandardElementTree
 from zipfile import BadZipFile, ZipFile
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+
+from defusedxml import ElementTree
 
 from .fcstd_signature import fcstd_technical_signature
 
@@ -31,6 +33,12 @@ DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES = 500 * 1024 * 1024
 DEFAULT_PLM_MAX_ZIP_MEMBERS = 2000
 DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
 DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES = 200 * 1024 * 1024
+XML_SECURITY_ERRORS = (
+    ElementTree.DTDForbidden,
+    ElementTree.EntitiesForbidden,
+    ElementTree.ExternalReferenceForbidden,
+)
+XML_PARSE_ERRORS = (ElementTree.ParseError,) + XML_SECURITY_ERRORS
 
 
 def setting_int(name, default):
@@ -85,8 +93,8 @@ def read_uploaded_file(uploaded_file):
 def extract_document_xml_metadata(document_xml):
     try:
         root = ElementTree.fromstring(document_xml)
-    except ElementTree.ParseError:
-        return {}
+    except XML_PARSE_ERRORS as exc:
+        raise ValidationError("Document.xml konnte nicht gelesen werden.") from exc
 
     metadata = {
         "schema_version": root.attrib.get("SchemaVersion", ""),
@@ -144,7 +152,7 @@ def set_document_string_property(document_xml, name, value):
     root = ElementTree.fromstring(document_xml)
     properties_node = root.find("./Properties")
     if properties_node is None:
-        properties_node = ElementTree.SubElement(root, "Properties")
+        properties_node = StandardElementTree.SubElement(root, "Properties")
 
     property_node = None
     for candidate in properties_node.findall("./Property"):
@@ -153,7 +161,7 @@ def set_document_string_property(document_xml, name, value):
             break
 
     if property_node is None:
-        property_node = ElementTree.SubElement(
+        property_node = StandardElementTree.SubElement(
             properties_node,
             "Property",
             {"name": name, "type": "App::PropertyString"},
@@ -163,10 +171,10 @@ def set_document_string_property(document_xml, name, value):
 
     for child in list(property_node):
         property_node.remove(child)
-    ElementTree.SubElement(property_node, "String", {"value": value})
+    StandardElementTree.SubElement(property_node, "String", {"value": value})
 
     properties_node.attrib["Count"] = str(len(properties_node.findall("./Property")))
-    return ElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
+    return StandardElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
 def fcstd_with_plm_revision(data, revision_code):
@@ -195,7 +203,7 @@ def fcstd_with_plm_revision(data, revision_code):
                     updated_archive.writestr(info, content)
     except BadZipFile as exc:
         raise ValidationError("Die FCStd-Datei muss ein gueltiges ZIP-Archiv sein.") from exc
-    except ElementTree.ParseError as exc:
+    except XML_PARSE_ERRORS as exc:
         raise ValidationError("Document.xml konnte nicht gelesen werden.") from exc
 
     return target.getvalue()
@@ -247,6 +255,10 @@ def validate_fcstd_upload(uploaded_file):
     except BadZipFile as exc:
         raise ValidationError("Die FCStd-Datei muss ein gueltiges ZIP-Archiv sein.") from exc
 
+    freecad_document = (
+        extract_document_xml_metadata(document_xml) if document_xml else {}
+    )
+
     if not members:
         raise ValidationError("Die FCStd-Datei enthaelt keine Dateien.")
 
@@ -259,7 +271,5 @@ def validate_fcstd_upload(uploaded_file):
         "has_document_xml": "Document.xml" in member_names,
         "has_gui_document_xml": "GuiDocument.xml" in member_names,
         "technical_signature": fcstd_technical_signature(data),
-        "freecad_document": (
-            extract_document_xml_metadata(document_xml) if document_xml else {}
-        ),
+        "freecad_document": freecad_document,
     }

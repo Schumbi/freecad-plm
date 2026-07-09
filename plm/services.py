@@ -5,7 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import PurePosixPath
-from xml.etree import ElementTree
+from defusedxml import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError
@@ -382,11 +382,19 @@ def inspect_manufacturing_upload(uploaded_file):
             "Die 3MF-Datei",
         )
     file_sha256, size_bytes = upload_file_digest(uploaded_file)
+    max_project_zip_bytes = setting_int(
+        "PLM_MAX_PROJECT_ZIP_BYTES",
+        DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
+    )
     metadata = {"extension": suffix}
     thumbnail = None
     if suffix == ".3mf":
         try:
             data = read_uploaded_file(uploaded_file)
+            if len(data) > max_project_zip_bytes:
+                raise ValidationError(
+                    "Die 3MF-Datei ist groesser als das erlaubte Upload-Budget."
+                )
             with ZipFile(BytesIO(data)) as archive:
                 validate_zip_archive_budget(
                     archive,
@@ -749,15 +757,18 @@ def create_or_reuse_revision(part, path, data, created_by):
 
 
 def iter_fcstd_zip_members(uploaded_zip):
+    max_project_zip_bytes = setting_int(
+        "PLM_MAX_PROJECT_ZIP_BYTES",
+        DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
+    )
     validate_uploaded_file_size(
         uploaded_zip,
-        setting_int(
-            "PLM_MAX_PROJECT_ZIP_BYTES",
-            DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
-        ),
+        max_project_zip_bytes,
         "Die Projektdatei",
     )
     data = read_uploaded_file(uploaded_zip)
+    if len(data) > max_project_zip_bytes:
+        raise ValidationError("Die Projektdatei ist groesser als das erlaubte Upload-Budget.")
     try:
         with ZipFile(BytesIO(data)) as archive:
             validate_zip_archive_budget(

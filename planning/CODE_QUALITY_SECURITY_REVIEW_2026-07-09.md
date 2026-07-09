@@ -40,11 +40,11 @@ CPU-/RAM-/PID-Limits.
 Das Projekt ist fuer ein V1-LAN-PLM erstaunlich reif: klares immutable Revisionsmodell, durchgaengiger Audit-Trail, saubere Token-Auth, ordentliche Testabdeckung (150 Tests) und bewusste Designentscheidungen, die in `planning/` dokumentiert sind. Die groessten Baustellen sind **nicht** akute Loecher, sondern strukturelle Themen:
 
 - **Wartbarkeit:** `views.py` (~1600 Zeilen) und `services.py` (~1475 Zeilen) sind zu gross; Permission-/Audit-/Serialisierungs-Boilerplate wiederholt sich dutzendfach.
-- **Sicherheit (Betrieb):** Keine Upload-/ZIP-Budgets (DoS/Zip-Bomb), Worker ohne Container-Haertung, FreeCAD im Web-Image.
-- **Sicherheit (Code):** Eine konkrete Inkonsistenz bei der Snapshot-Zuordnung (mögliches projektuebergreifendes Referenzieren), XML-Parsing ohne Härtung, kein Rate-Limiting/Login-Lockout.
+- **Sicherheit (Betrieb):** Upload-/ZIP-Budgets und Worker-Haertung sind inzwischen umgesetzt; offen bleibt u.a. FreeCAD im Web-Image.
+- **Sicherheit (Code):** Snapshot-Zuordnungspruefung und XML-Haertung sind inzwischen umgesetzt; offen bleibt u.a. Rate-Limiting/Login-Lockout.
 - **Nachvollziehbarkeit:** Audit-Trail gut, aber ohne Request-Kontext (IP, User-Agent) und mit wenig aktivem Logging.
 
-Priorisierte Sofortmaßnahmen: Upload-Budgets, Worker-Haertung, Snapshot-Projektpruefung, `defusedxml`.
+Priorisierte Sofortmaßnahmen: Upload-Budgets, Worker-Haertung, Snapshot-Projektpruefung und `defusedxml` sind umgesetzt; naechster Sofortpunkt ist der CI-Test-Job.
 
 ---
 
@@ -219,11 +219,11 @@ snapshot = get_object_or_404(
 )
 ```
 
-### 4.4 XML-Parsing ohne Härtung (Mittel)
+### 4.4 XML-Parsing ohne Härtung (Mittel, umgesetzt)
 
-`Document.xml` und 3MF-Configs werden mit der Standard-`xml.etree.ElementTree` geparst (`fcstd.py`, `fcstd_signature.py`, `services.py`). ElementTree expandiert keine externen Entities, ist aber gegen interne Entity-Expansion („Billion Laughs") nicht robust.
+`Document.xml` und 3MF-Configs werden jetzt mit `defusedxml.ElementTree` aus der echten `defusedxml`-Abhaengigkeit geparst (`fcstd.py`, `fcstd_signature.py`, `services.py`). DTDs, Entities und externe Referenzen werden fuer diese Parserpfade blockiert.
 
-**Vorschlag:** `defusedxml` einsetzen (`defusedxml.ElementTree`). Minimaler, gezielter Ersatz der Imports; kein Funktionsverlust für wohlgeformte Dateien.
+**Status:** umgesetzt mit echter `defusedxml`-Dependency und Regressionstest fuer gefaehrliche `Document.xml`.
 
 ### 4.5 Kein Rate-Limiting / Login-Lockout (Mittel)
 
@@ -286,7 +286,7 @@ Jeder eingeloggte Nutzer sieht/lädt alle Projekte/Teile/Revisionen. Für ein kl
 1. Upload-/ZIP-Budgets (4.1) — umgesetzt; Settings, Validierung und Tests fuer zu grosse Datei / zu viele Member.
 2. Worker-Härtung im Compose (4.2 / A2) — umgesetzt; Worker mit `cap_drop`, `read_only`, `tmpfs`, `no-new-privileges`, Limits.
 3. Snapshot-Projektprüfung in `revision_checkout_api` (4.3) — umgesetzt; Checkout akzeptiert nur Snapshots aus dem gleichen Projekt wie die Revision.
-4. `defusedxml` einführen (4.4).
+4. `defusedxml` einführen (4.4) -- umgesetzt.
 5. CI-Test-Job (A7).
 
 **Kurzfristig:**
