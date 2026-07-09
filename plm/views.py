@@ -4,7 +4,7 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -19,6 +19,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from .forms import (
     AdminSetPasswordForm,
@@ -93,6 +94,13 @@ VIEWER_CONTENT_TYPES = {
     "stl": "model/stl",
     "3mf": "model/3mf",
 }
+
+
+@login_required
+@require_POST
+def logout_view(request):
+    logout(request)
+    return redirect("admin:login")
 
 
 def admin_required_response(request):

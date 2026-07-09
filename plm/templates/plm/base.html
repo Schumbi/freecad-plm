@@ -319,6 +319,29 @@
       font-size: 0.88rem;
       white-space: nowrap;
     }
+    .user-menu {
+      align-items: center;
+      display: flex;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+    .logout-form {
+      margin: 0;
+    }
+    .logout-button {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.86rem;
+      padding: 0.42rem 0.62rem;
+    }
+    .logout-button:hover {
+      background: var(--surface-soft);
+      border-color: #bfd3d1;
+    }
     main {
       margin: 0 auto;
       max-width: 1480px;
@@ -921,11 +944,19 @@
         <div class="global-search" aria-label="Globale Suche">
           <input type="search" placeholder="Suche vorbereiten" disabled>
         </div>
-        <div class="user-chip">
+        <div class="user-menu">
+          <div class="user-chip">
+            {% if request.user.is_authenticated %}
+              {{ request.user.get_username }}
+            {% else %}
+              Nicht angemeldet
+            {% endif %}
+          </div>
           {% if request.user.is_authenticated %}
-            {{ request.user.get_username }}
-          {% else %}
-            Nicht angemeldet
+            <form class="logout-form" action="{% url 'plm:logout' %}" method="post">
+              {% csrf_token %}
+              <button class="logout-button" type="submit">Abmelden</button>
+            </form>
           {% endif %}
         </div>
       </header>

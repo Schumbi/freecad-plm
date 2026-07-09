@@ -932,6 +932,22 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login/", response["Location"])
 
+    def test_logged_in_user_can_logout_from_topbar(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:project_list"))
+
+        self.assertContains(response, self.user.username)
+        self.assertContains(response, "Abmelden")
+        self.assertContains(response, reverse("plm:logout"))
+
+        response = self.client.post(reverse("plm:logout"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response["Location"])
+        response = self.client.get(reverse("plm:project_list"))
+        self.assertIn("/admin/login/", response["Location"])
+
     def test_part_detail_shows_upload_form(self):
         self.client.force_login(self.user)
 
