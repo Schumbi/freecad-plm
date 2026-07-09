@@ -27,6 +27,7 @@ from .fcstd import (
     validate_zip_archive_budget,
     validate_fcstd_upload,
 )
+from .derivatives import prepare_revision_derivatives
 from .models import (
     Annotation,
     AuditEvent,
@@ -1325,6 +1326,7 @@ def checkin_checkout(checkout, uploaded_file, actor, notes=""):
             }
         ],
     )
+    prepare_revision_derivatives([revision], actor)
     return {
         "root_revision": revision,
         "revisions": [
@@ -1403,6 +1405,10 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
             actor,
             completed_revision=root_revision,
             revisions=revisions,
+        )
+        prepare_revision_derivatives(
+            [entry["revision"] for entry in revisions],
+            actor,
         )
     return {
         "root_revision": root_revision,

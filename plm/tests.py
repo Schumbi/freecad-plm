@@ -1369,7 +1369,7 @@ class RevisionUploadViewTests(TestCase):
 
         with (
             override_settings(PROCESS_EXPORT_JOBS_INLINE=False),
-            patch("plm.views.process_export_job") as process,
+            patch("plm.derivatives.process_export_job") as process,
         ):
             response = self.client.get(
                 reverse("plm:revision_compare", args=[self.part.id]),
@@ -3521,6 +3521,41 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(checkout.status, Checkout.Status.COMPLETED)
         self.assertEqual(checkout.completed_revision, revision)
         self.assertEqual(revision.notes, "Geometrie angepasst.")
+
+    def test_checkin_queues_derivative_jobs_for_new_revision(self):
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
+        create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        base_revision = Revision.objects.get(revision_code="R0001")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[base_revision.id]),
+            {},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        updated_data = fcstd_with_plm_revision(
+            make_fcstd_bytes("Updated Part"),
+            "R0002",
+        )
+
+        with override_settings(PROCESS_EXPORT_JOBS_INLINE=False):
+            response = self.client.post(
+                reverse("plm:api_checkout_checkin", args=[checkout_id]),
+                {
+                    "file": SimpleUploadedFile("updated.FCStd", updated_data),
+                    "change_summary": "Geometrie angepasst.",
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        revision = Revision.objects.get(revision_code="R0002")
+        self.assertEqual(
+            set(
+                revision.export_jobs.values_list("job_type", "status")
+            ),
+            {
+                (ExportJob.JobType.INSPECT, ExportJob.Status.QUEUED),
+                (ExportJob.JobType.PNG_VIEWS, ExportJob.Status.QUEUED),
+            },
+        )
 
     def test_checkin_ignores_technical_only_single_file_change(self):
         self.authorize_token([ApiToken.Scope.CHECKOUT])
