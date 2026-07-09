@@ -1,9 +1,11 @@
 import json
+import logging
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+from datetime import timedelta
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,6 +17,8 @@ from django.utils import timezone
 
 from .mesh_preview import render_stl_views
 from .models import AuditEvent, ExportJob, Revision, RevisionArtifact
+
+logger = logging.getLogger(__name__)
 
 
 PNG_VIEW_NAMES = (
@@ -225,7 +229,55 @@ def queued_export_jobs(limit=None):
     return list(queryset.select_related("revision", "revision__part", "created_by"))
 
 
+def export_job_stale_seconds():
+    configured = getattr(settings, "EXPORT_JOB_STALE_SECONDS", None)
+    if configured is not None:
+        return configured
+    timeout = getattr(settings, "FREECADCMD_TIMEOUT_SECONDS", 300)
+    return max(timeout + 120, 600)
+
+
+def recover_stale_export_jobs(now=None):
+    now = now or timezone.now()
+    cutoff = now - timedelta(seconds=export_job_stale_seconds())
+    stale_jobs = list(
+        ExportJob.objects.filter(
+            status=ExportJob.Status.RUNNING,
+            started_at__lt=cutoff,
+        ).select_related("revision", "created_by")
+    )
+    stale_message = (
+        "Job blieb zu lange im Status running haengen "
+        f"(>{export_job_stale_seconds()}s). "
+        "Vermutlich Worker-Neustart oder abgebrochener FreeCAD-Prozess."
+    )
+    for job in stale_jobs:
+        job.status = ExportJob.Status.FAILED
+        job.error = stale_message
+        job.finished_at = now
+        job.save(update_fields=["status", "error", "finished_at", "updated_at"])
+        AuditEvent.objects.create(
+            actor=job.created_by,
+            action=AuditEvent.Action.EXPORT_JOB_FAILED,
+            object_repr=str(job),
+            metadata={
+                "revision_id": job.revision_id,
+                "job_id": job.id,
+                "job_type": job.job_type,
+                "error": job.error,
+                "recovered_stale": True,
+            },
+        )
+    if stale_jobs:
+        logger.warning(
+            "Marked %s stale export job(s) as failed.",
+            len(stale_jobs),
+        )
+    return stale_jobs
+
+
 def process_queued_export_jobs(limit=None):
+    recover_stale_export_jobs()
     processed = []
     for job in queued_export_jobs(limit=limit):
         processed.append(process_export_job(job))

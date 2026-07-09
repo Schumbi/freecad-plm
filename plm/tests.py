@@ -59,8 +59,11 @@ from .services import (
 from .freecadcmd import (
     PNG_VIEW_NAMES,
     create_export_job,
+    export_job_stale_seconds,
     freecadcmd_command,
     process_export_job,
+    process_queued_export_jobs,
+    recover_stale_export_jobs,
     with_flatpak_worker_options,
 )
 from .mesh_preview import render_stl_views
@@ -2749,6 +2752,89 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
         )
         script.chmod(0o755)
         return str(script)
+
+    def test_export_job_stale_seconds_defaults_to_timeout_plus_grace(self):
+        with override_settings(FREECADCMD_TIMEOUT_SECONDS=300, EXPORT_JOB_STALE_SECONDS=None):
+            self.assertEqual(export_job_stale_seconds(), 600)
+
+    def test_recover_stale_export_jobs_marks_old_running_jobs_failed(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+        stale_started_at = timezone.now() - timedelta(minutes=15)
+        ExportJob.objects.filter(pk=job.pk).update(
+            status=ExportJob.Status.RUNNING,
+            started_at=stale_started_at,
+        )
+
+        with override_settings(EXPORT_JOB_STALE_SECONDS=600):
+            recovered = recover_stale_export_jobs()
+
+        self.assertEqual(len(recovered), 1)
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.FAILED)
+        self.assertIn("running haengen", job.error)
+        self.assertIsNotNone(job.finished_at)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.EXPORT_JOB_FAILED,
+                metadata__job_id=job.id,
+                metadata__recovered_stale=True,
+            ).exists()
+        )
+
+    def test_recover_stale_export_jobs_ignores_recent_running_jobs(self):
+        job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+        ExportJob.objects.filter(pk=job.pk).update(
+            status=ExportJob.Status.RUNNING,
+            started_at=timezone.now() - timedelta(minutes=2),
+        )
+
+        with override_settings(EXPORT_JOB_STALE_SECONDS=600):
+            recovered = recover_stale_export_jobs()
+
+        self.assertEqual(recovered, [])
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.RUNNING)
+
+    def test_process_queued_export_jobs_recovers_stale_jobs_before_processing(self):
+        stale_job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.INSPECT,
+            created_by=self.user,
+        )
+        queued_job = create_export_job(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+        ExportJob.objects.filter(pk=stale_job.pk).update(
+            status=ExportJob.Status.RUNNING,
+            started_at=timezone.now() - timedelta(minutes=20),
+        )
+
+        def mark_succeeded(job):
+            job.status = ExportJob.Status.SUCCEEDED
+            job.finished_at = timezone.now()
+            job.save(update_fields=["status", "finished_at", "updated_at"])
+            return job
+
+        with (
+            override_settings(EXPORT_JOB_STALE_SECONDS=600),
+            patch("plm.freecadcmd.process_export_job", side_effect=mark_succeeded),
+        ):
+            processed = process_queued_export_jobs(limit=1)
+
+        stale_job.refresh_from_db()
+        self.assertEqual(stale_job.status, ExportJob.Status.FAILED)
+        self.assertEqual(len(processed), 1)
+        self.assertEqual(processed[0].id, queued_job.id)
 
     def test_inspect_job_stores_freecadcmd_metadata(self):
         executable = self.fake_freecadcmd([])
