@@ -95,3 +95,4 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Bestehende FreeCAD-Ordnerimport-Funktion fuer das Addon umgesetzt und dokumentiert.
 - Manufacturing-Dateien fuer gedruckte Revisionen angelegt: Datenmodell, Upload, Download, 3MF-Basisvalidierung, Maschinenbezug und spaeter erweiterbare Fertigungslauf-/Anhangmodelle.
 - Schwebenden 3D-Viewer fuer Revisionen, Artefakte und Fertigungsdateien angelegt; STL/3MF werden direkt angezeigt, FCStd/STEP nutzen ein gespeichertes STL-Preview-Artefakt.
+- Upload-/ZIP-Budgets fuer FCStd, Projekt-ZIP und 3MF eingefuehrt; grobe DoS-/Zip-Bomb-Grenzen liegen jetzt als konfigurierbare `PLM_MAX_*`-Werte in den Settings.

@@ -35,6 +35,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Downloads sind nur fuer angemeldete Benutzer moeglich.
 - Wichtige Aktionen werden in einem Audit-Trail protokolliert.
 - `FCStd`-Uploads werden mindestens als ZIP-Datei validiert.
+- `FCStd`-, Projekt-ZIP- und 3MF-Uploads werden mit konfigurierbaren ZIP-Budgets gegen grosse Uploads und ZIP-Bomben begrenzt.
 - Soweit ohne FreeCAD-Installation moeglich, werden Metadaten aus der `FCStd`-Datei extrahiert.
 - Revisionen koennen Freitext-Anmerkungen enthalten, z.B. naechste Schritte, Einbauhinweise oder kurze Arbeitsnotizen.
 - FreeCAD-Dokumentmetadaten aus `Document.xml` sollen beim Upload ausgelesen und pro Revision gespeichert werden.

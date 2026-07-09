@@ -57,9 +57,16 @@ PLM_USER=plm
 PLM_UID=1000
 PLM_GID=1000
 FREECADCMD_COMMAND=freecadcmd
+PLM_MAX_FCSTD_UPLOAD_BYTES=200000000
+PLM_MAX_PROJECT_ZIP_BYTES=500000000
+PLM_MAX_ZIP_MEMBERS=2000
+PLM_MAX_ZIP_UNCOMPRESSED_BYTES=2147483648
+PLM_MAX_ZIP_MEMBER_BYTES=200000000
 ```
 
 Das Runtime-Image enthaelt den User `plm` mit UID/GID `1000:1000`. `PLM_USER` sollte deshalb auf `plm` bleiben. `PLM_UID` und `PLM_GID` dokumentieren, wem die lokalen Verzeichnisse auf dem Host gehoeren sollen; die Werte zeigt `id` oder `id <user>`.
+
+Die `PLM_MAX_*`-Werte begrenzen `FCStd`-, Projekt-ZIP- und 3MF-Uploads gegen sehr grosse Dateien und ZIP-Bomben. Die Defaults sind fuer ein LAN-Team konservativ und koennen bei Bedarf hoeher gesetzt werden.
 
 Lokale Verzeichnisse fuer Modelle/Uploads und statische Dateien anlegen:
 

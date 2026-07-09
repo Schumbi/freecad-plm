@@ -602,3 +602,10 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Self-Lockout-Regeln verhindern, dass ein Admin sich selbst deaktiviert oder
   den letzten aktiven Admin entfernt.
 - Root-`README.md` dokumentiert Bedienung und Token-Presets.
+
+### Upload-Und-ZIP-Budgets
+
+- Konfigurierbare `PLM_MAX_*`-Limits fuer `FCStd`-, Projekt-ZIP- und 3MF-Uploads angelegt.
+- `FCStd`-Uploads werden jetzt vor dem Einlesen auf Dateigroesse, ZIP-Mitgliederzahl, maximale Einzelmitgliedsgroesse und unkomprimierte Gesamtsumme begrenzt.
+- Projekt-ZIP-Import und 3MF-Inventarisierung nutzen dieselbe ZIP-Budget-Schutzschicht.
+- Tests fuer zu grosse `FCStd`-Uploads, zu viele ZIP-Mitglieder im `FCStd`, im Projekt-ZIP und in 3MF wurden ergaenzt.

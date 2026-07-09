@@ -304,6 +304,29 @@ class FcstdValidationTests(SimpleTestCase):
         self.assertEqual(metadata["technical_signature"]["rules_version"], 2)
         self.assertGreater(metadata["size_bytes"], 0)
 
+    @override_settings(PLM_MAX_FCSTD_UPLOAD_BYTES=32)
+    def test_rejects_fcstd_upload_above_size_budget(self):
+        upload = SimpleUploadedFile("part.FCStd", b"x" * 64)
+
+        with self.assertRaises(ValidationError) as context:
+            validate_fcstd_upload(upload)
+
+        self.assertIn("Upload-Budget", str(context.exception))
+
+    @override_settings(PLM_MAX_ZIP_MEMBERS=1)
+    def test_rejects_fcstd_upload_with_too_many_zip_members(self):
+        upload = make_zip_upload(
+            members={
+                "Document.xml": FREECAD_DOCUMENT_XML,
+                "GuiDocument.xml": "<GuiDocument />",
+            },
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            validate_fcstd_upload(upload)
+
+        self.assertIn("zu viele ZIP-Mitglieder", str(context.exception))
+
     def test_technical_signature_ignores_gui_plm_revision_and_brep_cache(self):
         base = make_fcstd_bytes("Druck", xlinks=[("Box.FCStd", "Body")])
         noisy = noisy_fcstd_bytes(base)
@@ -757,6 +780,17 @@ class RevisionUploadServiceTests(TestCase):
         )
         self.assertEqual(second.import_summary["created_revisions"], 1)
         self.assertEqual(second.import_summary["reused_revisions"], 4)
+
+    @override_settings(PLM_MAX_ZIP_MEMBERS=1)
+    def test_import_project_snapshot_rejects_zip_with_too_many_members(self):
+        with self.assertRaises(ValidationError) as context:
+            import_project_snapshot(
+                self.project,
+                make_project_zip_upload(),
+                self.user,
+            )
+
+        self.assertIn("zu viele ZIP-Mitglieder", str(context.exception))
 
     def test_release_revision_sets_status_timestamp_and_audit(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -2137,6 +2171,17 @@ class ManufacturingFileTests(TestCase):
         self.assertEqual(manufacturing_file.machine_label, "P1S")
         self.assertEqual(manufacturing_file.material, "PLA")
         self.assertEqual(manufacturing_file.material_brand, "Bambu Lab")
+
+    @override_settings(PLM_MAX_ZIP_MEMBERS=2)
+    def test_service_rejects_3mf_with_too_many_zip_members(self):
+        with self.assertRaises(ValidationError) as context:
+            create_manufacturing_file_from_upload(
+                revision=self.revision,
+                uploaded_file=make_3mf_upload(),
+                uploaded_by=self.editor,
+            )
+
+        self.assertIn("zu viele ZIP-Mitglieder", str(context.exception))
 
     def test_duplicate_manufacturing_file_for_revision_is_rejected(self):
         content = make_3mf_upload().read()

@@ -7,3 +7,6 @@ storage/
 staticfiles/
 test-model/
 old/
+.env
+.env.*
+!.env.example

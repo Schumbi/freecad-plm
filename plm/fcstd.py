@@ -4,6 +4,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 
 from .fcstd_signature import fcstd_technical_signature
@@ -25,6 +26,49 @@ FREECAD_STRING_PROPERTIES = (
 )
 
 PLM_REVISION_PROPERTY = "PLMRevision"
+DEFAULT_PLM_MAX_FCSTD_UPLOAD_BYTES = 200 * 1024 * 1024
+DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES = 500 * 1024 * 1024
+DEFAULT_PLM_MAX_ZIP_MEMBERS = 2000
+DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
+DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES = 200 * 1024 * 1024
+
+
+def setting_int(name, default):
+    return int(getattr(settings, name, default))
+
+
+def validate_uploaded_file_size(uploaded_file, max_bytes, label):
+    size = getattr(uploaded_file, "size", None)
+    if size is not None and int(size) > max_bytes:
+        raise ValidationError(f"{label} ist groesser als das erlaubte Upload-Budget.")
+
+
+def validate_zip_archive_budget(
+    archive,
+    *,
+    label,
+    max_members,
+    max_uncompressed_bytes,
+    max_member_bytes,
+):
+    members = archive.infolist()
+    if len(members) > max_members:
+        raise ValidationError(f"{label} enthaelt zu viele ZIP-Mitglieder.")
+
+    uncompressed_bytes = 0
+    for info in members:
+        if info.is_dir():
+            continue
+        if info.file_size > max_member_bytes:
+            raise ValidationError(
+                f"{label} enthaelt ein ZIP-Mitglied, das das Budget ueberschreitet."
+            )
+        uncompressed_bytes += info.file_size
+
+    if uncompressed_bytes > max_uncompressed_bytes:
+        raise ValidationError(
+            f"{label} enthaelt zu viele unkomprimierte Daten."
+        )
 
 
 def read_uploaded_file(uploaded_file):
@@ -162,12 +206,40 @@ def validate_fcstd_upload(uploaded_file):
     if Path(filename).suffix.lower() != ".fcstd":
         raise ValidationError("Nur FreeCAD-Dateien mit der Endung .FCStd sind erlaubt.")
 
+    validate_uploaded_file_size(
+        uploaded_file,
+        setting_int("PLM_MAX_FCSTD_UPLOAD_BYTES", DEFAULT_PLM_MAX_FCSTD_UPLOAD_BYTES),
+        "Die FCStd-Datei",
+    )
     data = read_uploaded_file(uploaded_file)
     if not data:
         raise ValidationError("Die FCStd-Datei ist leer.")
 
+    max_fcstd_upload_bytes = setting_int(
+        "PLM_MAX_FCSTD_UPLOAD_BYTES",
+        DEFAULT_PLM_MAX_FCSTD_UPLOAD_BYTES,
+    )
+    if len(data) > max_fcstd_upload_bytes:
+        raise ValidationError("Die FCStd-Datei ist groesser als das erlaubte Upload-Budget.")
+
     try:
         with ZipFile(BytesIO(data)) as archive:
+            validate_zip_archive_budget(
+                archive,
+                label="Die FCStd-Datei",
+                max_members=setting_int(
+                    "PLM_MAX_ZIP_MEMBERS",
+                    DEFAULT_PLM_MAX_ZIP_MEMBERS,
+                ),
+                max_uncompressed_bytes=setting_int(
+                    "PLM_MAX_ZIP_UNCOMPRESSED_BYTES",
+                    DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES,
+                ),
+                max_member_bytes=setting_int(
+                    "PLM_MAX_ZIP_MEMBER_BYTES",
+                    DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES,
+                ),
+            )
             members = archive.namelist()
             document_xml = (
                 archive.read("Document.xml") if "Document.xml" in members else None

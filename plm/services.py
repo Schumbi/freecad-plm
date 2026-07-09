@@ -15,9 +15,16 @@ from django.db import transaction
 from django.utils import timezone
 
 from .fcstd import (
+    DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
+    DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES,
+    DEFAULT_PLM_MAX_ZIP_MEMBERS,
+    DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES,
     PLM_REVISION_PROPERTY,
     fcstd_with_plm_revision,
     read_uploaded_file,
+    setting_int,
+    validate_uploaded_file_size,
+    validate_zip_archive_budget,
     validate_fcstd_upload,
 )
 from .models import (
@@ -365,6 +372,15 @@ def inspect_manufacturing_upload(uploaded_file):
         allowed = ", ".join(sorted(MANUFACTURING_FILE_EXTENSIONS))
         raise ValidationError(f"Nicht unterstuetzter Dateityp. Erlaubt: {allowed}.")
 
+    if suffix == ".3mf":
+        validate_uploaded_file_size(
+            uploaded_file,
+            setting_int(
+                "PLM_MAX_PROJECT_ZIP_BYTES",
+                DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
+            ),
+            "Die 3MF-Datei",
+        )
     file_sha256, size_bytes = upload_file_digest(uploaded_file)
     metadata = {"extension": suffix}
     thumbnail = None
@@ -372,6 +388,22 @@ def inspect_manufacturing_upload(uploaded_file):
         try:
             data = read_uploaded_file(uploaded_file)
             with ZipFile(BytesIO(data)) as archive:
+                validate_zip_archive_budget(
+                    archive,
+                    label="Die 3MF-Datei",
+                    max_members=setting_int(
+                        "PLM_MAX_ZIP_MEMBERS",
+                        DEFAULT_PLM_MAX_ZIP_MEMBERS,
+                    ),
+                    max_uncompressed_bytes=setting_int(
+                        "PLM_MAX_ZIP_UNCOMPRESSED_BYTES",
+                        DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES,
+                    ),
+                    max_member_bytes=setting_int(
+                        "PLM_MAX_ZIP_MEMBER_BYTES",
+                        DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES,
+                    ),
+                )
                 names = archive.namelist()
                 metadata["container"] = "3mf"
                 metadata["members"] = [
@@ -717,9 +749,33 @@ def create_or_reuse_revision(part, path, data, created_by):
 
 
 def iter_fcstd_zip_members(uploaded_zip):
+    validate_uploaded_file_size(
+        uploaded_zip,
+        setting_int(
+            "PLM_MAX_PROJECT_ZIP_BYTES",
+            DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
+        ),
+        "Die Projektdatei",
+    )
     data = read_uploaded_file(uploaded_zip)
     try:
         with ZipFile(BytesIO(data)) as archive:
+            validate_zip_archive_budget(
+                archive,
+                label="Die Projektdatei",
+                max_members=setting_int(
+                    "PLM_MAX_ZIP_MEMBERS",
+                    DEFAULT_PLM_MAX_ZIP_MEMBERS,
+                ),
+                max_uncompressed_bytes=setting_int(
+                    "PLM_MAX_ZIP_UNCOMPRESSED_BYTES",
+                    DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES,
+                ),
+                max_member_bytes=setting_int(
+                    "PLM_MAX_ZIP_MEMBER_BYTES",
+                    DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES,
+                ),
+            )
             for info in archive.infolist():
                 if info.is_dir():
                     continue
