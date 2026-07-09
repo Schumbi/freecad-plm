@@ -16,9 +16,13 @@ Das Addon ist eine FreeCAD-Workbench mit einem Dock/Task-Panel fuer PLM-Arbeit:
 - Checkout-Manifest laden.
 - Alle benoetigten `.FCStd`-Dateien lokal mit den serverseitigen relativen Pfaden speichern.
 - Root-Datei in FreeCAD oeffnen.
-- Geaenderte Root-Datei als neue PLM-Revision einchecken.
+- Geaenderte Root-Datei und geaenderte referenzierte Dateien als neue PLM-Revisionen einchecken.
 - Checkout abbrechen.
 - Anmerkungen zu Teil, Revision und optional FreeCAD-Objekt speichern und anzeigen.
+- Revisionsnotizen bearbeiten.
+- Projekte mit Code, Name, Status, Datum und Beschreibung spiegeln.
+- Neue PLM-Teile oder Baugruppen als Metadatensatz anlegen.
+- Lokale FreeCAD-Ordner als Projektstand oder neues Projekt importieren.
 
 Nicht Ziel fuer die erste Addon-Version:
 
@@ -27,6 +31,7 @@ Nicht Ziel fuer die erste Addon-Version:
 - 3D-Marker/Annotationen im Viewport.
 - Automatische Konfliktloesung bei parallelen Bearbeitungen.
 - Eigenes Server-Backend.
+- Vollstaendige VarSet-Parameterbearbeitung.
 
 ## Empfohlene Addon-Struktur
 
@@ -773,8 +778,9 @@ Regeln:
 - Absolute Pfade und `..` in Manifest-Pfaden muessen lokal abgelehnt werden.
 - Nach jedem Download SHA-256 pruefen.
 - Root-Datei ist `manifest.files[]` mit `is_root == true`.
-- Nur die Root-Datei wird in der ersten Version eingecheckt.
-- Abhaengige Dateien werden als Referenzdateien lokal abgelegt und nicht automatisch eingecheckt.
+- Beim Check-in vergleicht das Addon alle Manifest-Dateien und uebertraegt nur technisch geaenderte `.FCStd`-Dateien.
+- Abhaengige Dateien koennen eigene neue Revisionen erzeugen, wenn sie modellrelevant geaendert wurden.
+- Reine FreeCAD-Speicherartefakte werden lokal vorgefiltert und serverseitig erneut ueber die technische Signatur geprueft.
 
 ## FreeCAD-Workflow
 
@@ -805,10 +811,14 @@ Regeln:
 
 1. Nutzer speichert das FreeCAD-Dokument lokal.
 2. Addon erkennt aktuellen Checkout aus `manifest.json`.
-3. Addon sendet Root-`.FCStd` an `POST /api/checkouts/<checkout_id>/checkin/`.
-4. Bei Erfolg aktualisiert das Addon lokalen Status auf `completed`.
-5. Addon zeigt neue Revision an.
-6. Bei `409` zeigt Addon die Servermeldung an und laesst Checkout aktiv.
+3. Addon speichert alle geoeffneten Checkout-Dokumente.
+4. Addon vergleicht alle Manifest-Dateien gegen die lokale Checkout-Metadatenbasis.
+5. Wenn keine technischen Aenderungen erkannt werden, fragt das Addon, ob der Checkout abgebrochen werden soll.
+6. Addon sendet geaenderte Dateien an `POST /api/checkouts/<checkout_id>/checkin/`.
+7. Bei Erfolg aktualisiert das Addon lokalen Status auf `completed`.
+8. Addon zeigt die neue Root-Revision und weitere erzeugte Revisionen an.
+9. Wenn der Server nur technische Aenderungen erkennt, bleibt der Checkout aktiv und das Addon bietet Abbrechen an.
+10. Bei `409` zeigt Addon die Servermeldung an und laesst Checkout aktiv.
 
 ### Abbrechen
 
@@ -902,10 +912,12 @@ Wichtig:
 `fcstd.py`:
 
 - Hilfsfunktionen fuer aktuelles Dokument:
-  - `active_document_path()`
-  - `save_active_document()`
-  - `selected_object_name()`
-  - `selected_subelement_name()`
+- `active_document_path()`
+- `save_active_document()`
+- `save_checkout_documents()`
+- `close_readonly_documents_for_project()`
+- `selected_object_name()`
+- `selected_subelement_name()`
 
 ## Tests Fuer Das Addon
 

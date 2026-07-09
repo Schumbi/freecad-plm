@@ -22,12 +22,21 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             gunicorn freecad_plm.wsgi:application --bind 0.0.0.0:8000"
+             if [ \"${GUNICORN_ACCESS_LOG:-1}\" = \"1\" ]; then
+               gunicorn freecad_plm.wsgi:application --bind 0.0.0.0:8000 --access-logfile - --error-logfile - --log-level \"${GUNICORN_LOG_LEVEL:-info}\";
+             else
+               gunicorn freecad_plm.wsgi:application --bind 0.0.0.0:8000 --access-logfile /dev/null --error-logfile - --log-level \"${GUNICORN_LOG_LEVEL:-info}\";
+             fi"
     environment:
       DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS muss in .env gesetzt sein}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY muss in .env gesetzt sein}
+      PLM_LOG_LEVEL: ${PLM_LOG_LEVEL:-INFO}
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-${PLM_LOG_LEVEL:-INFO}}
+      DJANGO_DB_LOG_LEVEL: ${DJANGO_DB_LOG_LEVEL:-WARNING}
+      GUNICORN_LOG_LEVEL: ${GUNICORN_LOG_LEVEL:-info}
+      GUNICORN_ACCESS_LOG: ${GUNICORN_ACCESS_LOG:-1}
       POSTGRES_DB: ${POSTGRES_DB:-freecad_plm}
       POSTGRES_USER: ${POSTGRES_USER:-freecad_plm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss in .env gesetzt sein}
@@ -59,6 +68,9 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS muss in .env gesetzt sein}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY muss in .env gesetzt sein}
+      PLM_LOG_LEVEL: ${PLM_LOG_LEVEL:-INFO}
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-${PLM_LOG_LEVEL:-INFO}}
+      DJANGO_DB_LOG_LEVEL: ${DJANGO_DB_LOG_LEVEL:-WARNING}
       POSTGRES_DB: ${POSTGRES_DB:-freecad_plm}
       POSTGRES_USER: ${POSTGRES_USER:-freecad_plm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss in .env gesetzt sein}

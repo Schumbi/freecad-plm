@@ -46,6 +46,11 @@ DJANGO_SECURE_SSL_REDIRECT=0
 DJANGO_SECURE_HSTS_SECONDS=0
 DJANGO_SESSION_COOKIE_SECURE=1
 DJANGO_CSRF_COOKIE_SECURE=1
+PLM_LOG_LEVEL=INFO
+DJANGO_LOG_LEVEL=INFO
+DJANGO_DB_LOG_LEVEL=WARNING
+GUNICORN_LOG_LEVEL=info
+GUNICORN_ACCESS_LOG=1
 POSTGRES_PASSWORD=replace-with-a-strong-database-password
 PLM_IMAGE=git.home.schumbi.de/ralf/freecad-plm:latest
 PLM_USER=plm
@@ -120,6 +125,52 @@ Nach Aenderungen an `.env` den Web-Container neu erstellen:
 ```bash
 docker compose -f docker-compose.image.yml up -d --force-recreate web worker
 ```
+
+### Debugging Und Logs
+
+Web- und Worker-Logs landen auf stdout/stderr und sind direkt ueber Docker
+Compose abrufbar:
+
+```bash
+cd /opt/freecad-plm
+docker compose -f docker-compose.image.yml logs -f --tail=200 web
+docker compose -f docker-compose.image.yml logs -f --tail=200 worker
+docker compose -f docker-compose.image.yml logs -f --tail=300 web worker
+```
+
+Fuer die lokale Testing-Instanz entsprechend:
+
+```bash
+cd ~/freecad-plm-testing
+docker compose -f docker-compose.image.yml logs -f --tail=300 web worker
+```
+
+Die Ausfuehrlichkeit laesst sich in `.env` steuern:
+
+```env
+PLM_LOG_LEVEL=DEBUG
+DJANGO_LOG_LEVEL=DEBUG
+DJANGO_DB_LOG_LEVEL=WARNING
+GUNICORN_LOG_LEVEL=debug
+GUNICORN_ACCESS_LOG=1
+```
+
+- `PLM_LOG_LEVEL`: App-Logger fuer `plm.*` und Root-Logger.
+- `DJANGO_LOG_LEVEL`: Django-Logger inklusive Request-/Exception-Logging.
+- `DJANGO_DB_LOG_LEVEL`: SQL-Logging ueber `django.db.backends`; `DEBUG` ist
+  sehr laut und nur fuer gezielte Datenbankdiagnose gedacht.
+- `GUNICORN_LOG_LEVEL`: Gunicorn-Loglevel.
+- `GUNICORN_ACCESS_LOG`: `1` schreibt HTTP-Access-Logs nach stdout, `0`
+  deaktiviert sie.
+
+Nach Aenderungen an diesen Werten:
+
+```bash
+docker compose -f docker-compose.image.yml up -d --force-recreate web worker
+```
+
+`DJANGO_DEBUG=1` kann in einer lokalen Testumgebung zusaetzlich helfen, sollte
+aber nicht fuer oeffentlich erreichbare Instanzen gesetzt werden.
 
 ### Image Manuell Bauen
 

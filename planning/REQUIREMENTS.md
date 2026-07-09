@@ -55,11 +55,15 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - PNG-Ansichten koennen als abgeleitete Artefakte zu einer Revision erzeugt und als Galerie angezeigt werden.
 - Zwei Revisionen desselben Teils koennen anhand gleichnamiger PNG-Ansichten nebeneinander verglichen werden.
 - Beim Upload einer Revision kann eine Aenderungsnotiz erfasst werden.
+- Das FreeCAD-Addon kann lokale Ordner mit einer oder mehreren `.FCStd`-Dateien als Projektstand importieren.
+- Das FreeCAD-Addon kann optional ein neues Projekt mit Code, Name, Status, Datum und Beschreibung anlegen und direkt mit dem Import befuellen.
+- Nach einem Addon-Import kann ein importiertes Teil oder eine importierte Baugruppe direkt ausgecheckt werden.
+- Wenn der direkte Checkout nach dem Import erfolgreich war, kann das Addon den urspruenglichen lokalen Importordner nach `~/FreeCAD-PLM/imported/...` verschieben.
+- Das FreeCAD-Addon kann neue PLM-Teile oder Baugruppen ohne initiale CAD-Datei als Metadatensatz anlegen; die CAD-Quelle entsteht danach ueber Checkout/Check-in oder Ordnerimport.
 
 ## Nicht Ziel Fuer V1
 
 - Kein Umbau des alten nanoPLM.
-- Kein automatischer Import bestehender Ordner.
 - Kein verpflichtender FreeCADCmd- oder FreeCAD-GUI-Betrieb.
 - Keine automatische STEP/STL/PDF/DXF-Erzeugung.
 - Keine vollstaendige Stuecklistenverwaltung.

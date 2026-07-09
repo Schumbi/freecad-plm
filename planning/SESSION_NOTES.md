@@ -548,3 +548,40 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Das Addon baut aus einem lokalen Ordner ein ZIP mit relativen `.FCStd`-Pfaden,
   kann neue Projekte inklusive Stammdaten anlegen und aktualisiert danach die
   Projekt-/Teilelisten.
+- Nach erfolgreichem Import kann das Addon ein importiertes Teil oder eine
+  Baugruppe als Root auswaehlen, direkt ueber den normalen Checkout-Workflow
+  oeffnen und den urspruenglichen Importordner anschliessend optional nach
+  `~/FreeCAD-PLM/imported/...` verschieben.
+
+## 2026-07-09
+
+### Dokumentationsabgleich Server Und Addon
+
+- `planning/README.md` wurde erneut als Einstiegspunkt gelesen und die dort
+  genannte Reihenfolge fuer die Planning-Dateien verwendet.
+- Die Server-Planning-Dateien wurden gegen den aktuellen Stand von Server und
+  Addon abgeglichen.
+- Aktualisiert wurden Anforderungen, Roadmap, TODOs und Addon-Plan fuer den
+  inzwischen vorhandenen Addon-Grundworkflow:
+  - Verbinden, Lesen und aktive Checkouts wiederfinden.
+  - Read-only Oeffnen und Checkout ueber dieselbe Manifest-Logik.
+  - Multi-Datei-Check-in mit serverseitiger FCStd-Signatur.
+  - No-op-Check-in ohne Aenderungsnotiz mit Cancel-Angebot im Addon.
+  - Revisionsnotizen und Anmerkungs-CRUD.
+  - Projektmetadaten, Teilanlage und lokaler Projektimport inklusive optionalem
+    Checkout und Archivierung des Importordners.
+
+### Server-Logging Und Debugging
+
+- Django-Logging wurde in `freecad_plm/settings.py` konfigurierbar gemacht.
+- Neue `.env`-Schalter:
+  - `PLM_LOG_LEVEL` fuer App-/Root-Logger.
+  - `DJANGO_LOG_LEVEL` fuer Django und Request-/Exception-Logging.
+  - `DJANGO_DB_LOG_LEVEL` fuer optionales SQL-Logging.
+  - `GUNICORN_LOG_LEVEL` fuer Gunicorn.
+  - `GUNICORN_ACCESS_LOG` fuer HTTP-Access-Logs nach stdout.
+- `docker-compose.yml` und `docker-compose.image.yml` leiten Gunicorn Access-
+  und Error-Logs auf stdout/stderr, damit `docker compose logs web` den
+  relevanten Request- und Exception-Kontext zeigt.
+- Root-`README.md` dokumentiert die Debug-Kommandos fuer Serverbetrieb und die
+  lokale Testing-Instanz unter `~/freecad-plm-testing`.

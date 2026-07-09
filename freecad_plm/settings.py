@@ -200,6 +200,52 @@ PROCESS_EXPORT_JOBS_INLINE = os.environ.get(
     '1',
 ).lower() in {'1', 'true', 'yes', 'on'}
 
+PLM_LOG_LEVEL = os.environ.get('PLM_LOG_LEVEL', 'INFO').upper()
+DJANGO_LOG_LEVEL = os.environ.get('DJANGO_LOG_LEVEL', PLM_LOG_LEVEL).upper()
+DJANGO_DB_LOG_LEVEL = os.environ.get('DJANGO_DB_LOG_LEVEL', 'WARNING').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'console': {
+            'format': '%(asctime)s %(levelname)s [%(name)s] %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'console',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': PLM_LOG_LEVEL,
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': DJANGO_LOG_LEVEL,
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': DJANGO_LOG_LEVEL,
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': DJANGO_DB_LOG_LEVEL,
+            'propagate': False,
+        },
+        'plm': {
+            'handlers': ['console'],
+            'level': PLM_LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

@@ -25,6 +25,7 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 - Download geschuetzt hinter Login.
 - Audit-Trail fuer Upload, Release, Download und Admin-Aktionen.
 - Suche nach Projekten, Teilen, Revisionen und Dateinamen.
+- FreeCAD-Addon-Grundworkflow fuer Verbinden, Lesen, Checkout, Check-in, Cancel, Notizen, Anmerkungen, Teilanlage und Projektimport.
 - FreeCADCmd-Analyse fuer Revisionen.
 - Abgeleitete Artefakte fuer STEP, STL, 3MF und PNG-Ansichten.
 - Visueller Vergleich von Revisionen ueber PNG-Ansichten.
@@ -44,7 +45,6 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 
 ## Spaeter
 
-- Ordnerimport bestehender FreeCAD-Projekte.
 - Stuecklisten und Baugruppenbeziehungen.
 - Nummernkreise.
 - Mehrstufige Freigabeprozesse.
