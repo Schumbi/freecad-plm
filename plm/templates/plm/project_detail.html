@@ -1,25 +1,44 @@
 {% extends "plm/base.html" %}
 
-{% block content %}
-  <a class="back-link" href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a>
+{% block topbar_search %}
+  <div class="global-search" aria-label="Teile filtern">
+    <svg class="global-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input
+      type="search"
+      placeholder="Teile nach Nummer, Name oder Typ filtern …"
+      data-filter-input="#part-list"
+      data-filter-count="#part-filter-count"
+      data-filter-empty="#part-filter-empty">
+  </div>
+{% endblock %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><span aria-current="page">{{ project.code }}</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
   <div class="object-layout">
     <div class="object-main">
       <div class="page-header">
         <div class="page-header-main">
           <span class="page-kicker">Projekt</span>
-          <h1>{{ project.code }} - {{ project.name }}</h1>
+          <h1>{{ project.code }} · {{ project.name }}</h1>
           <p class="object-subtitle">{{ project.description|default:"Kein Beschreibungstext hinterlegt." }}</p>
         </div>
         <div class="page-header-actions">
           <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
           {% if can_edit_project %}
             <a class="btn btn-outline-secondary" href="{% url 'plm:edit_project' project.id %}">Projekt bearbeiten</a>
-            <a class="btn btn-outline-danger" href="{% url 'plm:delete_project' project.id %}">Projekt loeschen</a>
+            <a class="btn btn-outline-danger" href="{% url 'plm:delete_project' project.id %}">Löschen</a>
           {% endif %}
           {% if can_create_part %}
-            <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Teil/Baugruppe anlegen</a>
-            <button type="button" class="btn btn-outline-secondary" data-dialog-target="#snapshot-import">Projektstand importieren</button>
+            <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe</a>
+            <button type="button" class="btn btn-outline-secondary" data-dialog-target="#snapshot-import">Stand importieren</button>
           {% endif %}
         </div>
       </div>
@@ -32,7 +51,7 @@
         </div>
         <div class="stat-card">
           <span class="stat-value">{{ snapshots|length }}</span>
-          <span class="stat-label">Projektstaende</span>
+          <span class="stat-label">Projektstände</span>
         </div>
         <div class="stat-card">
           <span class="stat-value">{{ project.project_date|date:"d.m." }}</span>
@@ -42,12 +61,10 @@
 
       <div class="section-header">
         <h2>Teile und Baugruppen</h2>
-        <div class="section-actions">
-          <input class="filter-input" type="search" placeholder="Teile filtern" disabled>
-        </div>
+        <span class="muted" id="part-filter-count" data-filter-default="{{ parts|length }} Einträge">{{ parts|length }} Einträge</span>
       </div>
       {% if parts %}
-        <div class="table-wrap">
+        <div class="table-wrap" id="part-list">
           <table>
             <thead>
               <tr>
@@ -55,24 +72,28 @@
                 <th>Name</th>
                 <th>Typ</th>
                 <th>Neueste Revision</th>
-                <th>Geaendert</th>
+                <th>Geändert</th>
               </tr>
             </thead>
             <tbody>
               {% for part in parts %}
                 {% with latest=part.revisions.first %}
-                  <tr>
-                    <td><a class="object-title" href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
+                  <tr
+                    class="clickable-row"
+                    data-filter-item
+                    data-filter-text="{{ part.number }} {{ part.name }} {{ part.description }} {{ part.get_category_display }}"
+                    onclick="window.location='{% url 'plm:part_detail' part.id %}';">
+                    <td><span class="object-title">{{ part.number }}</span></td>
                     <td>
-                      <a class="object-title" href="{% url 'plm:part_detail' part.id %}">{{ part.name }}</a>
-                      {% if part.description %}<div class="object-meta">{{ part.description|truncatechars:90 }}</div>{% endif %}
+                      <span class="object-title">{{ part.name }}</span>
+                      {% if part.description %}<div class="meta-line">{{ part.description|truncatechars:90 }}</div>{% endif %}
                     </td>
                     <td><span class="type-pill">{{ part.get_category_display }}</span></td>
                     <td>
                       {% if latest %}
-                        <span class="status-badge status-{{ latest.status }}">{{ latest.revision_code }} - {{ latest.get_status_display }}</span>
+                        <span class="status-badge status-{{ latest.status }}">{{ latest.revision_code }}</span>
                       {% else %}
-                        <span class="muted">-</span>
+                        <span class="muted">–</span>
                       {% endif %}
                     </td>
                     <td>{{ part.updated_at|date:"d.m.Y" }}</td>
@@ -82,8 +103,17 @@
             </tbody>
           </table>
         </div>
+        <div class="empty-state" id="part-filter-empty" hidden>
+          <strong>Keine Treffer</strong>
+          Für diesen Filter wurden keine Teile gefunden.
+        </div>
       {% else %}
-        <div class="empty-state">Noch keine Teile oder Baugruppen vorhanden.</div>
+        <div class="empty-state">
+          <strong>Noch keine Teile</strong>
+          {% if can_create_part %}
+            Lege das erste Teil oder die erste Baugruppe mit einer FCStd-Datei an.
+          {% endif %}
+        </div>
       {% endif %}
     </div>
 
@@ -93,7 +123,7 @@
   </div>
 
   <div class="section-header">
-    <h2>Projektstaende</h2>
+    <h2>Projektstände</h2>
     {% if can_create_part %}
       <div class="section-actions">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#snapshot-import">ZIP importieren</button>
@@ -101,25 +131,23 @@
     {% endif %}
   </div>
   {% if snapshots %}
-    <div class="object-list">
+    <div class="snapshot-list">
       {% for snapshot in snapshots %}
-        <article class="data-card">
-          <div class="page-header mb-0">
-            <div class="page-header-main">
-              <h3>{{ snapshot.name }}</h3>
-              <p class="meta-line">{{ snapshot.entries.count }} Dateien - erstellt von {{ snapshot.created_by }} - {{ snapshot.created_at|date:"d.m.Y H:i" }}</p>
-            </div>
-            <div class="page-header-actions">
-              <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#snapshot-{{ snapshot.id }}">Dateien</button>
-              <a class="btn btn-primary btn-sm" href="{% url 'plm:download_project_snapshot' snapshot.id %}">ZIP herunterladen</a>
-            </div>
+        <article class="snapshot-card">
+          <div class="snapshot-card-main">
+            <h3>{{ snapshot.name }}</h3>
+            <p class="snapshot-card-meta">{{ snapshot.entries.count }} Dateien · {{ snapshot.created_by }} · {{ snapshot.created_at|date:"d.m.Y H:i" }}</p>
+          </div>
+          <div class="section-actions">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#snapshot-{{ snapshot.id }}">Dateien</button>
+            <a class="btn btn-primary btn-sm" href="{% url 'plm:download_project_snapshot' snapshot.id %}">ZIP laden</a>
           </div>
         </article>
         <div class="plm-dialog" id="snapshot-{{ snapshot.id }}" role="dialog" aria-modal="true" aria-labelledby="snapshot-title-{{ snapshot.id }}" hidden>
           <div class="plm-dialog-panel wide">
             <div class="plm-dialog-header">
               <h5 class="plm-dialog-title" id="snapshot-title-{{ snapshot.id }}">Dateien in {{ snapshot.name }}</h5>
-              <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+              <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
             </div>
             <div class="plm-dialog-body">
               <div class="table-wrap">
@@ -148,7 +176,7 @@
       {% endfor %}
     </div>
   {% else %}
-    <div class="empty-state">Noch keine Projektstaende vorhanden.</div>
+    <div class="empty-state">Noch keine Projektstände vorhanden.</div>
   {% endif %}
 
   {% if can_create_part %}
@@ -156,10 +184,10 @@
       <div class="plm-dialog-panel">
         <div class="plm-dialog-header">
           <h5 class="plm-dialog-title" id="snapshot-import-title">Projektstand aus ZIP importieren</h5>
-          <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+          <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
         </div>
         <div class="plm-dialog-body">
-          <form method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
+          <form class="form-card" method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
             {% csrf_token %}
             <p>
               {{ snapshot_form.name.label_tag }}
@@ -172,7 +200,7 @@
                 <span class="errors">{{ snapshot_form.file.errors }}</span>
               {% endif %}
             </p>
-            <button type="submit">Projektstand importieren</button>
+            <button type="submit">Importieren</button>
           </form>
         </div>
       </div>

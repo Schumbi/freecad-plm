@@ -1,23 +1,42 @@
 {% extends "plm/base.html" %}
 
+{% block topbar_search %}
+  <div class="global-search" aria-label="Projekte filtern">
+    <svg class="global-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input
+      type="search"
+      placeholder="Projekte nach Code, Name oder Status filtern …"
+      data-filter-input="#project-list"
+      data-filter-count="#project-filter-count"
+      data-filter-empty="#project-filter-empty">
+  </div>
+{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><span aria-current="page">Projekte</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
   <div class="page-header">
     <div class="page-header-main">
       <span class="page-kicker">Arbeitsbereich</span>
       <h1>Projekte</h1>
-      <p class="lead-text">Aktive Entwicklungsprojekte mit Teilen, Baugruppen und Projektstaenden.</p>
+      <p class="lead-text">Übersicht über aktive Entwicklungsprojekte mit Teilen, Baugruppen und Projektständen.</p>
     </div>
     {% if can_create_project %}
       <div class="page-header-actions">
-        <a class="btn btn-primary" href="{% url 'plm:create_project' %}">Neues Projekt anlegen</a>
+        <a class="btn btn-primary" href="{% url 'plm:create_project' %}">Neues Projekt</a>
       </div>
     {% endif %}
   </div>
 
   <div class="toolbar">
     <div class="toolbar-group">
-      <input class="filter-input" type="search" placeholder="Projekte filtern" disabled>
-      <span class="muted">{{ projects|length }} aktive Projekte</span>
+      <span class="muted" id="project-filter-count" data-filter-default="{{ projects|length }} Projekte">{{ projects|length }} Projekte</span>
     </div>
     <div class="toolbar-group">
       <span class="status-badge status-running">Laufend</span>
@@ -27,32 +46,40 @@
   </div>
 
   {% if projects %}
-    <div class="object-list">
+    <div class="project-grid" id="project-list">
       {% for project in projects %}
-        <article class="object-row">
-          <div>
-            <a class="object-title" href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a>
-            <div class="object-meta">{{ project.project_date|date:"d.m.Y" }}</div>
-          </div>
-          <div>
-            <a class="object-title" href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a>
-            <div class="object-meta">{{ project.description|default:"Keine Beschreibung"|truncatechars:110 }}</div>
-          </div>
-          <div>
+        <article
+          class="project-card"
+          data-filter-item
+          data-filter-text="{{ project.code }} {{ project.name }} {{ project.description }} {{ project.get_status_display }}">
+          <div class="project-card-top">
+            <span class="project-code">{{ project.code }}</span>
             <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
           </div>
-          <div>
-            <span class="stat-value">{{ project.parts.count }}</span>
-            <span class="stat-label">Teile</span>
-          </div>
-          <div>
-            <span class="stat-value">{{ project.snapshots.count }}</span>
-            <span class="stat-label">Staende</span>
+          <h2 class="project-card-title">
+            <a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a>
+          </h2>
+          <p class="project-card-desc">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p>
+          <div class="project-card-footer">
+            <span>{{ project.parts.count }} Teile</span>
+            <span>{{ project.snapshots.count }} Stände</span>
+            <span>{{ project.project_date|date:"d.m.Y" }}</span>
           </div>
         </article>
       {% endfor %}
     </div>
+    <div class="empty-state" id="project-filter-empty" hidden>
+      <strong>Keine Treffer</strong>
+      Für diesen Filter wurden keine Projekte gefunden.
+    </div>
   {% else %}
-    <div class="empty-state">Noch keine Projekte vorhanden.</div>
+    <div class="empty-state">
+      <strong>Noch keine Projekte</strong>
+      {% if can_create_project %}
+        Lege das erste Projekt an, um Teile und Revisionen zu verwalten.
+      {% else %}
+        Es sind noch keine Projekte vorhanden.
+      {% endif %}
+    </div>
   {% endif %}
 {% endblock %}

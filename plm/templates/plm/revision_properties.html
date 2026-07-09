@@ -1,8 +1,29 @@
 {% extends "plm/base.html" %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' revision.part.project.id %}">{{ revision.part.project.code }}</a></li>
+      <li><a href="{% url 'plm:part_detail' revision.part.id %}">{{ revision.part.number }}</a></li>
+      <li><span aria-current="page">{{ revision.revision_code }}</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
-  <a class="back-link" href="{% url 'plm:part_detail' revision.part.id %}">Zurueck zu {{ revision.part.number }}</a>
-  <div class="panel">
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">{{ revision.part.number }}</span>
+      <h1>Revision {{ revision.revision_code }}</h1>
+      <p class="lead-text">{{ revision.part.name }}</p>
+    </div>
+    <div class="page-header-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'plm:part_detail' revision.part.id %}">Zurück zum Teil</a>
+    </div>
+  </div>
+
+  <div class="panel properties-page">
     {% include "plm/includes/revision_properties.html" %}
   </div>
 {% endblock %}

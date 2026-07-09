@@ -1,28 +1,30 @@
 {% extends "plm/base.html" %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' revision.part.project.id %}">{{ revision.part.project.code }}</a></li>
+      <li><a href="{% url 'plm:part_detail' revision.part.id %}">{{ revision.part.number }}</a></li>
+      <li><span aria-current="page">Export planen</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
-  <a class="back-link" href="{% url 'plm:part_detail' revision.part.id %}">Zurueck zu {{ revision.part.number }}</a>
   <div class="page-header">
     <div class="page-header-main">
-      <span class="page-kicker">{{ revision.part.number }} - {{ revision.revision_code }}</span>
+      <span class="page-kicker">{{ revision.part.number }} · {{ revision.revision_code }}</span>
       <h1>Export planen</h1>
-      <p class="lead-text">Exportformat und ausgelesene FreeCAD-Objekte fuer den naechsten Worker-Lauf auswaehlen.</p>
+      <p class="lead-text">Exportformat und ausgelesene FreeCAD-Objekte für den nächsten Worker-Lauf auswählen.</p>
     </div>
   </div>
 
-  <div class="data-card">
-    <form method="post">
+  <div class="data-card form-shell wide">
+    <form class="form-card" method="post">
       {% csrf_token %}
-      {% for field in form %}
-        <p>
-          {{ field.label_tag }}
-          {{ field }}
-          {% if field.errors %}
-            <span class="errors">{{ field.errors }}</span>
-          {% endif %}
-        </p>
-      {% endfor %}
-      <div class="toolbar-group">
+      {% include "plm/includes/form_fields.html" with form=form %}
+      <div class="form-actions">
         <button type="submit">Exportjob anlegen</button>
         <a class="btn btn-outline-secondary" href="{% url 'plm:part_detail' revision.part.id %}">Abbrechen</a>
       </div>

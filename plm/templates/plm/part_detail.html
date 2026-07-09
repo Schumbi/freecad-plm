@@ -1,14 +1,34 @@
 {% extends "plm/base.html" %}
 
-{% block content %}
-  <a class="back-link" href="{% url 'plm:project_detail' part.project.id %}">Zurueck zu {{ part.project.code }}</a>
+{% block topbar_search %}
+  <div class="global-search" aria-label="Revisionen filtern">
+    <svg class="global-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input
+      type="search"
+      placeholder="Revisionen nach Code, Dateiname oder Status filtern …"
+      data-filter-input="#revision-list"
+      data-filter-count="#revision-filter-count"
+      data-filter-empty="#revision-filter-empty">
+  </div>
+{% endblock %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' part.project.id %}">{{ part.project.code }}</a></li>
+      <li><span aria-current="page">{{ part.number }}</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
   <div class="object-layout">
     <div class="object-main">
       <div class="page-header">
         <div class="page-header-main">
-          <span class="page-kicker">{{ part.project.code }} - {{ part.get_category_display }}</span>
-          <h1>{{ part.number }} - {{ part.name }}</h1>
+          <span class="page-kicker">{{ part.project.code }} · {{ part.get_category_display }}</span>
+          <h1>{{ part.number }} · {{ part.name }}</h1>
           <p class="object-subtitle">{{ part.description|default:"Keine Beschreibung hinterlegt." }}</p>
         </div>
         <div class="page-header-actions">
@@ -25,8 +45,7 @@
 
       <div class="toolbar">
         <div class="toolbar-group">
-          <input class="filter-input" type="search" placeholder="Revisionen filtern" disabled>
-          <span class="muted">{{ revisions|length }} Revisionen</span>
+          <span class="muted" id="revision-filter-count" data-filter-default="{{ revisions|length }} Revisionen">{{ revisions|length }} Revisionen</span>
         </div>
       </div>
 
@@ -34,9 +53,12 @@
         <h2>Revisionen</h2>
       </div>
       {% if revisions %}
-        <div class="object-list">
+        <div class="object-list" id="revision-list">
           {% for revision in revisions %}
-            <article class="revision-card">
+            <article
+              class="revision-card"
+              data-filter-item
+              data-filter-text="{{ revision.revision_code }} {{ revision.status }} {{ revision.original_filename }} {{ revision.notes }}">
               <div class="revision-main">
                 <div class="revision-title-row">
                   <span class="revision-code">{{ revision.revision_code }}</span>
@@ -63,28 +85,31 @@
               </div>
 
               <div class="revision-actions">
-                <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a>
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary btn-sm"
-                  data-model-viewer-source="{% url 'plm:revision_viewer_source' revision.id %}"
-                  data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
-                  data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
-                  data-model-viewer-format="stl"
-                  data-model-viewer-title="{{ revision.revision_code }} - {{ revision.original_filename }}"
-                  data-model-viewer-download="{% url 'plm:download_revision' revision.id %}">
-                  3D anzeigen
-                </button>
-                {% if can_release and revision.status == "draft" %}
-                  <form method="post" action="{% url 'plm:release_revision' revision.id %}">
-                    {% csrf_token %}
-                    <button type="submit">Freigeben</button>
-                  </form>
-                {% endif %}
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">Anmerkungen</button>
-                <details class="action-menu">
-                  <summary>Mehr</summary>
-                  <div class="action-menu-content">
+                <div class="revision-actions-primary">
+                  <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    data-model-viewer-source="{% url 'plm:revision_viewer_source' revision.id %}"
+                    data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
+                    data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
+                    data-model-viewer-format="stl"
+                    data-model-viewer-title="{{ revision.revision_code }} - {{ revision.original_filename }}"
+                    data-model-viewer-download="{% url 'plm:download_revision' revision.id %}">
+                    3D anzeigen
+                  </button>
+                  {% if can_release and revision.status == "draft" %}
+                    <form method="post" action="{% url 'plm:release_revision' revision.id %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm">Freigeben</button>
+                    </form>
+                  {% endif %}
+                </div>
+                <div class="revision-actions-secondary">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">Anmerkungen</button>
+                  <details class="action-menu">
+                    <summary>Mehr</summary>
+                    <div class="action-menu-content">
                     <button type="button" data-dialog-target="#revision-properties-{{ revision.id }}">Eigenschaften</button>
                     <button type="button" data-dialog-target="#freecad-{{ revision.id }}">Metadaten</button>
                     <button type="button" data-dialog-target="#manufacturing-{{ revision.id }}">Fertigung</button>
@@ -100,6 +125,7 @@
                     {% endif %}
                   </div>
                 </details>
+                </div>
               </div>
             </article>
 
@@ -107,7 +133,7 @@
               <div class="plm-dialog-panel">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="notes-title-{{ revision.id }}">Anmerkungen {{ revision.revision_code }}</h5>
-                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
                   {% if revision.notes %}
@@ -116,7 +142,7 @@
                     <div class="empty-state">Noch keine Anmerkungen.</div>
                   {% endif %}
                   {% if can_edit_notes %}
-                    <form method="post" action="{% url 'plm:update_revision_notes' revision.id %}">
+                    <form class="form-card" method="post" action="{% url 'plm:update_revision_notes' revision.id %}">
                       {% csrf_token %}
                       <label for="notes-text-{{ revision.id }}">Anmerkungen</label>
                       <textarea id="notes-text-{{ revision.id }}" name="notes" rows="6">{{ revision.notes }}</textarea>
@@ -131,7 +157,7 @@
               <div class="plm-dialog-panel">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="revision-properties-title-{{ revision.id }}">Eigenschaften {{ revision.revision_code }}</h5>
-                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
                   {% include "plm/includes/revision_properties.html" with revision=revision %}
@@ -143,7 +169,7 @@
               <div class="plm-dialog-panel wide">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="freecad-title-{{ revision.id }}">FreeCAD-Metadaten {{ revision.revision_code }}</h5>
-                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
                   {% with document=revision.extracted_metadata.freecad_document %}
@@ -170,11 +196,11 @@
                           <dd>{{ document.properties.CreationDate }}</dd>
                         {% endif %}
                         {% if document.properties.LastModifiedBy %}
-                          <dt>Geaendert von</dt>
+                          <dt>Geändert von</dt>
                           <dd>{{ document.properties.LastModifiedBy }}</dd>
                         {% endif %}
                         {% if document.properties.LastModifiedDate %}
-                          <dt>Geaendert am</dt>
+                          <dt>Geändert am</dt>
                           <dd>{{ document.properties.LastModifiedDate }}</dd>
                         {% endif %}
                         {% if document.properties.License %}
@@ -233,11 +259,12 @@
               <div class="plm-dialog-panel wide">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="manufacturing-title-{{ revision.id }}">Fertigung {{ revision.revision_code }}</h5>
-                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
                   <h5>Verwendbare Fertigungsdateien</h5>
                   {% if revision.manufacturing_files.all %}
+                    <div class="table-wrap">
                     <table>
                       <thead>
                         <tr>
@@ -302,13 +329,14 @@
                         {% endfor %}
                       </tbody>
                     </table>
+                    </div>
                   {% else %}
                     <div class="empty-state">Noch keine verwendbare Fertigungsdatei fuer diese Revision.</div>
                   {% endif %}
 
                   {% if can_upload %}
                     <h5>Fertigungsdatei hochladen</h5>
-                    <form method="post" action="{% url 'plm:upload_manufacturing_file' revision.id %}" enctype="multipart/form-data">
+                    <form class="form-card" method="post" action="{% url 'plm:upload_manufacturing_file' revision.id %}" enctype="multipart/form-data">
                       {% csrf_token %}
                       {{ manufacturing_form.as_p }}
                       <button type="submit">Fertigungsdatei hochladen</button>
@@ -322,7 +350,7 @@
               <div class="plm-dialog-panel wide">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="jobs-title-{{ revision.id }}">Jobs und Artefakte {{ revision.revision_code }}</h5>
-                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+                  <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
                   <h5>Jobs</h5>
@@ -384,6 +412,10 @@
             </div>
           {% endfor %}
         </div>
+        <div class="empty-state" id="revision-filter-empty" hidden>
+          <strong>Keine Treffer</strong>
+          Für diesen Filter wurden keine Revisionen gefunden.
+        </div>
       {% else %}
         <div class="empty-state">Noch keine Revisionen vorhanden.</div>
       {% endif %}
@@ -404,10 +436,10 @@
       <div class="plm-dialog-panel">
         <div class="plm-dialog-header">
           <h5 class="plm-dialog-title" id="revision-upload-title">Neue Revision hochladen</h5>
-          <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schliessen">&times;</button>
+          <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
         </div>
         <div class="plm-dialog-body">
-          <form method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
+          <form class="form-card" method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
             {% csrf_token %}
             <p>
               {{ form.file.label_tag }}

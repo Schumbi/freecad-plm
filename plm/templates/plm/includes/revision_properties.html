@@ -1,9 +1,9 @@
 <h2>Revision {{ revision.revision_code }}</h2>
 <dl class="properties-list">
   <dt>Teil</dt>
-  <dd>{{ revision.part.number }} - {{ revision.part.name }}</dd>
+  <dd>{{ revision.part.number }} · {{ revision.part.name }}</dd>
   <dt>Status</dt>
-  <dd>{{ revision.get_status_display }}</dd>
+  <dd><span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span></dd>
   <dt>Datei</dt>
   <dd>{{ revision.original_filename }}</dd>
   <dt>Erstellt von</dt>

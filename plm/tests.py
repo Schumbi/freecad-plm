@@ -47,12 +47,14 @@ from .permissions import (
 )
 from .services import (
     PLMRevisionConflict,
+    checkout_snapshot_name,
     create_checkout,
     create_manufacturing_file_from_upload,
     create_revision_from_upload,
     import_project_snapshot,
     next_revision_code,
     release_revision,
+    snapshot_base_name,
 )
 from .freecadcmd import (
     PNG_VIEW_NAMES,
@@ -277,6 +279,28 @@ def noisy_fcstd_bytes(data, plm_revision="R0099"):
         write_zip_member(target, "GuiDocument.xml", "<GuiDocument><Camera /></GuiDocument>")
         write_zip_member(target, "Body.brp", b"rewritten-cache")
     return buffer.getvalue()
+
+
+class SnapshotNamingTests(SimpleTestCase):
+    def test_snapshot_base_name_strips_checkout_suffixes(self):
+        self.assertEqual(
+            snapshot_base_name(
+                "Sommerrodelbahn-Chipbox - Checkout 1 - Checkout 2 - Checkout 3"
+            ),
+            "Sommerrodelbahn-Chipbox",
+        )
+
+    def test_snapshot_base_name_strips_v_suffixes(self):
+        self.assertEqual(
+            snapshot_base_name("Arbeitsstand - V4 - V7"),
+            "Arbeitsstand",
+        )
+
+    def test_checkout_snapshot_name_uses_v_prefix(self):
+        self.assertEqual(
+            checkout_snapshot_name("Sommerrodelbahn-Chipbox - Checkout 8", 9),
+            "Sommerrodelbahn-Chipbox - V9",
+        )
 
 
 class FcstdValidationTests(SimpleTestCase):
@@ -1070,7 +1094,7 @@ class RevisionUploadViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 409)
-        self.assertContains(response, "PLMRevision pruefen", status_code=409)
+        self.assertContains(response, "PLMRevision prüfen", status_code=409)
         self.assertContains(response, "R0001", status_code=409)
         self.assertContains(response, "keine PLMRevision", status_code=409)
         self.assertFalse(Revision.objects.exists())
@@ -1545,7 +1569,7 @@ class RolePermissionTests(TestCase):
 
         response = self.client.get(reverse("plm:project_list"))
 
-        self.assertContains(response, "Neues Projekt anlegen")
+        self.assertContains(response, "Neues Projekt")
 
     def test_admin_can_create_project(self):
         self.client.force_login(self.admin)
@@ -1599,7 +1623,7 @@ class RolePermissionTests(TestCase):
         self.assertContains(response, "Laufend")
         self.assertLess(
             content.index("Teile und Baugruppen"),
-            content.index("Projektstaende"),
+            content.index("Projektstände"),
         )
 
         response = self.client.get(reverse("plm:project_properties", args=[self.project.id]))
@@ -3539,6 +3563,7 @@ class AddonApiWorkflowTests(TestCase):
             Revision.objects.filter(part=box_revision.part, revision_code="R0002").exists()
         )
         new_snapshot = ProjectSnapshot.objects.exclude(id=snapshot.id).get()
+        self.assertEqual(new_snapshot.name, f"Arbeitsstand - V{checkout_id}")
         self.assertEqual(
             new_snapshot.entries.get(path="Druck.FCStd").revision,
             root_created,

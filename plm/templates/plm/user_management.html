@@ -1,11 +1,20 @@
 {% extends "plm/base.html" %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><span aria-current="page">Verwaltung</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
   <div class="page-header">
     <div class="page-header-main">
       <span class="page-kicker">Verwaltung</span>
       <h1>Benutzer und API-Tokens</h1>
-      <p class="lead-text">Nutzer, Rollen, Passwoerter und Addon-Tokens fuer das PLM verwalten.</p>
+      <p class="lead-text">Nutzer, Rollen, Passwörter und Addon-Tokens für das PLM verwalten.</p>
     </div>
     <div class="page-header-actions">
       <a class="btn btn-primary" href="{% url 'plm:create_user' %}">Benutzer anlegen</a>
@@ -15,43 +24,45 @@
   <section class="panel">
     <div class="section-header">
       <h2>Benutzer</h2>
-      <span class="muted">{{ user_rows|length }} Eintraege</span>
+      <span class="muted">{{ user_rows|length }} Einträge</span>
     </div>
     {% if user_rows %}
-      <table>
-        <thead>
-          <tr>
-            <th>Benutzer</th>
-            <th>Name</th>
-            <th>E-Mail</th>
-            <th>Rolle</th>
-            <th>Status</th>
-            <th>Letzter Login</th>
-            <th>Tokens</th>
-            <th>Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in user_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>{{ row.user.username }}</td>
-              <td>{{ row.user.get_full_name|default:"-" }}</td>
-              <td>{{ row.user.email|default:"-" }}</td>
-              <td>{{ row.role }}</td>
-              <td>{% if row.user.is_active %}Aktiv{% else %}Inaktiv{% endif %}</td>
-              <td>{{ row.user.last_login|date:"d.m.Y H:i"|default:"-" }}</td>
-              <td>{{ row.token_count }}</td>
-              <td>
-                <div class="inline-actions">
-                  <a href="{% url 'plm:edit_user' row.user.id %}">Bearbeiten</a>
-                  <a href="{% url 'plm:set_user_password' row.user.id %}">Passwort</a>
-                  <a href="{% url 'plm:create_user_token' row.user.id %}">Token</a>
-                </div>
-              </td>
+              <th>Benutzer</th>
+              <th>Name</th>
+              <th>E-Mail</th>
+              <th>Rolle</th>
+              <th>Status</th>
+              <th>Letzter Login</th>
+              <th>Tokens</th>
+              <th>Aktionen</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in user_rows %}
+              <tr>
+                <td>{{ row.user.username }}</td>
+                <td>{{ row.user.get_full_name|default:"–" }}</td>
+                <td>{{ row.user.email|default:"–" }}</td>
+                <td>{{ row.role }}</td>
+                <td>{% if row.user.is_active %}<span class="status-badge status-released">Aktiv</span>{% else %}<span class="status-badge status-obsolete">Inaktiv</span>{% endif %}</td>
+                <td>{{ row.user.last_login|date:"d.m.Y H:i"|default:"–" }}</td>
+                <td>{{ row.token_count }}</td>
+                <td>
+                  <div class="inline-actions">
+                    <a href="{% url 'plm:edit_user' row.user.id %}">Bearbeiten</a>
+                    <a href="{% url 'plm:set_user_password' row.user.id %}">Passwort</a>
+                    <a href="{% url 'plm:create_user_token' row.user.id %}">Token</a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% else %}
       <div class="empty-state">Noch keine Benutzer vorhanden.</div>
     {% endif %}
@@ -60,47 +71,49 @@
   <section class="panel mt-4">
     <div class="section-header">
       <h2>API-Tokens</h2>
-      <span class="muted">{{ token_rows|length }} Eintraege</span>
+      <span class="muted">{{ token_rows|length }} Einträge</span>
     </div>
     {% if token_rows %}
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Benutzer</th>
-            <th>Prefix</th>
-            <th>Rechte</th>
-            <th>Status</th>
-            <th>Letzte Nutzung</th>
-            <th>Ablauf</th>
-            <th>Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in token_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>{{ row.token.name }}</td>
-              <td>{{ row.token.user.username }}</td>
-              <td><code>{{ row.token.token_prefix }}</code></td>
-              <td>{{ row.preset }}</td>
-              <td>{{ row.status }}</td>
-              <td>{{ row.token.last_used_at|date:"d.m.Y H:i"|default:"-" }}</td>
-              <td>{{ row.token.expires_at|date:"d.m.Y H:i"|default:"-" }}</td>
-              <td>
-                <div class="inline-actions">
-                  <a href="{% url 'plm:edit_api_token' row.token.id %}">Bearbeiten</a>
-                  {% if not row.token.is_revoked %}
-                    <form class="inline-form" method="post" action="{% url 'plm:revoke_api_token' row.token.id %}">
-                      {% csrf_token %}
-                      <button class="btn-danger" type="submit">Widerrufen</button>
-                    </form>
-                  {% endif %}
-                </div>
-              </td>
+              <th>Name</th>
+              <th>Benutzer</th>
+              <th>Prefix</th>
+              <th>Rechte</th>
+              <th>Status</th>
+              <th>Letzte Nutzung</th>
+              <th>Ablauf</th>
+              <th>Aktionen</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in token_rows %}
+              <tr>
+                <td>{{ row.token.name }}</td>
+                <td>{{ row.token.user.username }}</td>
+                <td><code>{{ row.token.token_prefix }}</code></td>
+                <td>{{ row.preset }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.token.last_used_at|date:"d.m.Y H:i"|default:"–" }}</td>
+                <td>{{ row.token.expires_at|date:"d.m.Y H:i"|default:"–" }}</td>
+                <td>
+                  <div class="inline-actions">
+                    <a href="{% url 'plm:edit_api_token' row.token.id %}">Bearbeiten</a>
+                    {% if not row.token.is_revoked %}
+                      <form class="inline-form" method="post" action="{% url 'plm:revoke_api_token' row.token.id %}">
+                        {% csrf_token %}
+                        <button class="btn-danger btn-sm" type="submit">Widerrufen</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% else %}
       <div class="empty-state">Noch keine API-Tokens vorhanden.</div>
     {% endif %}

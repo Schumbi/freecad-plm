@@ -1,33 +1,33 @@
 {% extends "plm/base.html" %}
 
-{% block content %}
-  {% if project %}
-    <a class="back-link" href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a>
-  {% else %}
-    <a class="back-link" href="{% url 'plm:project_list' %}">Zurueck zu Projekten</a>
-  {% endif %}
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      {% if project %}
+        <li><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></li>
+        <li><span aria-current="page">Bearbeiten</span></li>
+      {% else %}
+        <li><span aria-current="page">Neues Projekt</span></li>
+      {% endif %}
+    </ol>
+  </nav>
+{% endblock %}
 
+{% block content %}
   <div class="page-header">
     <div class="page-header-main">
       <span class="page-kicker">Projekt</span>
       <h1>{{ title|default:"Neues Projekt" }}</h1>
-      <p class="lead-text">Status, Datum und Beschreibung fuer den Projektkontext pflegen.</p>
+      <p class="lead-text">Code, Status, Datum und Beschreibung für den Projektkontext festlegen.</p>
     </div>
   </div>
 
-  <div class="data-card">
-    <form method="post">
+  <div class="data-card form-shell">
+    <form class="form-card" method="post">
       {% csrf_token %}
-      {% for field in form %}
-        <p>
-          {{ field.label_tag }}
-          {{ field }}
-          {% if field.errors %}
-            <span class="errors">{{ field.errors }}</span>
-          {% endif %}
-        </p>
-      {% endfor %}
-      <div class="toolbar-group">
+      {% include "plm/includes/form_fields.html" with form=form %}
+      <div class="form-actions">
         <button type="submit">{{ submit_label|default:"Anlegen" }}</button>
         {% if project %}
           <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Abbrechen</a>

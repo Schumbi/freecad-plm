@@ -49,6 +49,7 @@ REVISION_CODE_MAX_NUMBER = 10**REVISION_CODE_NUMBER_WIDTH - 1
 REVISION_CODE_PATTERN = re.compile(
     rf"^{re.escape(REVISION_CODE_PREFIX)}(\d{{{REVISION_CODE_NUMBER_WIDTH}}})$"
 )
+SNAPSHOT_VERSION_SUFFIX_RE = re.compile(r" - (?:Checkout \d+|V\d+)$")
 MANUFACTURING_FILE_EXTENSIONS = {
     ".3mf": ManufacturingFile.FileType.SLICER_3MF,
     ".gcode": ManufacturingFile.FileType.GCODE,
@@ -1246,6 +1247,19 @@ def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
     return checkout
 
 
+def snapshot_base_name(name):
+    result = (name or "").strip()
+    while True:
+        stripped = SNAPSHOT_VERSION_SUFFIX_RE.sub("", result)
+        if stripped == result:
+            return result
+        result = stripped
+
+
+def checkout_snapshot_name(source_snapshot_name, checkout_id):
+    return f"{snapshot_base_name(source_snapshot_name)} - V{checkout_id}"
+
+
 def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
     if not checkout.snapshot_id or not revisions:
         return None
@@ -1253,7 +1267,7 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
     replacements = {item["path"]: item["revision"] for item in revisions}
     snapshot = ProjectSnapshot.objects.create(
         project=checkout.part.project,
-        name=f"{checkout.snapshot.name} - Checkout {checkout.id}",
+        name=checkout_snapshot_name(checkout.snapshot.name, checkout.id),
         created_by=actor,
     )
     for entry in checkout.snapshot.entries.select_related("revision").order_by("path"):

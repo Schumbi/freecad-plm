@@ -1,8 +1,27 @@
 {% extends "plm/base.html" %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></li>
+      <li><span aria-current="page">Eigenschaften</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
-  <a class="back-link" href="{% url 'plm:project_detail' project.id %}">Zurueck zu {{ project.code }}</a>
-  <div class="panel">
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">{{ project.code }}</span>
+      <h1>Projekteigenschaften</h1>
+    </div>
+    <div class="page-header-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Zurück zum Projekt</a>
+    </div>
+  </div>
+
+  <div class="panel properties-page">
     {% include "plm/includes/project_properties.html" %}
   </div>
 {% endblock %}

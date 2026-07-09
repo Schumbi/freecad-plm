@@ -1,42 +1,53 @@
 {% extends "plm/base.html" %}
 
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' part.project.id %}">{{ part.project.code }}</a></li>
+      <li><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></li>
+      <li><span aria-current="page">PLMRevision prüfen</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
-  <a class="back-link" href="{% url 'plm:part_detail' part.id %}">Zurueck zu {{ part.number }}</a>
   <div class="page-header">
     <div class="page-header-main">
-      <span class="page-kicker">{{ part.number }} - {{ part.name }}</span>
-      <h1>PLMRevision pruefen</h1>
-      <p class="lead-text">Die hochgeladene Datei passt nicht zur naechsten PLM-Revision. Du kannst eine PLM-normalisierte Kopie speichern oder den Upload verwerfen.</p>
+      <span class="page-kicker">{{ part.number }} · {{ part.name }}</span>
+      <h1>PLMRevision prüfen</h1>
+      <p class="lead-text">Die hochgeladene Datei passt nicht zur nächsten PLM-Revision. Du kannst eine PLM-normalisierte Kopie speichern oder den Upload verwerfen.</p>
     </div>
   </div>
 
   <div class="object-layout">
     <div class="object-main">
-      <div class="data-card">
+      <div class="data-card conflict-card">
         <dl class="properties-list">
           <dt>Datei</dt>
           <dd>{{ pending.original_filename }}</dd>
           <dt>PLM erwartet</dt>
           <dd><span class="status-badge status-draft">{{ pending.expected }}</span></dd>
-          <dt>FCStd enthaelt</dt>
+          <dt>FCStd enthält</dt>
           <dd>{% if pending.actual %}{{ pending.actual }}{% else %}keine PLMRevision{% endif %}</dd>
           <dt>Original-SHA-256</dt>
-          <dd>{{ pending.original_sha256|slice:":12" }}</dd>
+          <dd><code>{{ pending.original_sha256 }}</code></dd>
         </dl>
       </div>
 
-      <form method="post" action="{% url 'plm:confirm_revision_upload' part.id %}">
+      <form class="form-card conflict-actions" method="post" action="{% url 'plm:confirm_revision_upload' part.id %}">
         {% csrf_token %}
-        <div class="toolbar-group">
+        <div class="form-actions" style="border-top:0;padding-top:0;margin-top:0;">
           <button type="submit" name="action" value="normalize">An PLM anpassen und hochladen</button>
           <button type="submit" name="action" value="discard" class="secondary">Upload verwerfen</button>
+          <a class="btn btn-outline-secondary" href="{% url 'plm:part_detail' part.id %}">Zurück</a>
         </div>
       </form>
     </div>
 
     <aside class="context-panel">
       <h2>Was passiert?</h2>
-      <p class="muted">Beim Anpassen wird nur die PLMRevision in der hochgeladenen Kopie korrigiert. Der Original-Hash bleibt im Audit nachvollziehbar.</p>
+      <p class="muted">Beim Anpassen wird nur die PLMRevision in der hochgeladenen Kopie korrigiert. Original-Hash, hochgeladener Wert und gespeicherter Hash bleiben im Audit nachvollziehbar.</p>
     </aside>
   </div>
 {% endblock %}
