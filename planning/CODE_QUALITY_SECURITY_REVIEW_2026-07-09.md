@@ -30,7 +30,7 @@ Zusaetzlich neu (Funktion/UX, nicht sicherheitskritisch): globale PLM-Suche, Obs
 | 4.5 | Kein Rate-Limiting / Login-Lockout | Mittel | Weder `django-axes` noch `django-ratelimit`; relevant v.a. hinter Reverse Proxy. Alternativ nginx `limit_req`. |
 | 3.1 | Audit-Events ohne Request-Kontext | Mittel | `AuditEvent` hat weiterhin keine `ip_address`/`user_agent`/`api_token_id`. `request.api_token` ist verfuegbar und leicht ergaenzbar. |
 | 4.7 | Media-Guard fehlt | Niedrig | `freecad_plm/urls.py` haengt `static(MEDIA_URL, ...)` unbedingt an. Bei versehentlichem `DJANGO_DEBUG=1` auf erreichbarer Instanz waeren CAD-Dateien unter `/media/` ohne Auth erreichbar. Empfehlung: nur unter `if settings.DEBUG` anhaengen. |
-| 2.1 | Uebergrosse Module | Mittel (teilweise) | `services.py` (1659 Zeilen) ist in das Paket `plm/services/` aufgeteilt (`manufacturing`, `revisions`, `snapshots`, `manifests`, `checkouts`, `search`, `common`). `views.py` (~1790 Zeilen) ist ebenso in `plm/views/` aufgeteilt (`common`, `jobs`, `users`, `projects`, `parts`, `revisions`, `manufacturing`) mit re-exportierender Fassade (`__init__.py`) – Aufrufer/`urls.py` unveraendert, tote Importe entfernt, `mock.patch`-Ziele in Tests auf Aufrufmodule umgestellt, 184 Tests gruen. **Offen:** `api.py` (~690 Zeilen) analog splitten. |
+| 2.1 | Uebergrosse Module | **Erledigt** | Alle drei Kernmodule sind in Pakete aufgeteilt, jeweils mit re-exportierender Fassade (`__init__.py`), sodass Aufrufer/`urls.py` unveraendert bleiben und tote Importe entfernt wurden: `plm/services/` (`manufacturing`, `revisions`, `snapshots`, `manifests`, `checkouts`, `search`, `common`); `plm/views/` (`common`, `jobs`, `users`, `projects`, `parts`, `revisions`, `manufacturing`, dabei `mock.patch`-Ziele in Tests auf Aufrufmodule umgestellt); `plm/api/` (`common`, `projects`, `parts`, `revisions`, `checkouts`, `annotations`). 184 Tests gruen. |
 | 2.2/2.3/2.5 | Boilerplate-/Pfad-/Serialisierungs-Duplizierung | Mittel | Unveraendert. |
 | 2.7 | Dev-Tooling/Linting | Mittel | Kein `ruff`/`black`/`mypy`, keine `requirements-dev.txt`. |
 
@@ -315,7 +315,7 @@ Jeder eingeloggte Nutzer sieht/lädt alle Projekte/Teile/Revisionen. Für ein kl
 | A2 | Worker-Container härten (cap_drop, limits, tmpfs) | Eindämmung bei FreeCAD-Exploit | klein |
 | A3 | Upload-/ZIP-Budgets in Settings + Validierung | DoS/Zip-Bomb-Schutz | klein |
 | A4 | Eigene Login-View statt Admin-Login | Entkopplung, Admin separat abschottbar | klein |
-| A5 | `services.py`/`views.py`/`api.py` in Packages splitten | Wartbarkeit | mittel |
+| A5 | `services.py`/`views.py`/`api.py` in Packages splitten | Wartbarkeit | mittel | **Erledigt** |
 | A6 | Mittelfristig DRF für die API | weniger Boilerplate, konsistente AuthZ | groß |
 | A7 | Test- + `check --deploy`-Job in Forgejo-CI | Regressionsschutz | klein |
 | A8 | `defusedxml`, `django-axes`/ratelimit | XML-/Brute-Force-Härtung | klein |
