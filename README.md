@@ -21,7 +21,7 @@ Django-Admin-Oberflaeche liegt weiterhin unter <http://127.0.0.1:8000/admin/>.
 
 Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker laufen aus demselben PLM-Image. Dieses Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd.
 
-Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut das Image bei jedem Push nach `main` oder `master` automatisch aus dem lokalen `Dockerfile` und veroeffentlicht:
+Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut das Image bei jedem Push nach `main` oder `master` automatisch aus dem lokalen `Dockerfile`, fuehrt die Django-Tests im gebauten Image aus und veroeffentlicht nur bei bestandenen Tests:
 
 ```text
 git.home.schumbi.de/ralf/freecad-plm:latest
@@ -201,11 +201,12 @@ cd /home/ralf/devel/freecad-plm
 git push
 ```
 
-Der Forgejo-Workflow `Build FreeCAD PLM Image` startet bei Push nach `main` oder
-`master` automatisch. Den Lauf findest du in Forgejo unter:
+Der Forgejo-Workflow `Test and Build FreeCAD PLM Image` startet bei Push nach `main` oder
+`master` automatisch. Er baut das Image, fuehrt darin die Tests aus und pusht nur
+bei gruenen Tests. Den Lauf findest du in Forgejo unter:
 
 ```text
-ralf/freecad-plm -> Actions -> Build FreeCAD PLM Image
+ralf/freecad-plm -> Actions -> Test and Build FreeCAD PLM Image
 ```
 
 Wenn ein Build ohne neuen Commit erneut laufen soll, kann der Workflow dort auch

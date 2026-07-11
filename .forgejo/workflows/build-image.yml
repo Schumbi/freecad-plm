@@ -1,10 +1,11 @@
-name: Build FreeCAD PLM Image
+name: Test and Build FreeCAD PLM Image
 
 on:
   push:
     branches:
       - main
       - master
+  pull_request:
   workflow_dispatch:
 
 env:
@@ -21,12 +22,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to Registry
-        run: |
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${{ env.REGISTRY }}" \
-            -u "${{ secrets.REGISTRY_USERNAME }}" \
-            --password-stdin
-
       - name: Build image
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
@@ -38,7 +33,23 @@ jobs:
             -t "${IMAGE}:${{ github.sha }}" \
             .
 
+      - name: Run tests
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          docker run --rm \
+            -e DJANGO_DEBUG=1 \
+            "${IMAGE}:${{ github.sha }}" \
+            python manage.py test --parallel auto --verbosity=1
+
+      - name: Login to Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login "${{ env.REGISTRY }}" \
+            -u "${{ secrets.REGISTRY_USERNAME }}" \
+            --password-stdin
+
       - name: Push image
+        if: github.event_name != 'pull_request'
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           docker push "${IMAGE}:latest"

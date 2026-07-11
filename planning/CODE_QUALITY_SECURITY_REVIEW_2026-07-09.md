@@ -1,5 +1,49 @@
 # Review: Softwarequalitaet, Wartbarkeit, Nachvollziehbarkeit und Sicherheit
 
+---
+
+## UPDATE 2026-07-11 — Nachkontrolle
+
+Seit dem urspruenglichen Review (2026-07-09) wurde deutlich nachgebessert. Verifiziert per Git-Historie und Code-Review.
+**Neuer Teststand:** `manage.py test plm` = **184 Tests, alle OK** (vorher 150). `manage.py check` = 0 Issues.
+
+### Erledigt seit dem Review
+
+| # | Finding | Status | Nachweis |
+|---|---------|--------|----------|
+| 0 | `.dockerignore` schliesst `.env` aus | **Erledigt** | `.dockerignore` enthaelt `.env`, `.env.*`, `!.env.example`, zusaetzlich `.git/` |
+| 4.1 | Upload-/ZIP-Budgets (DoS/Zip-Bomb) | **Erledigt** | `PLM_MAX_*` in `settings.py`; Enforcement in `fcstd.py`/`services.py`; Tests (`PLM_MAX_FCSTD_UPLOAD_BYTES`, `PLM_MAX_ZIP_MEMBERS`, `PLM_MAX_PROJECT_ZIP_BYTES`) |
+| 4.2 | Worker-Container haerten | **Erledigt** | `docker-compose.image.yml`: `cap_drop: [ALL]`, `no-new-privileges`, `read_only`, `tmpfs`, `mem_limit`, `cpus`, `pids_limit`, `init` |
+| 4.3 | Snapshot-Projektpruefung im Checkout-API | **Erledigt** | `revision_checkout_api` filtert jetzt `ProjectSnapshot` mit `project=revision.part.project` (Commit `4c5e03c`) |
+| 4.4 | XML-Haertung | **Erledigt** | `defusedxml` in `fcstd.py`, `fcstd_signature.py`, `services.py`; `requirements.txt` erweitert |
+| 4.6 | Login haengt am Django-Admin | **Erledigt** | Eigene `LoginView` unter `/login/` + `logout_view`; `LOGIN_URL='plm:login'`, `LOGIN_REDIRECT_URL='plm:project_list'`, `LOGOUT_REDIRECT_URL='plm:login'` |
+| 3.2 | Zu wenig Observability bei Jobs | **Teilweise** | Haengengebliebene Exportjobs werden automatisch als fehlgeschlagen markiert (`EXPORT_JOB_STALE_SECONDS`, Commit `cc4d044`); Live-Jobstatus in der Sidebar |
+| A7 | CI fuehrt Tests aus | **Erledigt** | `.forgejo/workflows/build-image.yml`: Schritt `Run tests` fuehrt `manage.py test --parallel` im gebauten Image aus; Push nur bei gruenen Tests. Testlauf beschleunigt (MD5-Hasher im Testmodus + `--parallel`): ~266s → ~5s |
+
+Zusaetzlich neu (Funktion/UX, nicht sicherheitskritisch): globale PLM-Suche, Obsolet-Markierung fuer Revisionen, automatische Analyse-/PNG-Jobs nach API-Check-in, Live-Vergleichsansicht, modernisiertes Web-UI. Der urspruenglich von mir gesetzte Klein-Fix (`.dockerignore`) ist eingecheckt.
+
+### Noch offen
+
+| # | Finding | Schwere | Bemerkung |
+|---|---------|---------|-----------|
+| A1 | Web-Image enthaelt weiterhin FreeCAD | Mittel | `Dockerfile` `ARG INSTALL_FREECAD=1` (Default). Worker macht die Verarbeitung (`PROCESS_EXPORT_JOBS_INLINE=0`), daher koennte das Web-Image mit `INSTALL_FREECAD=0` schlanker/sicherer gebaut werden. |
+| 4.5 | Kein Rate-Limiting / Login-Lockout | Mittel | Weder `django-axes` noch `django-ratelimit`; relevant v.a. hinter Reverse Proxy. Alternativ nginx `limit_req`. |
+| 3.1 | Audit-Events ohne Request-Kontext | Mittel | `AuditEvent` hat weiterhin keine `ip_address`/`user_agent`/`api_token_id`. `request.api_token` ist verfuegbar und leicht ergaenzbar. |
+| 4.7 | Media-Guard fehlt | Niedrig | `freecad_plm/urls.py` haengt `static(MEDIA_URL, ...)` unbedingt an. Bei versehentlichem `DJANGO_DEBUG=1` auf erreichbarer Instanz waeren CAD-Dateien unter `/media/` ohne Auth erreichbar. Empfehlung: nur unter `if settings.DEBUG` anhaengen. |
+| 2.1 | Uebergrosse Module | Mittel | **Eher verschlechtert:** `views.py` 1600→**1790**, `services.py` 1475→**1659** Zeilen. Package-Split weiterhin empfohlen. |
+| 2.2/2.3/2.5 | Boilerplate-/Pfad-/Serialisierungs-Duplizierung | Mittel | Unveraendert. |
+| 2.7 | Dev-Tooling/Linting | Mittel | Kein `ruff`/`black`/`mypy`, keine `requirements-dev.txt`. |
+
+### Aktualisierte Kurzbewertung
+
+Die als **Hoch** eingestuften Sicherheitsrisiken (Upload-Budgets, Worker-Haertung) sind erledigt, ebenso die konkrete Code-Inkonsistenz bei der Snapshot-Zuordnung und die XML-Haertung. Der Sicherheitsstand ist damit fuer einen LAN-/Reverse-Proxy-Betrieb **deutlich verbessert** und aus meiner Sicht produktionstauglich, sofern der Betrieb (HTTPS, `.env`-Secrets, `/admin/`-Abschottung) sauber ist.
+
+Die verbleibenden Punkte sind ueberwiegend **Wartbarkeit und Betriebsreife**: die zwei Kernmodule wachsen weiter (Refactoring lohnt zunehmend); die CI fuehrt die 184 Tests inzwischen aktiv aus (A7 erledigt). Noch offen sind die guenstigen Haertungen (Web-Image ohne FreeCAD, Media-Guard, Rate-Limiting, Audit-Request-Kontext). Priorisierte Sofortmaßnahmen jetzt: **Media-Guard (4.7)** und **Web-Image ohne FreeCAD (A1)** — beide klein und risikoarm.
+
+Der Rest dieses Dokuments ist der urspruengliche Review-Stand vom 2026-07-09 und bleibt zur Nachvollziehbarkeit erhalten.
+
+---
+
 **Datum:** 2026-07-09
 **Scope:** `freecad-plm` (Server), `freecad-plm-addon` (Client), Betriebskontext `freecad-plm-testing`.
 **Betriebsmodell:** interner LAN-Dienst bzw. hinter Reverse Proxy.
