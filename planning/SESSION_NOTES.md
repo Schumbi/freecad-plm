@@ -636,3 +636,43 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Freigegebene Revisionen koennen in der Web-UI als obsolet markiert werden (`obsolete_revision`, Audit `revision_obsoleted`).
 - Commit `e8c14c5`; `manage.py test plm` laeuft mit 184 Tests erfolgreich.
 - Abnahme-Checkliste in `planning/V1_ACCEPTANCE.md` angelegt; Browser-Abnahme steht noch aus.
+
+## 2026-07-12
+
+### CI Fuehrt Tests Aus (Forgejo)
+
+- `.forgejo/workflows/build-image.yml` fuehrt vor dem Push die 184 Tests im
+  gebauten Image aus (`manage.py test --parallel auto`); Push nur bei gruenen
+  Tests, zusaetzlicher `pull_request`-Trigger.
+- Testlauf deutlich beschleunigt: `MD5PasswordHasher` im Testmodus
+  (`TESTING`-Flag in `freecad_plm/settings.py`) plus `--parallel` senken die
+  Laufzeit von ~266s auf wenige Sekunden.
+- Zwei umgebungsabhaengige Tests explizit gemacht
+  (`override_settings(PROCESS_EXPORT_JOBS_INLINE=True)`), CI-Testlauf setzt
+  `PROCESS_EXPORT_JOBS_INLINE=1` als Sicherheitsnetz.
+
+### Getrennte Web- Und Worker-Images
+
+- Ein `Dockerfile` mit Build-Arg `INSTALL_FREECAD`: Web-Image ohne FreeCAD
+  (`0`), Worker-Image mit FreeCAD (`1`). `build-essential` entfernt (Wheels
+  genuegen).
+- Web-Image von ~2 GB auf ~279 MB geschrumpft; 184 Tests laufen im schlanken
+  Web-Image gruen.
+- CI baut/pusht beide Images (`freecad-plm-web`, `freecad-plm-worker`, jeweils
+  `latest` und Commit-SHA). Compose nutzt `PLM_WEB_IMAGE`/`PLM_WORKER_IMAGE`;
+  `.env.example` und Root-`README.md` entsprechend aktualisiert.
+
+### Modul-Split Der Kernmodule (Finding 2.1 / A5)
+
+- Die drei gewachsenen "God Modules" sind in Pakete mit re-exportierender
+  Fassade (`__init__.py`) aufgeteilt; `urls.py` und alle Aufrufer bleiben
+  unveraendert, tote Importe wurden dabei entfernt.
+- `plm/services/`: `common`, `manufacturing`, `revisions`, `snapshots`,
+  `manifests`, `checkouts`, `search`.
+- `plm/views/`: `common`, `jobs`, `users`, `projects`, `parts`, `revisions`,
+  `manufacturing`. `mock.patch`-Ziele in Tests auf die jeweiligen Aufrufmodule
+  umgestellt (`plm.views.revisions.*`, `plm.views.parts.*`).
+- `plm/api/`: `common`, `projects`, `parts`, `revisions`, `checkouts`,
+  `annotations`.
+- Commits `28ee770` (services), `c26007d` (views), `ad2cfa8` (api); nach jedem
+  Split `manage.py check` sauber und 184 Tests gruen.

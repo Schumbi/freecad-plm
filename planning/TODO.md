@@ -66,7 +66,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - FreeCAD-`XLink`-Referenzen werden extrahiert.
 - Einzeldatei-Download aus Snapshot kann rekursiv referenzierte `FCStd`-Dateien als ZIP mitnehmen.
 - `test-model/` wird ignoriert.
-- Revisionscode-Format `R0001`, `R0002`, ... zentral in `plm/services.py` definiert und gegen nicht-kanonische Alt-/Testcodes abgesichert.
+- Revisionscode-Format `R0001`, `R0002`, ... zentral im Paket `plm/services/` definiert und gegen nicht-kanonische Alt-/Testcodes abgesichert.
 - FreeCAD-Property `PLMRevision` wird extrahiert und beim Revisionsupload gegen den PLM-Revisionscode geprueft.
 - Revisionsupload kann fehlende oder abweichende `PLMRevision` als normalisierte FCStd-Kopie speichern.
 - Projekte koennen von `admin` und Superuser ausserhalb der Django-Admin-Oberflaeche angelegt werden.
@@ -102,3 +102,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Recovery haengengebliebener Exportjobs (`EXPORT_JOB_STALE_SECONDS`).
 - Globale PLM-Suche unter `/search/` fuer Projekte, Teile, Revisionen und Dateipfade in Projektstaenden.
 - Freigegebene Revisionen koennen in der Web-UI als obsolet markiert werden (`revision_obsoleted` im Audit-Trail).
+- Forgejo-CI fuehrt vor dem Push die 184 Tests im gebauten Image aus; Testlauf durch MD5-Hasher im Testmodus und `--parallel` von ~266s auf wenige Sekunden beschleunigt.
+- Web- und Worker-Image getrennt (Build-Arg `INSTALL_FREECAD`); Web-Image von ~2 GB auf ~279 MB verkleinert, CI baut/pusht beide Images.
+- Kernmodule `services.py`, `views.py` und `api.py` in Pakete `plm/services/`, `plm/views/`, `plm/api/` mit re-exportierender Fassade aufgeteilt (Finding 2.1 / A5).

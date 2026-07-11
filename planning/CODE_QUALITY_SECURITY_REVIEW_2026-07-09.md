@@ -94,24 +94,19 @@ Priorisierte Sofortmaßnahmen: Upload-Budgets, Worker-Haertung, Snapshot-Projekt
 
 ## 2. Softwarequalitaet und Wartbarkeit
 
-### 2.1 Übergroße Module (Hoch)
+### 2.1 Übergroße Module (Hoch) — Erledigt
 
-- `plm/views.py` ~1600 Zeilen, `plm/services.py` ~1475 Zeilen, `plm/api.py` ~690 Zeilen.
-- `services.py` mischt Revisionen, Checkout/Check-in, Snapshots, Manufacturing-3MF-Parsing, Projektloeschung und Manifest-Erzeugung in einer Datei.
+Ausgangslage war: `plm/views.py` ~1790 Zeilen, `plm/services.py` ~1659 Zeilen, `plm/api.py` ~690 Zeilen; `services.py` mischte Revisionen, Checkout/Check-in, Snapshots, Manufacturing-3MF-Parsing, Projektloeschung und Manifest-Erzeugung in einer Datei.
 
-**Vorschlag:** In ein Package aufteilen, z.B.:
+**Umgesetzt:** Alle drei Module sind in Pakete mit re-exportierender Fassade (`__init__.py`) aufgeteilt. Reine Umschichtung ohne Verhaltensaenderung, tote Importe entfernt, `urls.py`/Aufrufer unveraendert, 184 Tests gruen:
 
 ```text
-plm/services/__init__.py
-plm/services/revisions.py
-plm/services/checkout.py
-plm/services/snapshots.py
-plm/services/manufacturing.py
-plm/views/  (analog: projects.py, parts.py, revisions.py, admin.py, viewer.py)
-plm/api/    (projects.py, parts.py, checkout.py, annotations.py)
+plm/services/  → common, manufacturing, revisions, snapshots, manifests, checkouts, search
+plm/views/     → common, jobs, users, projects, parts, revisions, manufacturing
+plm/api/       → common, projects, parts, revisions, checkouts, annotations
 ```
 
-Reine Umschichtung ohne Verhaltensaenderung, testgestuetzt schrittweise moeglich.
+Bei `views/` wurden zusaetzlich die `mock.patch`-Ziele in den Tests auf die jeweiligen Aufrufmodule umgestellt (`plm.views.revisions.*`, `plm.views.parts.*`).
 
 ### 2.2 Wiederholte Permission-Boilerplate (Mittel)
 
@@ -137,7 +132,7 @@ if not user_can_mutate_models(request.user):
 
 Dieselbe „kein `..`, nicht absolut"-Logik existiert dreimal, leicht unterschiedlich:
 
-- `plm/services.py` → `safe_snapshot_path()`
+- `plm/services/common.py` → `safe_snapshot_path()`
 - `plm/freecadcmd.py` → `safe_relative_fcstd_path()`
 - `freecad-plm-addon/workspace.py` → `safe_join()` / `safe_zip_path()`
 
@@ -245,7 +240,7 @@ Unverändert offen aus dem Audit 2026-07-06.
 
 ### 4.3 Snapshot-Zuordnung ohne Projektprüfung — Konsistenz/IDOR (Mittel)
 
-In `revision_checkout_api` (`plm/api.py`, ~Zeile 475):
+In `revision_checkout_api` (`plm/api/checkouts.py`):
 
 ```python
 if data.get("snapshot_id"):

@@ -46,7 +46,7 @@ Nicht zuordenbare `.3mf`-Dateien werden nicht importiert und im Ergebnisbericht 
 
 ### Service
 
-Neuer Service in `plm/services.py`:
+Neuer Service im Paket `plm/services/` (z. B. `plm/services/snapshots.py`):
 
 ```python
 import_bulk_project_zip(uploaded_zip, created_by)

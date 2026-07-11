@@ -57,3 +57,13 @@ Diese Datei haelt die grobe Entwicklungsreihenfolge fest. Die Roadmap ist bewuss
 ## Implementierungsstand 2026-07-10
 
 Die V1-Roadmap ist im Code umgesetzt. Docker Compose, Worker, Addon-API und modernisiertes Web-UI sind vorhanden. Vor einem formalen V1.0-Release fehlt die dokumentierte Browser-Abnahme (`planning/V1_ACCEPTANCE.md`) und die Betriebsabnahme auf dem Zielserver.
+
+## Implementierungsstand 2026-07-12
+
+Betriebsreife und Wartbarkeit ausgebaut:
+
+- Forgejo-CI fuehrt die 184 Tests vor jedem Push aus (beschleunigt via MD5-Hasher im Testmodus + `--parallel`).
+- Getrennte Web-/Worker-Images (Build-Arg `INSTALL_FREECAD`); Web-Image von ~2 GB auf ~279 MB verkleinert.
+- Kernmodule `services.py`/`views.py`/`api.py` in Pakete (`plm/services/`, `plm/views/`, `plm/api/`) mit re-exportierender Fassade aufgeteilt (Finding 2.1 / A5 erledigt).
+
+Weiterhin offen fuer V1.0: dokumentierte Browser-Abnahme und Betriebsabnahme auf dem Zielserver.

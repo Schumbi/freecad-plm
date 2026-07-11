@@ -112,7 +112,7 @@ Ausfuehrlicher Kontext: `planning/README.md` bis `planning/BULK_IMPORT_PLAN.md`.
 Relevante Dateien:
 
 - `plm/permissions.py` – `can_upload_revision`, `can_release_revision`, `is_plm_admin`
-- `plm/views.py` – `admin_required_response`, `validate_user_admin_safety`
+- `plm/views/` (Paket) – z. B. `plm/views/common.py` (`admin_required_response`, `validate_user_admin_safety`), `plm/views/users.py`
 - `plm/forms.py` – User-/Token-Formulare
 
 ### REST-API (`/api/`)
@@ -129,7 +129,7 @@ Relevante Dateien:
 
 - `plm/auth.py` – Token-Erzeugung, `api_auth_required`-Decorator
 - `plm/models.py` – `ApiToken`
-- `plm/api.py` – alle API-Endpunkte
+- `plm/api/` (Paket) – alle API-Endpunkte (`projects`, `parts`, `revisions`, `checkouts`, `annotations`, `common`)
 - `plm/management/commands/create_api_token.py`
 
 ### Bekannte Autorisierungs-Einschraenkung
@@ -178,7 +178,7 @@ Tests bestaetigen: Ein API-Token mit Scope `write` reicht nicht aus, wenn der ge
    - Gefaehrliche `Document.xml`-Inhalte sind per Regressionstest abgedeckt.
 
 6. **Pfad-Traversal in Snapshots/Manifesten**
-   - Server: `safe_snapshot_path()` in `plm/services.py` blockiert `..` und absolute Pfade
+   - Server: `safe_snapshot_path()` in `plm/services/common.py` blockiert `..` und absolute Pfade
    - Addon: `safe_join()` / `safe_zip_path()` in `freecad_plm_addon/workspace.py`
    - Tests fuer `../Box.FCStd` vorhanden – Audit soll End-to-End und Check-in-Pfade pruefen
 
@@ -208,7 +208,7 @@ Tests bestaetigen: Ein API-Token mit Scope `write` reicht nicht aus, wenn der ge
 
 | Kontrolle | Status | Referenz |
 |-----------|--------|----------|
-| API token-only (keine Session-Auth auf `/api/`) | Umgesetzt 2026-07-06 | `plm/auth.py`, `plm/api.py` |
+| API token-only (keine Session-Auth auf `/api/`) | Umgesetzt 2026-07-06 | `plm/auth.py`, `plm/api/` |
 | Gehashte API-Tokens, Widerruf, Ablauf | Umgesetzt | `plm/models.ApiToken` |
 | Scope-basierte API-Autorisierung | Umgesetzt | `@api_auth_required` |
 | Rollenmodell Web-UI | Umgesetzt | `plm/permissions.py` |
@@ -322,7 +322,7 @@ storage/projects/.../revisions/<code>/artifacts/
 storage/projects/.../revisions/<code>/manufacturing/<id>/
 ```
 
-Dateinamen im Storage nutzen SHA-256-basierte Namen (nicht reine Benutzereingabe) – in `plm/services.py` pruefen.
+Dateinamen im Storage nutzen SHA-256-basierte Namen (nicht reine Benutzereingabe) – im Paket `plm/services/` pruefen.
 
 ---
 
@@ -349,8 +349,8 @@ Tests (ohne FreeCAD): `python3 -m unittest discover -s tests`
 ### Docker Compose (`docker-compose.image.yml`)
 
 - Services: `db`, `web`, `worker`
-- `web` exponiert Port 8000
-- `worker` hat **keinen** Port, aber gleiches Image und Storage-Zugriff
+- `web` exponiert Port 8000, nutzt das schlanke Web-Image (`PLM_WEB_IMAGE`, ohne FreeCAD, ~279 MB)
+- `worker` hat **keinen** Port, nutzt das FreeCAD-Worker-Image (`PLM_WORKER_IMAGE`, mit FreeCAD) und teilt den Storage-Zugriff
 - `worker` laeuft mit `cap_drop: ["ALL"]`, `security_opt: ["no-new-privileges:true"]`, `read_only: true`, `tmpfs` fuer `/tmp` und `/var/tmp` sowie CPU-/RAM-/PID-Limits
 
 ### Umgebungsvariablen (`.env.example`)
@@ -359,7 +359,7 @@ Sicherheitsrelevant: `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`
 
 ### CI/CD
 
-- `.forgejo/workflows/build-image.yml` – Image-Build bei Push
+- `.forgejo/workflows/build-image.yml` – baut Web- und Worker-Image, fuehrt die 184 Tests im gebauten Web-Image aus und pusht nur bei gruenen Tests (Push nur ausserhalb von `pull_request`)
 
 ### Testing-Instanz
 
@@ -411,9 +411,9 @@ Vorhandene Security-Tests (Auswahl in `plm/tests.py`):
 ### Phase 1: Statische Code-Review
 
 1. `freecad_plm/settings.py` – alle Security-Settings, Defaults, Debug-Pfade
-2. `plm/auth.py`, `plm/api.py` – AuthN/AuthZ jedes Endpunkts
-3. `plm/views.py`, `plm/permissions.py` – Web-AuthZ-Luecken
-4. `plm/fcstd.py`, `plm/services.py` – Upload/ZIP/Storage
+2. `plm/auth.py`, `plm/api/` (Paket) – AuthN/AuthZ jedes Endpunkts
+3. `plm/views/` (Paket), `plm/permissions.py` – Web-AuthZ-Luecken
+4. `plm/fcstd.py`, `plm/services/` (Paket) – Upload/ZIP/Storage
 5. `plm/freecadcmd.py` – Subprocess, Pfade, Timeouts, Output-Groessen
 6. `plm/fcstd_signature.py` – Bypass-Moeglichkeiten der Signatur
 7. `Dockerfile`, `docker-compose*.yml`, `.dockerignore`
@@ -483,4 +483,4 @@ FreeCAD-PLM ist ein **reifes V1-LAN-PLM** mit durchdachtem Revisionsmodell, Audi
 4. **Globalem Zugriffsmodell** ohne Projekt-Isolation
 5. **Client-seitiger Token-Speicherung** im FreeCAD-Addon
 
-Das folgende LLM sollte mit `plm/api.py`, `plm/services.py`, `plm/fcstd.py`, `plm/freecadcmd.py` und `freecad_plm/settings.py` beginnen und die Findings aus `SECURITY_ARCHITECTURE_AUDIT_2026-07-06.md` auf aktuellen Code-Stand validieren.
+Das folgende LLM sollte mit den Paketen `plm/api/` und `plm/services/` sowie `plm/fcstd.py`, `plm/freecadcmd.py` und `freecad_plm/settings.py` beginnen und die Findings aus `SECURITY_ARCHITECTURE_AUDIT_2026-07-06.md` auf aktuellen Code-Stand validieren.
