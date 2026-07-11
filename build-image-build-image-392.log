@@ -1,0 +1,280 @@
+2026-07-11T22:23:58.1414046Z Runner dfabf5cb-d8b7-48f4-898a-75bbbb9029db (version:v12.12.0) received task 392 of job build-image, triggered by event: push
+2026-07-11T22:23:58.1615033Z workflow prepared
+2026-07-11T22:23:58.2527813Z 🚀  Start image=git.home.schumbi.de/***/debian-docker-builder:latest
+2026-07-11T22:23:58.3102209Z   🐳  docker create image=git.home.schumbi.de/***/debian-docker-builder:latest platform=linux/amd64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="bridge"
+2026-07-11T22:23:58.4170195Z   🐳  docker run image=git.home.schumbi.de/***/debian-docker-builder:latest platform=linux/amd64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="bridge"
+2026-07-11T22:23:59.0112043Z   ☁️  git fetch 'https://data.forgejo.org/actions/checkout' # ref=v4
+2026-07-11T22:23:59.6112703Z ⭐ Run Main Checkout repository
+2026-07-11T22:23:59.6185538Z   🐳  docker cp src=/var/lib/forgejo-runner/.cache/act/d9/802992a7ff326e6576d38e8afb0781294c449523088f7d8aaf9fd44681f0d2/ dst=/var/run/act/actions/d9/802992a7ff326e6576d38e8afb0781294c449523088f7d8aaf9fd44681f0d2/
+2026-07-11T22:23:59.7100843Z   🐳  docker exec cmd=[node /var/run/act/actions/d9/802992a7ff326e6576d38e8afb0781294c449523088f7d8aaf9fd44681f0d2/dist/index.js] user= workdir=
+2026-07-11T22:24:00.2832460Z   ❓ add-matcher /run/act/actions/d9/802992a7ff326e6576d38e8afb0781294c449523088f7d8aaf9fd44681f0d2/dist/problem-matcher.json
+2026-07-11T22:24:00.2832989Z ::add-matcher::/run/act/actions/d9/802992a7ff326e6576d38e8afb0781294c449523088f7d8aaf9fd44681f0d2/dist/problem-matcher.json
+2026-07-11T22:24:00.2833288Z Syncing repository: ***/freecad-plm
+2026-07-11T22:24:00.2833604Z ##[group]Getting Git version info
+2026-07-11T22:24:00.2833734Z Working directory is '/tmp/forgejo-runner/***/freecad-plm'
+2026-07-11T22:24:00.3015759Z [command]/usr/bin/git version
+2026-07-11T22:24:00.3256132Z git version 2.39.5
+2026-07-11T22:24:00.3318536Z ##[endgroup]
+2026-07-11T22:24:00.3355498Z Temporarily overriding HOME='/tmp/f388c96e-92bb-4984-8a54-a3a889c26291' before making global git config changes
+2026-07-11T22:24:00.3357370Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-11T22:24:00.3365750Z [command]/usr/bin/git config --global --add safe.directory /tmp/forgejo-runner/***/freecad-plm
+2026-07-11T22:24:00.3455656Z Deleting the contents of '/tmp/forgejo-runner/***/freecad-plm'
+2026-07-11T22:24:00.3462694Z ##[group]Initializing the repository
+2026-07-11T22:24:00.3485359Z [command]/usr/bin/git init /tmp/forgejo-runner/***/freecad-plm
+2026-07-11T22:24:00.3721572Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-07-11T22:24:00.3722381Z hint: is subject to change. To configure the initial branch name to use in all
+2026-07-11T22:24:00.3722564Z hint: of your new repositories, which will suppress this warning, call:
+2026-07-11T22:24:00.3722816Z hint: 
+2026-07-11T22:24:00.3722909Z hint: 	git config --global init.defaultBranch <name>
+2026-07-11T22:24:00.3723007Z hint: 
+2026-07-11T22:24:00.3723094Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-07-11T22:24:00.3723473Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-07-11T22:24:00.3723585Z hint: 
+2026-07-11T22:24:00.3723716Z hint: 	git branch -m <name>
+2026-07-11T22:24:00.3751825Z Initialized empty Git repository in /tmp/forgejo-runner/***/freecad-plm/.git/
+2026-07-11T22:24:00.3772790Z [command]/usr/bin/git remote add origin https://git.home.schumbi.de/***/freecad-plm
+2026-07-11T22:24:00.3849120Z ##[endgroup]
+2026-07-11T22:24:00.3849474Z ##[group]Disabling automatic garbage collection
+2026-07-11T22:24:00.3858150Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-11T22:24:00.3908782Z ##[endgroup]
+2026-07-11T22:24:00.3909140Z ##[group]Setting up auth
+2026-07-11T22:24:00.3926674Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-11T22:24:00.3981627Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-11T22:24:00.4618881Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/git\.home\.schumbi\.de\/\.extraheader
+2026-07-11T22:24:00.4665639Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/git\.home\.schumbi\.de\/\.extraheader' && git config --local --unset-all 'http.https://git.home.schumbi.de/.extraheader' || :"
+2026-07-11T22:24:00.5057016Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-11T22:24:00.5103604Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-11T22:24:00.5460182Z [command]/usr/bin/git config --local http.https://git.home.schumbi.de/.extraheader AUTHORIZATION: basic ***
+2026-07-11T22:24:00.5517075Z ##[endgroup]
+2026-07-11T22:24:00.5518001Z ##[group]Fetching the repository
+2026-07-11T22:24:00.5531945Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +27194cc81f7a70d150d513d3efaba4a168948dbf:refs/remotes/origin/main
+2026-07-11T22:24:01.0277723Z From https://git.home.schumbi.de/***/freecad-plm
+2026-07-11T22:24:01.0278912Z  * [new ref]         27194cc81f7a70d150d513d3efaba4a168948dbf -> origin/main
+2026-07-11T22:24:01.0313163Z ##[endgroup]
+2026-07-11T22:24:01.0313865Z ##[group]Determining the checkout info
+2026-07-11T22:24:01.0315732Z ##[endgroup]
+2026-07-11T22:24:01.0323736Z [command]/usr/bin/git sparse-checkout disable
+2026-07-11T22:24:01.0388058Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-11T22:24:01.0427654Z ##[group]Checking out the ref
+2026-07-11T22:24:01.0435025Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-07-11T22:24:01.0864696Z Switched to a new branch 'main'
+2026-07-11T22:24:01.0868531Z branch 'main' set up to track 'origin/main'.
+2026-07-11T22:24:01.0885995Z ##[endgroup]
+2026-07-11T22:24:01.0954458Z [command]/usr/bin/git log -1 --format=%H
+2026-07-11T22:24:01.0993193Z 27194cc81f7a70d150d513d3efaba4a168948dbf
+2026-07-11T22:24:01.1029466Z ::remove-matcher owner=checkout-git::
+2026-07-11T22:24:02.4640715Z #0 building with "default" instance using docker driver
+2026-07-11T22:24:02.4641295Z 
+2026-07-11T22:24:02.4641419Z #1 [internal] load build definition from Dockerfile
+2026-07-11T22:24:02.4641540Z #1 transferring dockerfile: 905B 0.0s done
+2026-07-11T22:24:02.4641661Z #1 DONE 0.1s
+2026-07-11T22:24:02.4641755Z 
+2026-07-11T22:24:02.4641873Z #2 [internal] load metadata for docker.io/library/python:3.12-slim
+2026-07-11T22:24:03.2582250Z #2 DONE 0.9s
+2026-07-11T22:24:03.4033555Z 
+2026-07-11T22:24:03.4034203Z #3 [internal] load .dockerignore
+2026-07-11T22:24:03.4034350Z #3 transferring context: 148B done
+2026-07-11T22:24:03.4034524Z #3 DONE 0.0s
+2026-07-11T22:24:03.4035737Z 
+2026-07-11T22:24:03.4035881Z #4 [1/8] FROM docker.io/library/python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf
+2026-07-11T22:24:03.4036022Z #4 DONE 0.0s
+2026-07-11T22:24:03.4036116Z 
+2026-07-11T22:24:03.4036240Z #5 [internal] load build context
+2026-07-11T22:24:03.6906251Z #5 transferring context: 2.52MB 0.1s done
+2026-07-11T22:24:03.6906587Z #5 DONE 0.2s
+2026-07-11T22:24:03.6906702Z 
+2026-07-11T22:24:03.6906858Z #6 [4/8] RUN groupadd --gid "1000" plm     && useradd --uid "1000" --gid "1000" --create-home --shell /usr/sbin/nologin plm
+2026-07-11T22:24:03.6907184Z #6 CACHED
+2026-07-11T22:24:03.6907300Z 
+2026-07-11T22:24:03.6907396Z #7 [5/8] COPY requirements.txt /app/
+2026-07-11T22:24:03.6907495Z #7 CACHED
+2026-07-11T22:24:03.6907599Z 
+2026-07-11T22:24:03.6907703Z #8 [2/8] WORKDIR /app
+2026-07-11T22:24:03.6908042Z #8 CACHED
+2026-07-11T22:24:03.6908139Z 
+2026-07-11T22:24:03.6908506Z #9 [3/8] RUN apt-get update     && apt-get install -y --no-install-recommends         build-essential         ca-certificates     && if [ "1" = "1" ]; then         apt-get install -y --no-install-recommends             freecad;     fi     && rm -rf /var/lib/apt/lists/*
+2026-07-11T22:24:03.6908653Z #9 CACHED
+2026-07-11T22:24:03.6908744Z 
+2026-07-11T22:24:03.6908832Z #10 [6/8] RUN pip install --no-cache-dir -r requirements.txt
+2026-07-11T22:24:03.6908931Z #10 CACHED
+2026-07-11T22:24:03.6909041Z 
+2026-07-11T22:24:03.6909132Z #11 [7/8] COPY . /app/
+2026-07-11T22:24:03.7075964Z #11 DONE 0.2s
+2026-07-11T22:24:03.8621585Z 
+2026-07-11T22:24:03.8621999Z #12 [8/8] RUN python manage.py collectstatic --noinput
+2026-07-11T22:24:07.1064231Z #12 3.393 
+2026-07-11T22:24:07.1064873Z #12 3.393 137 static files copied to '/app/staticfiles', 137 post-processed.
+2026-07-11T22:24:07.2584171Z #12 DONE 3.5s
+2026-07-11T22:24:07.4318226Z 
+2026-07-11T22:24:07.4318712Z #13 exporting to image
+2026-07-11T22:24:07.4318874Z #13 exporting layers
+2026-07-11T22:24:12.6188594Z #13 exporting layers 5.3s done
+2026-07-11T22:24:12.8054479Z #13 preparing layers for inline cache 0.0s done
+2026-07-11T22:24:12.8055785Z #13 writing image sha256:8ecab14ca6fc9ba01ba57b2dd6c503de051aff2214d4d2a594962043afc14d98 done
+2026-07-11T22:24:12.8056638Z #13 naming to git.home.schumbi.de/***/freecad-plm:latest done
+2026-07-11T22:24:12.8056841Z #13 naming to git.home.schumbi.de/***/freecad-plm:27194cc81f7a70d150d513d3efaba4a168948dbf done
+2026-07-11T22:24:12.8057092Z #13 DONE 5.4s
+2026-07-11T22:24:15.5292007Z Found 184 test(s).
+2026-07-11T22:24:15.5297886Z Creating test database for alias 'default'...
+2026-07-11T22:24:16.3327192Z Cloning test database for alias 'default'...
+2026-07-11T22:24:16.3327639Z Cloning test database for alias 'default'...
+2026-07-11T22:24:16.4372354Z System check identified no issues (0 silenced).
+2026-07-11T22:24:17.2285064Z 2026-07-12 00:24:17,227 WARNING [django.request] Unauthorized: /api/projects/
+2026-07-11T22:24:17.2678135Z 2026-07-12 00:24:17,267 WARNING [django.request] Unauthorized: /api/projects/
+2026-07-11T22:24:17.3064389Z 2026-07-12 00:24:17,305 WARNING [django.request] Forbidden: /api/projects/1/snapshots/import/
+2026-07-11T22:24:17.7741246Z 2026-07-12 00:24:17,773 WARNING [plm.freecadcmd] Marked 1 stale export job(s) as failed.
+2026-07-11T22:24:17.8023234Z 2026-07-12 00:24:17,800 WARNING [django.request] Not Found: /api/revisions/6/checkout/
+2026-07-11T22:24:17.8764474Z 2026-07-12 00:24:17,875 WARNING [django.request] Forbidden: /revisions/1/inspect/
+2026-07-11T22:24:17.9059029Z 2026-07-12 00:24:17,905 WARNING [plm.freecadcmd] Marked 1 stale export job(s) as failed.
+2026-07-11T22:24:17.9410718Z .............2026-07-12 00:24:17,940 WARNING [django.request] Unauthorized: /api/projects/
+2026-07-11T22:24:18.6437893Z ....2026-07-12 00:24:18,643 WARNING [django.request] Conflict: /api/checkouts/1/checkin/
+2026-07-11T22:24:18.8604106Z ..........2026-07-12 00:24:18,859 WARNING [django.request] Forbidden: /api/projects/1/parts/
+2026-07-11T22:24:18.9000990Z 2026-07-12 00:24:18,899 WARNING [django.request] Forbidden: /api/checkouts/active/
+2026-07-11T22:24:18.9330752Z 2026-07-12 00:24:18,932 WARNING [django.request] Forbidden: /projects/1/delete/
+2026-07-11T22:24:18.9898298Z 2026-07-12 00:24:18,989 WARNING [django.request] Bad Request: /projects/1/delete/
+2026-07-11T22:24:19.0429200Z ...2026-07-12 00:24:19,042 WARNING [django.request] Conflict: /api/revisions/1/manifest/
+2026-07-11T22:24:19.1953016Z 2026-07-12 00:24:19,194 WARNING [django.request] Unauthorized: /api/projects/
+2026-07-11T22:24:19.2522322Z 2026-07-12 00:24:19,251 WARNING [django.request] Conflict: /api/revisions/1/checkout/
+2026-07-11T22:24:19.2913050Z 2026-07-12 00:24:19,290 WARNING [django.request] Unauthorized: /api/projects/
+2026-07-11T22:24:19.3743854Z 2026-07-12 00:24:19,373 WARNING [django.request] Forbidden: /api/projects/1/parts/
+2026-07-11T22:24:19.6676517Z ...........................................................2026-07-12 00:24:19,667 WARNING [django.request] Bad Request: /parts/1/upload/
+2026-07-11T22:24:19.7105867Z 2026-07-12 00:24:19,710 WARNING [django.request] Bad Request: /parts/1/upload/
+2026-07-11T22:24:19.9012455Z 2026-07-12 00:24:19,900 WARNING [django.request] Conflict: /parts/1/upload/
+2026-07-11T22:24:20.1862673Z 2026-07-12 00:24:20,185 WARNING [django.request] Conflict: /parts/1/upload/
+2026-07-11T22:24:20.2389084Z 2026-07-12 00:24:20,238 WARNING [django.request] Conflict: /parts/1/upload/
+2026-07-11T22:24:20.3204060Z 2026-07-12 00:24:20,319 WARNING [django.request] Bad Request: /verwaltung/users/3/edit/
+2026-07-11T22:24:20.3818177Z 2026-07-12 00:24:20,381 WARNING [django.request] Bad Request: /verwaltung/users/2/tokens/new/
+2026-07-11T22:24:20.4920640Z 
+2026-07-11T22:24:20.4921667Z 
+2026-07-11T22:24:20.4921845Z test_png_views_button_processes_job_immediately (plm.tests.RevisionUploadViewTests.test_png_views_button_processes_job_immediately) failed:
+2026-07-11T22:24:20.4922010Z 
+2026-07-11T22:24:20.4922113Z     AssertionError("'queued' != ExportJob.Status.SUCCEEDED")
+2026-07-11T22:24:20.4922244Z 
+2026-07-11T22:24:20.4922342Z Unfortunately, tracebacks cannot be pickled, making it impossible for the
+2026-07-11T22:24:20.4922452Z parallel test runner to handle this exception cleanly.
+2026-07-11T22:24:20.4922549Z 
+2026-07-11T22:24:20.4922637Z In order to see the traceback, you should install tblib:
+2026-07-11T22:24:20.4922739Z 
+2026-07-11T22:24:20.4922997Z     python -m pip install tblib
+2026-07-11T22:24:20.4923091Z 
+2026-07-11T22:24:20.5066859Z Destroying test database for alias 'default'...
+2026-07-11T22:24:20.5069123Z Destroying test database for alias 'default'...
+2026-07-11T22:24:20.5069330Z Destroying test database for alias 'default'...
+2026-07-11T22:24:20.5197212Z multiprocessing.pool.RemoteTraceback: 
+2026-07-11T22:24:20.5197674Z """
+2026-07-11T22:24:20.5197791Z Traceback (most recent call last):
+2026-07-11T22:24:20.5197943Z   File "/usr/local/lib/python3.12/unittest/case.py", line 58, in testPartExecutor
+2026-07-11T22:24:20.5198743Z     yield
+2026-07-11T22:24:20.5198876Z   File "/usr/local/lib/python3.12/unittest/case.py", line 634, in run
+2026-07-11T22:24:20.5198993Z     self._callTestMethod(testMethod)
+2026-07-11T22:24:20.5199105Z   File "/usr/local/lib/python3.12/unittest/case.py", line 589, in _callTestMethod
+2026-07-11T22:24:20.5199221Z     if method() is not None:
+2026-07-11T22:24:20.5199315Z        ^^^^^^^^
+2026-07-11T22:24:20.5199418Z   File "/app/plm/tests.py", line 1215, in test_png_views_button_processes_job_immediately
+2026-07-11T22:24:20.5199530Z     self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+2026-07-11T22:24:20.5199849Z   File "/usr/local/lib/python3.12/unittest/case.py", line 885, in assertEqual
+2026-07-11T22:24:20.5199983Z     assertion_func(first, second, msg=msg)
+2026-07-11T22:24:20.5200080Z   File "/usr/local/lib/python3.12/unittest/case.py", line 878, in _baseAssertEqual
+2026-07-11T22:24:20.5200194Z     raise self.failureException(msg)
+2026-07-11T22:24:20.5200290Z AssertionError: 'queued' != ExportJob.Status.SUCCEEDED
+2026-07-11T22:24:20.5200391Z 
+2026-07-11T22:24:20.5200481Z During handling of the above exception, another exception occurred:
+2026-07-11T22:24:20.5200590Z 
+2026-07-11T22:24:20.5201261Z Traceback (most recent call last):
+2026-07-11T22:24:20.5202419Z   File "/usr/local/lib/python3.12/multiprocessing/pool.py", line 125, in worker
+2026-07-11T22:24:20.5202726Z     result = (True, func(*args, **kwds))
+2026-07-11T22:24:20.5202942Z                     ^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5203131Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 454, in _run_subsuite
+2026-07-11T22:24:20.5203349Z     result = runner.run(subsuite)
+2026-07-11T22:24:20.5203551Z              ^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5203746Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 369, in run
+2026-07-11T22:24:20.5204231Z     test(result)
+2026-07-11T22:24:20.5204452Z   File "/usr/local/lib/python3.12/unittest/suite.py", line 84, in __call__
+2026-07-11T22:24:20.5204653Z     return self.run(*args, **kwds)
+2026-07-11T22:24:20.5204857Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5206202Z   File "/usr/local/lib/python3.12/unittest/suite.py", line 122, in run
+2026-07-11T22:24:20.5206621Z     test(result)
+2026-07-11T22:24:20.5207067Z   File "/usr/local/lib/python3.12/site-packages/django/test/testcases.py", line 321, in __call__
+2026-07-11T22:24:20.5207391Z     self._setup_and_call(result)
+2026-07-11T22:24:20.5207573Z   File "/usr/local/lib/python3.12/site-packages/django/test/testcases.py", line 376, in _setup_and_call
+2026-07-11T22:24:20.5207788Z     super().__call__(result)
+2026-07-11T22:24:20.5207982Z   File "/usr/local/lib/python3.12/unittest/case.py", line 690, in __call__
+2026-07-11T22:24:20.5208376Z     return self.run(*args, **kwds)
+2026-07-11T22:24:20.5208585Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5208778Z   File "/usr/local/lib/python3.12/unittest/case.py", line 633, in run
+2026-07-11T22:24:20.5210904Z     with outcome.testPartExecutor(self):
+2026-07-11T22:24:20.5211181Z          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5211540Z   File "/usr/local/lib/python3.12/contextlib.py", line 158, in __exit__
+2026-07-11T22:24:20.5211783Z     self.gen.throw(value)
+2026-07-11T22:24:20.5211978Z   File "/usr/local/lib/python3.12/unittest/case.py", line 75, in testPartExecutor
+2026-07-11T22:24:20.5212185Z     _addError(self.result, test_case, exc_info)
+2026-07-11T22:24:20.5212352Z   File "/usr/local/lib/python3.12/unittest/case.py", line 98, in _addError
+2026-07-11T22:24:20.5212587Z     result.addFailure(test, exc_info)
+2026-07-11T22:24:20.5212789Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 299, in addFailure
+2026-07-11T22:24:20.5212971Z     self.check_picklable(test, err)
+2026-07-11T22:24:20.5214097Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 215, in check_picklable
+2026-07-11T22:24:20.5214311Z     self._confirm_picklable(err)
+2026-07-11T22:24:20.5214511Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 189, in _confirm_picklable
+2026-07-11T22:24:20.5214688Z     pickle.loads(pickle.dumps(obj))
+2026-07-11T22:24:20.5214882Z                  ^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5215083Z TypeError: cannot pickle 'traceback' object
+2026-07-11T22:24:20.5215271Z """
+2026-07-11T22:24:20.5215427Z 
+2026-07-11T22:24:20.5215625Z The above exception was the direct cause of the following exception:
+2026-07-11T22:24:20.5215820Z 
+2026-07-11T22:24:20.5226917Z Traceback (most recent call last):
+2026-07-11T22:24:20.5228280Z   File "/app/manage.py", line 22, in <module>
+2026-07-11T22:24:20.5228513Z     main()
+2026-07-11T22:24:20.5229158Z   File "/app/manage.py", line 18, in main
+2026-07-11T22:24:20.5229426Z     execute_from_command_line(sys.argv)
+2026-07-11T22:24:20.5232571Z   File "/usr/local/lib/python3.12/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+2026-07-11T22:24:20.5232793Z     utility.execute()
+2026-07-11T22:24:20.5233168Z   File "/usr/local/lib/python3.12/site-packages/django/core/management/__init__.py", line 436, in execute
+2026-07-11T22:24:20.5233434Z     self.fetch_command(subcommand).run_from_argv(self.argv)
+2026-07-11T22:24:20.5233648Z   File "/usr/local/lib/python3.12/site-packages/django/core/management/commands/test.py", line 24, in run_from_argv
+2026-07-11T22:24:20.5234067Z     super().run_from_argv(argv)
+2026-07-11T22:24:20.5252808Z   File "/usr/local/lib/python3.12/site-packages/django/core/management/base.py", line 420, in run_from_argv
+2026-07-11T22:24:20.5259586Z     self.execute(*args, **cmd_options)
+2026-07-11T22:24:20.5268093Z   File "/usr/local/lib/python3.12/site-packages/django/core/management/base.py", line 464, in execute
+2026-07-11T22:24:20.5275093Z     output = self.handle(*args, **options)
+2026-07-11T22:24:20.5291137Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5291500Z   File "/usr/local/lib/python3.12/site-packages/django/core/management/commands/test.py", line 63, in handle
+2026-07-11T22:24:20.5295277Z     failures = test_runner.run_tests(test_labels)
+2026-07-11T22:24:20.5307132Z                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5307616Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 1087, in run_tests
+2026-07-11T22:24:20.5317621Z     result = self.run_suite(suite)
+2026-07-11T22:24:20.5318073Z              ^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5318196Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 1014, in run_suite
+2026-07-11T22:24:20.5322558Z     return runner.run(suite)
+2026-07-11T22:24:20.5327593Z            ^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5327837Z   File "/usr/local/lib/python3.12/unittest/runner.py", line 240, in run
+2026-07-11T22:24:20.5331546Z     test(result)
+2026-07-11T22:24:20.5335418Z   File "/usr/local/lib/python3.12/unittest/suite.py", line 84, in __call__
+2026-07-11T22:24:20.5339484Z     return self.run(*args, **kwds)
+2026-07-11T22:24:20.5342880Z            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5343065Z   File "/usr/local/lib/python3.12/site-packages/django/test/runner.py", line 541, in run
+2026-07-11T22:24:20.5346980Z     subsuite_index, events = test_results.next(timeout=0.1)
+2026-07-11T22:24:20.5359063Z                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-11T22:24:20.5359507Z   File "/usr/local/lib/python3.12/multiprocessing/pool.py", line 873, in next
+2026-07-11T22:24:20.5365135Z     raise value
+2026-07-11T22:24:20.5368336Z TypeError: cannot pickle 'traceback' object
+2026-07-11T22:24:20.8800953Z ⚙️ [runner]: exitcode '1': failure
+2026-07-11T22:24:20.8805658Z ⭐ Run Post Checkout repository
+2026-07-11T22:24:20.8857339Z   🐳  docker exec cmd=[node /var/run/act/actions/d9/802992a7ff326e6576d38e8afb0781294c449523088f7d8aaf9fd44681f0d2/dist/index.js] user= workdir=
+2026-07-11T22:24:21.0892932Z [command]/usr/bin/git version
+2026-07-11T22:24:21.0986893Z git version 2.39.5
+2026-07-11T22:24:21.1036925Z   ⚙  ***
+2026-07-11T22:24:21.1067756Z Temporarily overriding HOME='/tmp/a88818b9-a5de-4a6a-a90f-7443d33942d6' before making global git config changes
+2026-07-11T22:24:21.1070136Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-11T22:24:21.1079368Z [command]/usr/bin/git config --global --add safe.directory /tmp/forgejo-runner/***/freecad-plm
+2026-07-11T22:24:21.1140961Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-11T22:24:21.1210990Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-11T22:24:21.1880988Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/git\.home\.schumbi\.de\/\.extraheader
+2026-07-11T22:24:21.1915132Z http.https://git.home.schumbi.de/.extraheader
+2026-07-11T22:24:21.1936678Z [command]/usr/bin/git config --local --unset-all http.https://git.home.schumbi.de/.extraheader
+2026-07-11T22:24:21.1983723Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/git\.home\.schumbi\.de\/\.extraheader' && git config --local --unset-all 'http.https://git.home.schumbi.de/.extraheader' || :"
+2026-07-11T22:24:21.2396122Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-11T22:24:21.2455145Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-11T22:24:21.2971138Z   ✅  Success - Post Checkout repository
+2026-07-11T22:24:21.3292963Z 🏁  Job failed
+2026-07-11T22:24:21.4864245Z Job 'build-image' failed

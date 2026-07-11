@@ -1204,7 +1204,10 @@ class RevisionUploadViewTests(TestCase):
             job.save(update_fields=["status", "updated_at"])
             return job
 
-        with patch("plm.views.process_export_job", side_effect=mark_succeeded) as process:
+        with (
+            override_settings(PROCESS_EXPORT_JOBS_INLINE=True),
+            patch("plm.views.process_export_job", side_effect=mark_succeeded) as process,
+        ):
             response = self.client.post(
                 reverse("plm:create_revision_png_job", args=[revision.id])
             )
@@ -1514,7 +1517,10 @@ class RevisionUploadViewTests(TestCase):
             job.save(update_fields=["status", "updated_at"])
             return [job]
 
-        with patch("plm.views.process_queued_export_jobs", side_effect=mark_succeeded) as process:
+        with (
+            override_settings(PROCESS_EXPORT_JOBS_INLINE=True),
+            patch("plm.views.process_queued_export_jobs", side_effect=mark_succeeded) as process,
+        ):
             response = self.client.post(
                 reverse("plm:process_export_jobs_once", args=[self.part.id])
             )

@@ -38,6 +38,7 @@ jobs:
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           docker run --rm \
             -e DJANGO_DEBUG=1 \
+            -e PROCESS_EXPORT_JOBS_INLINE=1 \
             "${IMAGE}:${{ github.sha }}" \
             python manage.py test --parallel auto --verbosity=1
 
