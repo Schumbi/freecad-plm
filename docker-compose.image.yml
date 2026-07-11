@@ -14,7 +14,7 @@ services:
       retries: 5
 
   web:
-    image: ${PLM_IMAGE:?PLM_IMAGE muss in .env gesetzt sein}
+    image: ${PLM_WEB_IMAGE:?PLM_WEB_IMAGE muss in .env gesetzt sein}
     user: "${PLM_USER:-plm}"
     command: >
       sh -c "python manage.py migrate --noinput &&
@@ -50,7 +50,7 @@ services:
         condition: service_healthy
 
   worker:
-    image: ${PLM_IMAGE:?PLM_IMAGE muss in .env gesetzt sein}
+    image: ${PLM_WORKER_IMAGE:?PLM_WORKER_IMAGE muss in .env gesetzt sein}
     user: "${PLM_USER:-plm}"
     init: true
     cap_drop:

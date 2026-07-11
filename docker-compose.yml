@@ -14,11 +14,11 @@ services:
       retries: 5
 
   web:
-    image: ${PLM_IMAGE:-freecad-plm:local}
+    image: ${PLM_WEB_IMAGE:-freecad-plm-web:local}
     build:
       context: .
       args:
-        INSTALL_FREECAD: "1"
+        INSTALL_FREECAD: "0"
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -53,7 +53,7 @@ services:
         condition: service_healthy
 
   worker:
-    image: ${PLM_IMAGE:-freecad-plm:local}
+    image: ${PLM_WORKER_IMAGE:-freecad-plm-worker:local}
     user: "${PLM_USER:-plm}"
     build:
       context: .

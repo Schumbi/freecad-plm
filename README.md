@@ -21,11 +21,13 @@ Django-Admin-Oberflaeche liegt weiterhin unter <http://127.0.0.1:8000/admin/>.
 
 Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker laufen aus demselben PLM-Image. Dieses Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd.
 
-Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut das Image bei jedem Push nach `main` oder `master` automatisch aus dem lokalen `Dockerfile`, fuehrt die Django-Tests im gebauten Image aus und veroeffentlicht nur bei bestandenen Tests:
+Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut bei jedem Push nach `main` oder `master` automatisch **zwei** Images aus dem lokalen `Dockerfile`, fuehrt die Django-Tests aus und veroeffentlicht nur bei bestandenen Tests. Das Web-Image wird ohne FreeCAD gebaut (`INSTALL_FREECAD=0`) und ist dadurch deutlich kleiner; nur der Worker enthaelt FreeCAD:
 
 ```text
-git.home.schumbi.de/ralf/freecad-plm:latest
-git.home.schumbi.de/ralf/freecad-plm:<commit-sha>
+git.home.schumbi.de/ralf/freecad-plm-web:latest
+git.home.schumbi.de/ralf/freecad-plm-web:<commit-sha>
+git.home.schumbi.de/ralf/freecad-plm-worker:latest
+git.home.schumbi.de/ralf/freecad-plm-worker:<commit-sha>
 ```
 
 ### Server Mit Fertigem Image Starten
@@ -53,7 +55,8 @@ DJANGO_DB_LOG_LEVEL=WARNING
 GUNICORN_LOG_LEVEL=info
 GUNICORN_ACCESS_LOG=1
 POSTGRES_PASSWORD=replace-with-a-strong-database-password
-PLM_IMAGE=git.home.schumbi.de/ralf/freecad-plm:latest
+PLM_WEB_IMAGE=git.home.schumbi.de/ralf/freecad-plm-web:latest
+PLM_WORKER_IMAGE=git.home.schumbi.de/ralf/freecad-plm-worker:latest
 PLM_USER=plm
 PLM_UID=1000
 PLM_GID=1000
@@ -183,13 +186,15 @@ aber nicht fuer oeffentlich erreichbare Instanzen gesetzt werden.
 
 ### Image Manuell Bauen
 
-Normalerweise baut der Forgejo-Workflow in diesem Repo das Image. Manuell geht es so:
+Normalerweise baut der Forgejo-Workflow in diesem Repo die Images. Manuell geht es so (Web ohne FreeCAD, Worker mit FreeCAD):
 
 ```bash
 git clone ssh://home.schumbi.de/ralf/freecad-plm.git /opt/freecad-plm-build
 cd /opt/freecad-plm-build
-docker build -t git.home.schumbi.de/ralf/freecad-plm:latest .
-docker push git.home.schumbi.de/ralf/freecad-plm:latest
+docker build --build-arg INSTALL_FREECAD=0 -t git.home.schumbi.de/ralf/freecad-plm-web:latest .
+docker build --build-arg INSTALL_FREECAD=1 -t git.home.schumbi.de/ralf/freecad-plm-worker:latest .
+docker push git.home.schumbi.de/ralf/freecad-plm-web:latest
+docker push git.home.schumbi.de/ralf/freecad-plm-worker:latest
 ```
 
 ### Image-Build Ausloesen
@@ -201,21 +206,23 @@ cd /home/ralf/devel/freecad-plm
 git push
 ```
 
-Der Forgejo-Workflow `Test and Build FreeCAD PLM Image` startet bei Push nach `main` oder
-`master` automatisch. Er baut das Image, fuehrt darin die Tests aus und pusht nur
+Der Forgejo-Workflow `Test and Build FreeCAD PLM Images` startet bei Push nach `main` oder
+`master` automatisch. Er baut Web- und Worker-Image, fuehrt die Tests aus und pusht nur
 bei gruenen Tests. Den Lauf findest du in Forgejo unter:
 
 ```text
-ralf/freecad-plm -> Actions -> Test and Build FreeCAD PLM Image
+ralf/freecad-plm -> Actions -> Test and Build FreeCAD PLM Images
 ```
 
 Wenn ein Build ohne neuen Commit erneut laufen soll, kann der Workflow dort auch
-manuell ueber `Run workflow` gestartet werden. Nach einem erfolgreichen Lauf ist
-das Registry-Image aktualisiert:
+manuell ueber `Run workflow` gestartet werden. Nach einem erfolgreichen Lauf sind
+die Registry-Images aktualisiert:
 
 ```text
-git.home.schumbi.de/ralf/freecad-plm:latest
-git.home.schumbi.de/ralf/freecad-plm:<commit-sha>
+git.home.schumbi.de/ralf/freecad-plm-web:latest
+git.home.schumbi.de/ralf/freecad-plm-web:<commit-sha>
+git.home.schumbi.de/ralf/freecad-plm-worker:latest
+git.home.schumbi.de/ralf/freecad-plm-worker:<commit-sha>
 ```
 
 ### Updates

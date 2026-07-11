@@ -13,7 +13,6 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
         ca-certificates \
     && if [ "$INSTALL_FREECAD" = "1" ]; then \
         apt-get install -y --no-install-recommends \

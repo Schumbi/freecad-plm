@@ -1,4 +1,4 @@
-name: Test and Build FreeCAD PLM Image
+name: Test and Build FreeCAD PLM Images
 
 on:
   push:
@@ -10,7 +10,8 @@ on:
 
 env:
   REGISTRY: git.home.schumbi.de/ralf
-  IMAGE_NAME: freecad-plm
+  WEB_IMAGE_NAME: freecad-plm-web
+  WORKER_IMAGE_NAME: freecad-plm-worker
   DOCKER_BUILDKIT: 1
 
 jobs:
@@ -22,20 +23,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build image
+      - name: Build web image (ohne FreeCAD)
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}"
           docker build \
             --progress=plain \
             --pull=false \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg INSTALL_FREECAD=0 \
+            -t "${IMAGE}:latest" \
+            -t "${IMAGE}:${{ github.sha }}" \
+            .
+
+      - name: Build worker image (mit FreeCAD)
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}"
+          docker build \
+            --progress=plain \
+            --pull=false \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg INSTALL_FREECAD=1 \
             -t "${IMAGE}:latest" \
             -t "${IMAGE}:${{ github.sha }}" \
             .
 
       - name: Run tests
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}"
           docker run --rm \
             -e DJANGO_DEBUG=1 \
             -e PROCESS_EXPORT_JOBS_INLINE=1 \
@@ -49,9 +63,12 @@ jobs:
             -u "${{ secrets.REGISTRY_USERNAME }}" \
             --password-stdin
 
-      - name: Push image
+      - name: Push images
         if: github.event_name != 'pull_request'
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          docker push "${IMAGE}:latest"
-          docker push "${IMAGE}:${{ github.sha }}"
+          WEB="${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}"
+          WORKER="${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}"
+          docker push "${WEB}:latest"
+          docker push "${WEB}:${{ github.sha }}"
+          docker push "${WORKER}:latest"
+          docker push "${WORKER}:${{ github.sha }}"
