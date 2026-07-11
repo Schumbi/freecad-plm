@@ -1206,7 +1206,7 @@ class RevisionUploadViewTests(TestCase):
 
         with (
             override_settings(PROCESS_EXPORT_JOBS_INLINE=True),
-            patch("plm.views.process_export_job", side_effect=mark_succeeded) as process,
+            patch("plm.views.revisions.process_export_job", side_effect=mark_succeeded) as process,
         ):
             response = self.client.post(
                 reverse("plm:create_revision_png_job", args=[revision.id])
@@ -1224,7 +1224,7 @@ class RevisionUploadViewTests(TestCase):
 
         with (
             override_settings(PROCESS_EXPORT_JOBS_INLINE=False),
-            patch("plm.views.process_export_job") as process,
+            patch("plm.views.revisions.process_export_job") as process,
         ):
             response = self.client.post(
                 reverse("plm:create_revision_png_job", args=[revision.id])
@@ -1240,7 +1240,7 @@ class RevisionUploadViewTests(TestCase):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
 
-        with patch("plm.views.ensure_revision_viewer_preview", return_value="queued") as ensure:
+        with patch("plm.views.revisions.ensure_revision_viewer_preview", return_value="queued") as ensure:
             response = self.client.post(
                 reverse("plm:create_revision_viewer_preview", args=[revision.id])
             )
@@ -1252,7 +1252,7 @@ class RevisionUploadViewTests(TestCase):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
 
-        with patch("plm.views.ensure_revision_viewer_preview", return_value="queued"):
+        with patch("plm.views.revisions.ensure_revision_viewer_preview", return_value="queued"):
             response = self.client.post(
                 reverse("plm:create_revision_viewer_preview", args=[revision.id]),
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
@@ -1519,7 +1519,7 @@ class RevisionUploadViewTests(TestCase):
 
         with (
             override_settings(PROCESS_EXPORT_JOBS_INLINE=True),
-            patch("plm.views.process_queued_export_jobs", side_effect=mark_succeeded) as process,
+            patch("plm.views.parts.process_queued_export_jobs", side_effect=mark_succeeded) as process,
         ):
             response = self.client.post(
                 reverse("plm:process_export_jobs_once", args=[self.part.id])
@@ -1541,7 +1541,7 @@ class RevisionUploadViewTests(TestCase):
 
         with (
             override_settings(PROCESS_EXPORT_JOBS_INLINE=False),
-            patch("plm.views.process_queued_export_jobs") as process,
+            patch("plm.views.parts.process_queued_export_jobs") as process,
         ):
             response = self.client.post(
                 reverse("plm:process_export_jobs_once", args=[self.part.id])
