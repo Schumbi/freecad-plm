@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+# Auf Digest gepinnt (python:3.12-slim, Debian 13 trixie), damit ein Wandern
+# des Tags nicht unbemerkt die FreeCAD-Version im Worker-Image aendert.
+FROM python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf
 
 ARG INSTALL_FREECAD=1
 ARG PLM_UID=1000
