@@ -30,7 +30,7 @@ Zusaetzlich neu (Funktion/UX, nicht sicherheitskritisch): globale PLM-Suche, Obs
 | 4.5 | Kein Rate-Limiting / Login-Lockout | Mittel | Weder `django-axes` noch `django-ratelimit`; relevant v.a. hinter Reverse Proxy. Alternativ nginx `limit_req`. |
 | 3.1 | Audit-Events ohne Request-Kontext | Mittel | `AuditEvent` hat weiterhin keine `ip_address`/`user_agent`/`api_token_id`. `request.api_token` ist verfuegbar und leicht ergaenzbar. |
 | 4.7 | Media-Guard fehlt | Niedrig | `freecad_plm/urls.py` haengt `static(MEDIA_URL, ...)` unbedingt an. Bei versehentlichem `DJANGO_DEBUG=1` auf erreichbarer Instanz waeren CAD-Dateien unter `/media/` ohne Auth erreichbar. Empfehlung: nur unter `if settings.DEBUG` anhaengen. |
-| 2.1 | Uebergrosse Module | Mittel | **Eher verschlechtert:** `views.py` 1600→**1790**, `services.py` 1475→**1659** Zeilen. Package-Split weiterhin empfohlen. |
+| 2.1 | Uebergrosse Module | Mittel (teilweise) | `services.py` (1659 Zeilen) ist in das Paket `plm/services/` aufgeteilt (`manufacturing`, `revisions`, `snapshots`, `manifests`, `checkouts`, `search`, `common`) mit re-exportierender Fassade (`__init__.py`, 86 Zeilen) – keine Aenderung an Aufrufern noetig, 184 Tests gruen. **Offen:** `views.py` (~1790 Zeilen) analog splitten. |
 | 2.2/2.3/2.5 | Boilerplate-/Pfad-/Serialisierungs-Duplizierung | Mittel | Unveraendert. |
 | 2.7 | Dev-Tooling/Linting | Mittel | Kein `ruff`/`black`/`mypy`, keine `requirements-dev.txt`. |
 
