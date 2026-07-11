@@ -343,6 +343,11 @@ def run_freecadcmd_job(job):
         )
 
         command = freecadcmd_command(job)
+        # FreeCAD 1.0 legt beim Start sein User-Konfigverzeichnis unter $HOME an
+        # und segfaultet, wenn HOME fehlt oder nicht beschreibbar ist (z.B. im
+        # gehaerteten Worker mit read-only Root-FS). Das beschreibbare, pro Job
+        # eindeutige Temp-Verzeichnis als HOME vermeidet das.
+        run_env = {**os.environ, "HOME": str(workdir)}
         completed = subprocess.run(
             [
                 *command,
@@ -354,6 +359,7 @@ def run_freecadcmd_job(job):
                 str(result_path),
             ],
             cwd=workdir,
+            env=run_env,
             capture_output=True,
             text=True,
             timeout=timeout,

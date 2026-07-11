@@ -86,6 +86,8 @@ services:
       PREVIEW_PNG_WIDTH: ${PREVIEW_PNG_WIDTH:-400}
       PREVIEW_PNG_HEIGHT: ${PREVIEW_PNG_HEIGHT:-300}
       TMPDIR: /tmp
+      # FreeCAD 1.0 braucht ein beschreibbares HOME (read-only Root-FS + tmpfs /tmp)
+      HOME: /tmp
     volumes:
       - ./storage:/app/storage
     depends_on:
