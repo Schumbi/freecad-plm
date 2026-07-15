@@ -10,7 +10,7 @@ from django.http import FileResponse, HttpResponseForbidden, HttpResponseNotFoun
 from django.urls import reverse
 from ..derivatives import revision_has_complete_png_views, revision_has_pending_png_job, revision_png_view_names
 from ..forms import user_role
-from ..freecadcmd import create_export_job, process_export_job
+from ..freecadcmd import PREVIEW_GENERATOR_VERSION, create_export_job, process_export_job
 from ..models import ExportJob, ManufacturingFile, RevisionArtifact
 from ..permissions import ROLE_ADMIN, is_plm_admin
 from ..services import revision_reference_files, snapshot_entries_with_references
@@ -155,14 +155,11 @@ def viewer_file_format(filename, fallback=""):
 
 
 def revision_viewer_artifact(revision):
-    artifacts = revision.artifacts.filter(
+    return revision.artifacts.filter(
         artifact_type=RevisionArtifact.ArtifactType.STL,
-    )
-    return (
-        artifacts.filter(view_name=VIEWER_PREVIEW_VIEW_NAME).first()
-        or artifacts.filter(view_name=VIEWER_FALLBACK_VIEW_NAME).first()
-        or artifacts.first()
-    )
+        view_name=VIEWER_PREVIEW_VIEW_NAME,
+        metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
+    ).order_by("-created_at", "-id").first()
 
 
 def viewer_file_response(field_file, filename, file_format):

@@ -1,4 +1,6 @@
 import json
+import sys
+import types
 from datetime import date, timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
@@ -59,6 +61,8 @@ from .services import (
     snapshot_base_name,
 )
 from .freecadcmd import (
+    FREECADCMD_SCRIPT,
+    PREVIEW_GENERATOR_VERSION,
     PNG_VIEW_NAMES,
     create_export_job,
     export_job_stale_seconds,
@@ -981,6 +985,7 @@ class RevisionUploadViewTests(TestCase):
             original_filename="preview.stl",
             sha256="b" * 64,
             size_bytes=len(content),
+            metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION},
         )
 
     def test_project_list_requires_login(self):
@@ -1264,6 +1269,37 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "missing")
         self.assertIn("message", response.json())
+
+    def test_legacy_viewer_preview_is_regenerated_on_demand(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        content = b"solid legacy\nendsolid legacy\n"
+        RevisionArtifact.objects.create(
+            revision=revision,
+            artifact_type=RevisionArtifact.ArtifactType.STL,
+            view_name="viewer-preview",
+            file=ContentFile(content, name="legacy.stl"),
+            original_filename="legacy.stl",
+            sha256="f" * 64,
+            size_bytes=len(content),
+            metadata={},
+        )
+
+        with override_settings(PROCESS_EXPORT_JOBS_INLINE=False):
+            response = self.client.post(
+                reverse("plm:create_revision_viewer_preview", args=[revision.id]),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], ExportJob.Status.QUEUED)
+        self.assertTrue(
+            ExportJob.objects.filter(
+                revision=revision,
+                job_type=ExportJob.JobType.PNG_VIEWS,
+                status=ExportJob.Status.QUEUED,
+            ).exists()
+        )
 
     def test_viewer_status_reports_ready_preview(self):
         self.client.force_login(self.user)
@@ -2759,6 +2795,52 @@ class FreeCADCmdJobTests(TestCase):
     def tearDown(self):
         self.settings_override.disable()
         self.media_root.cleanup()
+
+    def freecadcmd_script_namespace(self):
+        namespace = {"__name__": "plm_freecadcmd_test"}
+        freecad_module = types.ModuleType("FreeCAD")
+        with patch.dict(sys.modules, {"FreeCAD": freecad_module}):
+            exec(FREECADCMD_SCRIPT, namespace)
+        return namespace
+
+    def test_preview_objects_use_visible_top_level_solids_only(self):
+        class Shape:
+            def __init__(self, volume):
+                self.Volume = volume
+                self.Solids = [object()] if volume else []
+
+            def isNull(self):
+                return False
+
+        class Obj:
+            def __init__(self, name, volume, *, visible=True, parents=None):
+                self.Name = name
+                self.Label = name
+                self.TypeId = "PartDesign::Feature"
+                self.Shape = Shape(volume)
+                self.Visibility = visible
+                self.InList = parents or []
+                self.PropertiesList = []
+
+        body = Obj("Body", 42)
+        tip = Obj("Pocket", 42, parents=[body])
+        intermediate = Obj("Pad", 80, visible=False, parents=[body])
+        axis = Obj("X_Axis", 0)
+        separate_body = Obj("Body002", 12)
+        document = types.SimpleNamespace(
+            Objects=[body, tip, intermediate, axis, separate_body]
+        )
+
+        namespace = self.freecadcmd_script_namespace()
+
+        self.assertEqual(
+            [obj.Name for obj in namespace["preview_objects"](document)],
+            ["Body", "Body002"],
+        )
+        self.assertEqual(
+            [item["name"] for item in namespace["inspect_document"](document)["objects"]],
+            ["Body", "Body002"],
+        )
 
     def fake_freecadcmd(self, result_code):
         script = Path(self.media_root.name) / "fake_freecadcmd.py"

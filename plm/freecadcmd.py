@@ -32,6 +32,9 @@ PNG_VIEW_NAMES = (
 )
 
 
+PREVIEW_GENERATOR_VERSION = 2
+
+
 FREECADCMD_SCRIPT = r'''
 import json
 import sys
@@ -40,38 +43,53 @@ from pathlib import Path
 import FreeCAD
 
 
-EXPORTABLE_TYPE_MARKERS = ("Part::", "PartDesign::", "Mesh::")
-
-
 def object_label(obj):
     return getattr(obj, "Label", "") or getattr(obj, "Name", "")
+
+
+def has_solid_shape(obj):
+    shape = getattr(obj, "Shape", None)
+    if shape is None or getattr(shape, "isNull", lambda: True)():
+        return False
+    if getattr(shape, "Solids", None):
+        return True
+    return float(getattr(shape, "Volume", 0.0) or 0.0) > 1e-9
 
 
 def is_exportable(obj):
     if hasattr(obj, "Visibility") and not obj.Visibility:
         return False
-    type_id = getattr(obj, "TypeId", "")
-    shape = getattr(obj, "Shape", None)
-    if shape is not None and not getattr(shape, "isNull", lambda: True)():
-        return True
-    return type_id.startswith(EXPORTABLE_TYPE_MARKERS)
+    return has_solid_shape(obj)
+
+
+def exportable_objects(doc):
+    candidates = [obj for obj in doc.Objects if is_exportable(obj)]
+    candidate_ids = {id(obj) for obj in candidates}
+    top_level = []
+    for obj in candidates:
+        has_exportable_parent = any(
+            id(parent) in candidate_ids
+            for parent in getattr(obj, "InList", [])
+        )
+        if not has_exportable_parent:
+            top_level.append(obj)
+    return top_level or candidates
 
 
 def inspect_document(doc):
-    objects = []
+    objects = [
+        {
+            "name": obj.Name,
+            "label": object_label(obj),
+            "type": getattr(obj, "TypeId", ""),
+            "visible": bool(getattr(obj, "Visibility", True)),
+            "exportable": True,
+        }
+        for obj in exportable_objects(doc)
+    ]
     varsets = []
     for obj in doc.Objects:
         type_id = getattr(obj, "TypeId", "")
-        if is_exportable(obj):
-            objects.append(
-                {
-                    "name": obj.Name,
-                    "label": object_label(obj),
-                    "type": type_id,
-                    "visible": bool(getattr(obj, "Visibility", True)),
-                    "exportable": True,
-                }
-            )
         if type_id == "App::VarSet":
             properties = []
             for prop_name in obj.PropertiesList:
@@ -129,13 +147,9 @@ def export_objects(doc, spec, output_dir):
 
 
 def preview_objects(doc):
-    objects = []
-    for obj in doc.Objects:
-        shape = getattr(obj, "Shape", None)
-        if shape is not None and not getattr(shape, "isNull", lambda: True)():
-            objects.append(obj)
+    objects = exportable_objects(doc)
     if not objects:
-        raise RuntimeError("Keine Shape-Objekte fuer Vorschau-Ansichten gefunden.")
+        raise RuntimeError("Keine sichtbaren Volumenkoerper fuer Vorschau-Ansichten gefunden.")
     return objects
 
 
@@ -537,6 +551,13 @@ def apply_freecadcmd_result(job, result):
     for artifact_data in result.get("artifacts", []):
         content = artifact_data["content"]
         digest = sha256(content).hexdigest()
+        artifact_metadata = {
+            "job_id": job.id,
+            "selected_objects": job.selected_objects,
+            "parameters": job.parameters,
+        }
+        if job.job_type == ExportJob.JobType.PNG_VIEWS:
+            artifact_metadata["preview_generator_version"] = PREVIEW_GENERATOR_VERSION
         artifact = RevisionArtifact.objects.create(
             revision=job.revision,
             job=job,
@@ -546,11 +567,7 @@ def apply_freecadcmd_result(job, result):
             original_filename=artifact_data["filename"],
             sha256=digest,
             size_bytes=len(content),
-            metadata={
-                "job_id": job.id,
-                "selected_objects": job.selected_objects,
-                "parameters": job.parameters,
-            },
+            metadata=artifact_metadata,
         )
         AuditEvent.objects.create(
             actor=job.created_by,
