@@ -1395,6 +1395,14 @@ class ThreeMFLoader extends Loader {
 			}
 
 			// start build
+			//
+			// Production-extension 3MF files (for example from Bambu Studio)
+			// can keep meshes in separate model parts and reference them from a
+			// component in the root model. ZIP entry order is not a dependency
+			// order, so collect every object first, build leaf meshes, and only
+			// then build composites whose referenced objects are ready.
+
+			const objectEntries = [];
 
 			for ( let i = 0; i < modelsKeys.length; i ++ ) {
 
@@ -1406,10 +1414,60 @@ class ThreeMFLoader extends Loader {
 				for ( let j = 0; j < objectIds.length; j ++ ) {
 
 					const objectId = objectIds[ j ];
+					const objectData = modelData[ 'resources' ][ 'object' ][ objectId ];
 
-					buildObject( objectId, objects, modelData, textureData );
+					objectEntries.push( { objectId, objectData, modelData } );
 
 				}
+
+			}
+
+			for ( let i = 0; i < objectEntries.length; i ++ ) {
+
+				const entry = objectEntries[ i ];
+
+				if ( entry.objectData[ 'mesh' ] ) {
+
+					buildObject( entry.objectId, objects, entry.modelData, textureData );
+
+				}
+
+			}
+
+			let pendingComposites = objectEntries.filter( ( entry ) => entry.objectData[ 'components' ] );
+
+			while ( pendingComposites.length > 0 ) {
+
+				const unresolved = [];
+				let builtCount = 0;
+
+				for ( let i = 0; i < pendingComposites.length; i ++ ) {
+
+					const entry = pendingComposites[ i ];
+					const componentsReady = entry.objectData[ 'components' ].every(
+						( component ) => objects[ component.objectId ] !== undefined
+					);
+
+					if ( componentsReady ) {
+
+						buildObject( entry.objectId, objects, entry.modelData, textureData );
+						builtCount ++;
+
+					} else {
+
+						unresolved.push( entry );
+
+					}
+
+				}
+
+				if ( builtCount === 0 ) {
+
+					throw new Error( 'THREE.3MFLoader: Unresolved component object reference.' );
+
+				}
+
+				pendingComposites = unresolved;
 
 			}
 
