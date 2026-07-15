@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}FreeCAD-PLM{% endblock %}</title>
+  {% include "plm/includes/favicon.html" %}
   <link rel="stylesheet" href="{% static 'plm/app.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
@@ -12,7 +13,10 @@
   <div class="app-shell">
     <aside class="sidebar-nav">
       <div class="brand-block">
-        <a class="brand-name" href="{% url 'plm:project_list' %}">FreeCAD-PLM</a>
+        <a class="brand-name" href="{% url 'plm:project_list' %}">
+          <img class="brand-mark" src="{% static 'plm/icons/favicon-32.png' %}" width="32" height="32" alt="">
+          <span>FreeCAD-PLM</span>
+        </a>
         <span class="brand-subtitle">CAD-Revisionen verwalten</span>
       </div>
       <nav aria-label="Hauptnavigation">

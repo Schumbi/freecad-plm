@@ -994,6 +994,8 @@ class RevisionUploadViewTests(TestCase):
 
         self.assertContains(response, "FreeCAD-PLM")
         self.assertContains(response, "Django-Admin")
+        self.assertContains(response, "plm/icons/favicon.ico")
+        self.assertContains(response, "plm/icons/apple-touch-icon.png")
 
         response = self.client.post(
             reverse("plm:login"),
@@ -1013,6 +1015,7 @@ class RevisionUploadViewTests(TestCase):
         self.assertContains(response, self.user.username)
         self.assertContains(response, "Abmelden")
         self.assertContains(response, reverse("plm:logout"))
+        self.assertContains(response, "plm/icons/favicon-32.png")
 
         response = self.client.post(reverse("plm:logout"))
 

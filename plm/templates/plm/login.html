@@ -5,13 +5,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Anmelden | FreeCAD-PLM</title>
+  {% include "plm/includes/favicon.html" %}
   <link rel="stylesheet" href="{% static 'plm/app.css' %}">
 </head>
 <body>
   <main class="login-page">
     <section class="login-panel" aria-labelledby="login-title">
       <div class="brand-block" style="border:0;padding:0;margin-bottom:1.25rem;">
-        <h1 id="login-title">FreeCAD-PLM</h1>
+        <div class="login-brand-heading">
+          <img class="login-brand-mark" src="{% static 'plm/icons/favicon-32.png' %}" width="40" height="40" alt="">
+          <h1 id="login-title">FreeCAD-PLM</h1>
+        </div>
         <p class="login-subtitle">Anmelden und direkt mit Projekten und Revisionen weiterarbeiten.</p>
       </div>
 

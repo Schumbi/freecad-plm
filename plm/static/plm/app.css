@@ -313,19 +313,28 @@ input[type="radio"] {
 }
 
 .brand-name {
+  align-items: center;
   color: #fff;
-  display: block;
+  display: flex;
   font-size: 1.05rem;
   font-weight: 800;
+  gap: 0.65rem;
   letter-spacing: -0.02em;
   text-decoration: none;
+}
+
+.brand-mark {
+  border-radius: 7px;
+  flex: 0 0 2rem;
+  height: 2rem;
+  width: 2rem;
 }
 
 .brand-subtitle {
   color: var(--sidebar-muted);
   display: block;
   font-size: 0.78rem;
-  margin-top: 0.2rem;
+  margin: 0.2rem 0 0 2.65rem;
 }
 
 .nav-section-label {
@@ -1450,7 +1459,21 @@ td form {
 }
 
 .login-panel h1 {
+  margin: 0;
+}
+
+.login-brand-heading {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
   margin-bottom: 0.35rem;
+}
+
+.login-brand-mark {
+  border-radius: 9px;
+  flex: 0 0 2.5rem;
+  height: 2.5rem;
+  width: 2.5rem;
 }
 
 .login-subtitle {
@@ -1687,4 +1710,3 @@ code {
 figure {
   margin: 0;
 }
-
