@@ -1320,8 +1320,31 @@ a.object-title:hover {
 }
 
 .plm-dialog-panel.viewer {
+  display: flex;
+  flex-direction: column;
+  height: min(54rem, 96vh);
+  height: min(54rem, 96dvh);
   max-width: 88rem;
+  min-height: 0;
   width: min(100%, 88rem);
+}
+
+.model-viewer-dialog {
+  align-items: center;
+  overflow: hidden;
+  padding-block: 2vh;
+}
+
+.plm-dialog-panel.viewer .plm-dialog-header {
+  flex: 0 0 auto;
+}
+
+.plm-dialog-panel.viewer .plm-dialog-body {
+  display: flex;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .plm-dialog-header {
@@ -1388,7 +1411,11 @@ td form {
 
 .model-viewer-layout {
   display: grid;
+  flex: 1 1 auto;
   gap: var(--space-3);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  width: 100%;
 }
 
 .model-viewer-toolbar {
@@ -1407,13 +1434,14 @@ td form {
 }
 
 .model-viewer-canvas {
-  aspect-ratio: 16 / 9;
   background: #111827;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  min-height: 28rem;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   position: relative;
+  width: 100%;
 }
 
 .model-viewer-canvas canvas {
@@ -1575,6 +1603,32 @@ td form {
   .compare-toolbar .toolbar-group {
     display: grid;
     width: 100%;
+  }
+
+  .model-viewer-dialog {
+    padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+  }
+
+  .plm-dialog-panel.viewer {
+    height: calc(100vh - 1rem);
+    height: calc(100dvh - 1rem);
+  }
+
+  .plm-dialog-panel.viewer .plm-dialog-header,
+  .plm-dialog-panel.viewer .plm-dialog-body {
+    padding: var(--space-3);
+  }
+
+  .model-viewer-toolbar {
+    align-items: flex-start;
+  }
+
+  .model-viewer-toolbar-actions {
+    width: 100%;
+  }
+
+  .model-viewer-toolbar-actions > * {
+    flex: 1 1 auto;
   }
 }
 

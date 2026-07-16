@@ -20,6 +20,7 @@ let currentObject;
 let animationFrame;
 let wireframe = false;
 let activeLoadId = 0;
+let canvasResizeObserver;
 
 class ViewerHttpError extends Error {
   constructor(message, status) {
@@ -60,6 +61,10 @@ function ensureScene() {
   scene.add(axes);
 
   window.addEventListener("resize", resizeRenderer);
+  if (window.ResizeObserver) {
+    canvasResizeObserver = new ResizeObserver(resizeRenderer);
+    canvasResizeObserver.observe(canvasHost);
+  }
 }
 
 function resizeRenderer() {
@@ -67,9 +72,16 @@ function resizeRenderer() {
   const rect = canvasHost.getBoundingClientRect();
   const width = Math.max(rect.width, 1);
   const height = Math.max(rect.height, 1);
+  const nextAspect = width / height;
+  const aspectChanged = Math.abs(camera.aspect - nextAspect) > 0.05;
   renderer.setSize(width, height, false);
-  camera.aspect = width / height;
+  camera.aspect = nextAspect;
   camera.updateProjectionMatrix();
+
+  if (aspectChanged && currentObject) {
+    const viewDirection = camera.position.clone().sub(controls.target).normalize();
+    fitCamera(currentObject, viewDirection);
+  }
 }
 
 function animate() {
@@ -105,7 +117,7 @@ function setWireframe(enabled) {
   });
 }
 
-function fitCamera(object) {
+function fitCamera(object, viewDirection = new THREE.Vector3(1, 0.75, 1).normalize()) {
   const box = new THREE.Box3().setFromObject(object);
   if (box.isEmpty()) {
     camera.position.set(120, 100, 120);
@@ -121,8 +133,6 @@ function fitCamera(object) {
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
   const fitFov = Math.min(verticalFov, horizontalFov);
   const distance = (radius * 1.45) / Math.sin(fitFov / 2);
-  const viewDirection = new THREE.Vector3(1, 0.75, 1).normalize();
-
   camera.near = Math.max(distance / 500, 0.01);
   camera.far = distance * 500;
   camera.position.copy(center).addScaledVector(viewDirection, distance);
