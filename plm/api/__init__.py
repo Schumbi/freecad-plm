@@ -36,6 +36,7 @@ from .revisions import (
 )
 from .checkouts import (
     active_checkouts_api,
+    checkout_add_file_api,
     checkout_cancel_api,
     checkout_checkin_api,
     checkout_manifest_api,

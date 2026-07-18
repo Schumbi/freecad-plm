@@ -241,6 +241,11 @@ urlpatterns = [
         name="api_checkout_manifest",
     ),
     path(
+        "api/checkouts/<int:checkout_id>/files/add/",
+        api.checkout_add_file_api,
+        name="api_checkout_add_file",
+    ),
+    path(
         "api/checkouts/<int:checkout_id>/files/remove/",
         api.checkout_remove_file_api,
         name="api_checkout_remove_file",

@@ -511,6 +511,36 @@ class Checkout(TimeStampedModel):
         return f"{self.part.number} {self.base_revision.revision_code} {self.status}"
 
 
+class CheckoutFileAddition(TimeStampedModel):
+    checkout = models.ForeignKey(
+        Checkout,
+        on_delete=models.CASCADE,
+        related_name="added_files",
+    )
+    revision = models.ForeignKey(
+        Revision,
+        on_delete=models.PROTECT,
+        related_name="checkout_additions",
+    )
+    path = models.CharField(max_length=500)
+
+    class Meta:
+        ordering = ["path"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["checkout", "path"],
+                name="unique_added_path_per_checkout",
+            ),
+            models.UniqueConstraint(
+                fields=["checkout", "revision"],
+                name="unique_added_revision_per_checkout",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.checkout_id} {self.path} -> {self.revision}"
+
+
 class Annotation(TimeStampedModel):
     class Status(models.TextChoices):
         OPEN = "open", "Offen"
@@ -662,6 +692,7 @@ class AuditEvent(models.Model):
         MANUFACTURING_RUN_CREATED = "manufacturing_run_created", "Fertigungslauf angelegt"
         MANUFACTURING_RUN_ATTACHMENT_ADDED = "manufacturing_run_attachment_added", "Fertigungslauf-Anhang angelegt"
         CHECKOUT_CREATED = "checkout_created", "Checkout angelegt"
+        CHECKOUT_FILE_ADDED = "checkout_file_added", "Teil zu Checkout hinzugefügt"
         CHECKOUT_FILE_REMOVED = "checkout_file_removed", "Teil aus Checkout entfernt"
         CHECKOUT_CANCELED = "checkout_canceled", "Checkout abgebrochen"
         CHECKOUT_COMPLETED = "checkout_completed", "Checkout eingecheckt"

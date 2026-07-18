@@ -27,6 +27,7 @@ from .models import (
     ApiToken,
     AuditEvent,
     Checkout,
+    CheckoutFileAddition,
     ExportJob,
     ManufacturingFile,
     ManufacturingMachine,
@@ -3507,6 +3508,166 @@ class AddonApiWorkflowTests(TestCase):
             ["Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"],
         )
         self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
+
+    def test_checkout_can_add_unlinked_part_and_complete_snapshot(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(
+                members={
+                    "praxis/Box.FCStd": make_fcstd_bytes("Box"),
+                    "praxis/Druck.FCStd": make_fcstd_bytes(
+                        "Druck",
+                        object_type="Assembly::AssemblyObject",
+                        xlinks=[("Box.FCStd", "Body")],
+                    ),
+                }
+            ),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        extra_part = Part.objects.create(
+            project=self.project,
+            number="P-099",
+            name="Big Bottle",
+        )
+        extra_revision = create_revision_from_upload(
+            extra_part,
+            fcstd_upload_from_bytes(
+                fcstd_with_plm_revision(make_fcstd_bytes("Big Bottle"), "R0001"),
+                name="bigBottle.FCStd",
+            ),
+            self.user,
+        )
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+
+        response = self.post_json(
+            reverse("plm:api_checkout_add_file", args=[checkout_id]),
+            {"revision_id": extra_revision.id},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["added_file"]["path"], "praxis/bigBottle.FCStd")
+        self.assertEqual(
+            response.json()["manifest"]["added_paths"],
+            ["praxis/bigBottle.FCStd"],
+        )
+        self.assertTrue(
+            CheckoutFileAddition.objects.filter(
+                checkout_id=checkout_id,
+                revision=extra_revision,
+                path="praxis/bigBottle.FCStd",
+            ).exists()
+        )
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": "[]",
+                "change_summary": "Big Bottle zum Projektstand hinzugefügt.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["checkout"]["status"], Checkout.Status.COMPLETED)
+        completed_snapshot = self.project.snapshots.order_by("-created_at").first()
+        self.assertNotEqual(completed_snapshot.id, snapshot.id)
+        self.assertEqual(
+            completed_snapshot.entries.get(path="praxis/bigBottle.FCStd").revision_id,
+            extra_revision.id,
+        )
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.CHECKOUT_FILE_ADDED,
+                metadata__checkout_id=checkout_id,
+                metadata__path="praxis/bigBottle.FCStd",
+            ).exists()
+        )
+
+    def test_removing_pending_addition_cancels_it(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        extra_part = Part.objects.create(
+            project=self.project,
+            number="P-099",
+            name="Big Bottle",
+        )
+        extra_revision = create_revision_from_upload(
+            extra_part,
+            fcstd_upload_from_bytes(
+                fcstd_with_plm_revision(make_fcstd_bytes("Big Bottle"), "R0001"),
+                name="bigBottle.FCStd",
+            ),
+            self.user,
+        )
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        self.post_json(
+            reverse("plm:api_checkout_add_file", args=[checkout_id]),
+            {"revision_id": extra_revision.id},
+        )
+
+        response = self.post_json(
+            reverse("plm:api_checkout_remove_file", args=[checkout_id]),
+            {"path": "bigBottle.FCStd"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["manifest"]["added_paths"], [])
+        self.assertFalse(CheckoutFileAddition.objects.filter(checkout_id=checkout_id).exists())
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.removed_paths, [])
+
+    def test_checkout_cannot_add_part_with_active_checkout(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        extra_part = Part.objects.create(
+            project=self.project,
+            number="P-099",
+            name="Big Bottle",
+        )
+        extra_revision = create_revision_from_upload(
+            extra_part,
+            fcstd_upload_from_bytes(
+                fcstd_with_plm_revision(make_fcstd_bytes("Big Bottle"), "R0001"),
+                name="bigBottle.FCStd",
+            ),
+            self.user,
+        )
+        create_checkout(extra_revision, self.user)
+        master_checkout = create_checkout(root_revision, self.user, snapshot=snapshot)
+
+        response = self.post_json(
+            reverse("plm:api_checkout_add_file", args=[master_checkout.id]),
+            {"revision_id": extra_revision.id},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["error"],
+            "Das hinzuzufügende Teil ist bereits eigenständig ausgecheckt.",
+        )
+        self.assertFalse(CheckoutFileAddition.objects.exists())
 
     def test_checkout_can_remove_non_root_file_from_manifest(self):
         self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])

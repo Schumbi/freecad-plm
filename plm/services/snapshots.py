@@ -327,7 +327,11 @@ def checkout_snapshot_name(source_snapshot_name, checkout_id):
 
 def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
     removed_paths = set(checkout.removed_paths or [])
-    if not checkout.snapshot_id or (not revisions and not removed_paths):
+    additions = {
+        addition.path: addition.revision
+        for addition in checkout.added_files.select_related("revision").order_by("path")
+    }
+    if not checkout.snapshot_id or (not revisions and not removed_paths and not additions):
         return None
 
     replacements = {item["path"]: item["revision"] for item in revisions}
@@ -336,13 +340,26 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
         name=checkout_snapshot_name(checkout.snapshot.name, checkout.id),
         created_by=actor,
     )
+    copied_paths = set()
     for entry in checkout.snapshot.entries.select_related("revision").order_by("path"):
         if entry.path in removed_paths:
             continue
         ProjectSnapshotEntry.objects.create(
             snapshot=snapshot,
             path=entry.path,
-            revision=replacements.get(entry.path, entry.revision),
+            revision=replacements.get(
+                entry.path,
+                additions.get(entry.path, entry.revision),
+            ),
+        )
+        copied_paths.add(entry.path)
+    for path, revision in additions.items():
+        if path in copied_paths or path in removed_paths:
+            continue
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            path=path,
+            revision=replacements.get(path, revision),
         )
     AuditEvent.objects.create(
         actor=actor,
@@ -356,6 +373,7 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
             "entry_count": snapshot.entries.count(),
             "updated_paths": sorted(replacements),
             "removed_paths": sorted(removed_paths),
+            "added_paths": sorted(additions),
         },
     )
     return snapshot

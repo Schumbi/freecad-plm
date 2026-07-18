@@ -74,6 +74,7 @@ from .manifests import (
     revision_manifest,
 )
 from .checkouts import (
+    add_checkout_file,
     cancel_checkout,
     checkin_checkout,
     checkin_checkout_files,

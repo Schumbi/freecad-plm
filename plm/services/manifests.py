@@ -35,14 +35,26 @@ def manifest_entries_for_revision(revision, snapshot=None):
 
 def manifest_entries_for_checkout(checkout):
     removed_paths = set(checkout.removed_paths or [])
-    return [
-        entry
+    entries_by_path = {
+        entry["path"]: entry
         for entry in manifest_entries_for_revision(
             checkout.base_revision,
             snapshot=checkout.snapshot,
         )
         if entry["path"] not in removed_paths
-    ]
+    }
+    for addition in checkout.added_files.select_related(
+        "revision",
+        "revision__part",
+    ).order_by("path"):
+        if addition.path in removed_paths:
+            continue
+        entries_by_path[addition.path] = {
+            "path": addition.path,
+            "revision": addition.revision,
+            "is_root": False,
+        }
+    return [entries_by_path[path] for path in sorted(entries_by_path)]
 
 
 def manifest_file_payload(entry):
@@ -124,6 +136,9 @@ def checkout_manifest(checkout):
             else None
         ),
         "removed_paths": sorted(checkout.removed_paths or []),
+        "added_paths": list(
+            checkout.added_files.order_by("path").values_list("path", flat=True)
+        ),
         "files": [manifest_file_payload(entry) for entry in entries],
     }
 
