@@ -33,6 +33,18 @@ def manifest_entries_for_revision(revision, snapshot=None):
     ]
 
 
+def manifest_entries_for_checkout(checkout):
+    removed_paths = set(checkout.removed_paths or [])
+    return [
+        entry
+        for entry in manifest_entries_for_revision(
+            checkout.base_revision,
+            snapshot=checkout.snapshot,
+        )
+        if entry["path"] not in removed_paths
+    ]
+
+
 def manifest_file_payload(entry):
     revision = entry["revision"]
     return {
@@ -83,10 +95,7 @@ def revision_manifest(revision, snapshot=None):
 
 
 def checkout_manifest(checkout):
-    entries = manifest_entries_for_revision(
-        checkout.base_revision,
-        snapshot=checkout.snapshot,
-    )
+    entries = manifest_entries_for_checkout(checkout)
     return {
         "checkout_id": checkout.id,
         "status": checkout.status,
@@ -114,6 +123,7 @@ def checkout_manifest(checkout):
             if checkout.snapshot_id
             else None
         ),
+        "removed_paths": sorted(checkout.removed_paths or []),
         "files": [manifest_file_payload(entry) for entry in entries],
     }
 
@@ -121,8 +131,5 @@ def checkout_manifest(checkout):
 def manifest_entries_by_path(checkout):
     return {
         entry["path"]: entry
-        for entry in manifest_entries_for_revision(
-            checkout.base_revision,
-            snapshot=checkout.snapshot,
-        )
+        for entry in manifest_entries_for_checkout(checkout)
     }

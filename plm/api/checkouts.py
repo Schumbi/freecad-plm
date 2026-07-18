@@ -8,7 +8,15 @@ from django.views.decorators.http import require_http_methods
 from ..auth import api_auth_required
 from ..models import ApiToken, Checkout, ProjectSnapshot, Revision
 from ..permissions import is_plm_admin
-from ..services import cancel_checkout, checkin_checkout, checkin_checkout_files, checkout_manifest, create_checkout
+from ..services import (
+    cancel_checkout,
+    checkin_checkout,
+    checkin_checkout_files,
+    checkout_manifest,
+    create_checkout,
+    manifest_file_payload,
+    remove_checkout_file,
+)
 
 from .common import (
     active_checkout_payload,
@@ -95,6 +103,40 @@ def checkout_manifest_api(request, checkout_id):
     manifest = checkout_manifest(checkout)
     add_manifest_download_urls(manifest, request)
     return JsonResponse({"checkout": checkout_payload(checkout), "manifest": manifest})
+
+
+@csrf_exempt
+@api_auth_required(post=ApiToken.Scope.CHECKOUT)
+@require_http_methods(["POST"])
+def checkout_remove_file_api(request, checkout_id):
+    checkout = get_object_or_404(
+        Checkout.objects.select_related(
+            "part",
+            "part__project",
+            "base_revision",
+            "snapshot",
+            "checked_out_by",
+        ),
+        id=checkout_id,
+    )
+    if checkout.checked_out_by_id != request.user.id and not is_plm_admin(request.user):
+        return JsonResponse({"error": "Nur der Checkout-Besitzer darf Teile entfernen."}, status=403)
+    try:
+        removed_entry = remove_checkout_file(
+            checkout,
+            json_body(request).get("path", ""),
+            request.user,
+        )
+    except ValidationError as exc:
+        return validation_error_response(exc, status=409)
+    manifest = add_manifest_download_urls(checkout_manifest(checkout), request)
+    return JsonResponse(
+        {
+            "checkout": checkout_payload(checkout),
+            "removed_file": manifest_file_payload(removed_entry),
+            "manifest": manifest,
+        }
+    )
 
 
 @csrf_exempt

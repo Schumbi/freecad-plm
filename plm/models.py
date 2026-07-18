@@ -486,6 +486,7 @@ class Checkout(TimeStampedModel):
         default=Status.ACTIVE,
     )
     workspace_hint = models.CharField(max_length=500, blank=True)
+    removed_paths = models.JSONField(default=list, blank=True)
     completed_revision = models.ForeignKey(
         Revision,
         on_delete=models.PROTECT,
@@ -661,6 +662,7 @@ class AuditEvent(models.Model):
         MANUFACTURING_RUN_CREATED = "manufacturing_run_created", "Fertigungslauf angelegt"
         MANUFACTURING_RUN_ATTACHMENT_ADDED = "manufacturing_run_attachment_added", "Fertigungslauf-Anhang angelegt"
         CHECKOUT_CREATED = "checkout_created", "Checkout angelegt"
+        CHECKOUT_FILE_REMOVED = "checkout_file_removed", "Teil aus Checkout entfernt"
         CHECKOUT_CANCELED = "checkout_canceled", "Checkout abgebrochen"
         CHECKOUT_COMPLETED = "checkout_completed", "Checkout eingecheckt"
         ANNOTATION_CREATED = "annotation_created", "Anmerkung angelegt"

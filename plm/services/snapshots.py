@@ -326,7 +326,8 @@ def checkout_snapshot_name(source_snapshot_name, checkout_id):
 
 
 def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
-    if not checkout.snapshot_id or not revisions:
+    removed_paths = set(checkout.removed_paths or [])
+    if not checkout.snapshot_id or (not revisions and not removed_paths):
         return None
 
     replacements = {item["path"]: item["revision"] for item in revisions}
@@ -336,6 +337,8 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
         created_by=actor,
     )
     for entry in checkout.snapshot.entries.select_related("revision").order_by("path"):
+        if entry.path in removed_paths:
+            continue
         ProjectSnapshotEntry.objects.create(
             snapshot=snapshot,
             path=entry.path,
@@ -352,6 +355,7 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
             "checkout_id": checkout.id,
             "entry_count": snapshot.entries.count(),
             "updated_paths": sorted(replacements),
+            "removed_paths": sorted(removed_paths),
         },
     )
     return snapshot

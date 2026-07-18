@@ -39,6 +39,7 @@ from .checkouts import (
     checkout_cancel_api,
     checkout_checkin_api,
     checkout_manifest_api,
+    checkout_remove_file_api,
     revision_checkout_api,
 )
 from .annotations import (

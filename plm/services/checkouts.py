@@ -65,6 +65,46 @@ def cancel_checkout(checkout, actor):
     return checkout
 
 
+@transaction.atomic
+def remove_checkout_file(checkout, path, actor):
+    if checkout.status != Checkout.Status.ACTIVE:
+        raise ValidationError("Nur aus aktiven Checkouts koennen Teile entfernt werden.")
+
+    path = safe_snapshot_path(path.strip())
+    entries_by_path = {
+        entry["path"]: entry
+        for entry in manifest_entries_for_revision(
+            checkout.base_revision,
+            snapshot=checkout.snapshot,
+        )
+    }
+    entry = entries_by_path.get(path)
+    if entry is None:
+        raise ValidationError("Dateipfad ist nicht Teil des Checkout-Manifests.")
+    if entry["is_root"]:
+        raise ValidationError("Das Hauptteil kann nicht aus dem Checkout entfernt werden.")
+
+    removed_paths = list(checkout.removed_paths or [])
+    if path in removed_paths:
+        raise ValidationError("Dieses Teil wurde bereits aus dem Checkout entfernt.")
+    removed_paths.append(path)
+    checkout.removed_paths = sorted(removed_paths)
+    checkout.save(update_fields=["removed_paths", "updated_at"])
+
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.CHECKOUT_FILE_REMOVED,
+        object_repr=str(checkout),
+        metadata={
+            "checkout_id": checkout.id,
+            "part_id": entry["revision"].part_id,
+            "revision_id": entry["revision"].id,
+            "path": path,
+        },
+    )
+    return entry
+
+
 def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
     revisions = revisions or []
     checkout.status = Checkout.Status.COMPLETED
@@ -103,6 +143,7 @@ def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
                 }
                 for item in revisions
             ],
+            "removed_paths": sorted(checkout.removed_paths or []),
             "completed_snapshot_id": completed_snapshot.id if completed_snapshot else None,
         },
     )
@@ -160,7 +201,7 @@ def checkin_checkout(checkout, uploaded_file, actor, notes=""):
 def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, notes=""):
     if checkout.status != Checkout.Status.ACTIVE:
         raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
-    if not files_metadata:
+    if not files_metadata and not checkout.removed_paths:
         raise ValidationError("Keine Dateien fuer den Check-in angegeben.")
 
     manifest_by_path = manifest_entries_by_path(checkout)
@@ -215,7 +256,7 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
         if manifest_entry["is_root"]:
             root_revision = revision
 
-    if revisions:
+    if revisions or checkout.removed_paths:
         complete_checkout(
             checkout,
             actor,

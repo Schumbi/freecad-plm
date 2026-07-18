@@ -68,6 +68,7 @@ from .snapshots import (
 from .manifests import (
     checkout_manifest,
     manifest_entries_by_path,
+    manifest_entries_for_checkout,
     manifest_entries_for_revision,
     manifest_file_payload,
     revision_manifest,
@@ -78,6 +79,7 @@ from .checkouts import (
     checkin_checkout_files,
     complete_checkout,
     create_checkout,
+    remove_checkout_file,
 )
 from .search import (
     PLM_SEARCH_RESULT_LIMIT,

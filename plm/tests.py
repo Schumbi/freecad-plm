@@ -3508,6 +3508,109 @@ class AddonApiWorkflowTests(TestCase):
         )
         self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
 
+    def test_checkout_can_remove_non_root_file_from_manifest(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+
+        response = self.post_json(
+            reverse("plm:api_checkout_remove_file", args=[checkout_id]),
+            {"path": "Box.FCStd"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["removed_file"]["path"], "Box.FCStd")
+        self.assertEqual(response.json()["manifest"]["removed_paths"], ["Box.FCStd"])
+        self.assertNotIn(
+            "Box.FCStd",
+            [item["path"] for item in response.json()["manifest"]["files"]],
+        )
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.removed_paths, ["Box.FCStd"])
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.CHECKOUT_FILE_REMOVED,
+                metadata__checkout_id=checkout_id,
+                metadata__path="Box.FCStd",
+            ).exists()
+        )
+
+    def test_checkout_cannot_remove_root_file(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+
+        response = self.post_json(
+            reverse("plm:api_checkout_remove_file", args=[checkout_id]),
+            {"path": "Druck.FCStd"},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["error"],
+            "Das Hauptteil kann nicht aus dem Checkout entfernt werden.",
+        )
+        self.assertEqual(Checkout.objects.get(id=checkout_id).removed_paths, [])
+
+    def test_removal_only_checkin_creates_snapshot_without_removed_file(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(),
+            self.user,
+            name="Arbeitsstand",
+        )
+        root_revision = Revision.objects.get(part__name="Druck")
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {"snapshot_id": snapshot.id},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+        self.post_json(
+            reverse("plm:api_checkout_remove_file", args=[checkout_id]),
+            {"path": "Box.FCStd"},
+        )
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "files_metadata": "[]",
+                "change_summary": "Box aus Projektstand entfernt.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["checkout"]["status"], Checkout.Status.COMPLETED)
+        checkout = Checkout.objects.get(id=checkout_id)
+        self.assertEqual(checkout.status, Checkout.Status.COMPLETED)
+        self.assertIsNone(checkout.completed_revision)
+        completed_snapshot = self.project.snapshots.order_by("-created_at").first()
+        self.assertNotEqual(completed_snapshot.id, snapshot.id)
+        self.assertEqual(
+            list(completed_snapshot.entries.values_list("path", flat=True)),
+            ["Chip.FCStd", "Deckel.FCStd", "Druck.FCStd", "Zusammenbau.FCStd"],
+        )
+
     def test_checkout_rejects_snapshot_from_different_project(self):
         self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
         other_project = Project.objects.create(code="OTHER", name="Anderes Projekt")
