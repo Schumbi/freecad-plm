@@ -17,8 +17,7 @@ services:
     image: ${PLM_WEB_IMAGE:-freecad-plm-web:local}
     build:
       context: .
-      args:
-        INSTALL_FREECAD: "0"
+      target: web
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -57,8 +56,7 @@ services:
     user: "${PLM_USER:-plm}"
     build:
       context: .
-      args:
-        INSTALL_FREECAD: "1"
+      target: worker
     init: true
     cap_drop:
       - ALL
@@ -93,7 +91,7 @@ services:
       PREVIEW_PNG_WIDTH: ${PREVIEW_PNG_WIDTH:-400}
       PREVIEW_PNG_HEIGHT: ${PREVIEW_PNG_HEIGHT:-300}
       TMPDIR: /tmp
-      # FreeCAD 1.0 braucht ein beschreibbares HOME (read-only Root-FS + tmpfs /tmp)
+      # FreeCAD braucht ein beschreibbares HOME (read-only Root-FS + tmpfs /tmp)
       HOME: /tmp
     volumes:
       - media-data:/app/storage

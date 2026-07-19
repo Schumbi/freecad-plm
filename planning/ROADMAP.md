@@ -62,8 +62,8 @@ Die V1-Roadmap ist im Code umgesetzt. Docker Compose, Worker, Addon-API und mode
 
 Betriebsreife und Wartbarkeit ausgebaut:
 
-- Forgejo-CI fuehrt die 184 Tests vor jedem Push aus (beschleunigt via MD5-Hasher im Testmodus + `--parallel`).
-- Getrennte Web-/Worker-Images (Build-Arg `INSTALL_FREECAD`); Web-Image von ~2 GB auf ~279 MB verkleinert.
+- Forgejo-CI fuehrt die 192 Tests vor jedem Push aus (beschleunigt via MD5-Hasher im Testmodus + `--parallel`).
+- Getrennte Web-/Worker-Targets; Web-Image ohne FreeCAD, Worker mit dem offiziellen, per SHA-256 gepinnten FreeCAD-1.1.1-AppImage.
 - Kernmodule `services.py`/`views.py`/`api.py` in Pakete (`plm/services/`, `plm/views/`, `plm/api/`) mit re-exportierender Fassade aufgeteilt (Finding 2.1 / A5 erledigt).
 
 Weiterhin offen fuer V1.0: dokumentierte Browser-Abnahme und Betriebsabnahme auf dem Zielserver.

@@ -29,8 +29,8 @@ jobs:
           docker build \
             --progress=plain \
             --pull=false \
+            --target web \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --build-arg INSTALL_FREECAD=0 \
             -t "${IMAGE}:latest" \
             -t "${IMAGE}:${{ github.sha }}" \
             .
@@ -41,8 +41,8 @@ jobs:
           docker build \
             --progress=plain \
             --pull=false \
+            --target worker \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --build-arg INSTALL_FREECAD=1 \
             -t "${IMAGE}:latest" \
             -t "${IMAGE}:${{ github.sha }}" \
             .

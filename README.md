@@ -19,9 +19,9 @@ Django-Admin-Oberflaeche liegt weiterhin unter <http://127.0.0.1:8000/admin/>.
 
 ## Serverbetrieb Mit Docker Compose
 
-Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker laufen aus demselben PLM-Image. Dieses Image enthaelt Django, Gunicorn und FreeCAD/FreeCADCmd.
+Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker werden aus getrennten Docker-Targets gebaut. Beide enthalten die PLM-Anwendung; nur das Worker-Image enthält FreeCAD/FreeCADCmd.
 
-Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut bei jedem Push nach `main` oder `master` automatisch **zwei** Images aus dem lokalen `Dockerfile`, fuehrt die Django-Tests aus und veroeffentlicht nur bei bestandenen Tests. Das Web-Image wird ohne FreeCAD gebaut (`INSTALL_FREECAD=0`) und ist dadurch deutlich kleiner; nur der Worker enthaelt FreeCAD:
+Der Forgejo-Workflow in `.forgejo/workflows/build-image.yml` baut bei jedem Push nach `main` oder `master` automatisch **zwei** Images aus dem lokalen `Dockerfile`, fuehrt die Django-Tests aus und veroeffentlicht nur bei bestandenen Tests. Das Web-Image nutzt das Build-Target `web` ohne FreeCAD und bleibt dadurch klein; nur das Target `worker` enthaelt das auf FreeCAD 1.1.1 gepinnte und per SHA-256 gepruefte offizielle AppImage:
 
 ```text
 git.home.schumbi.de/ralf/freecad-plm-web:latest
@@ -191,8 +191,8 @@ Normalerweise baut der Forgejo-Workflow in diesem Repo die Images. Manuell geht 
 ```bash
 git clone ssh://home.schumbi.de/ralf/freecad-plm.git /opt/freecad-plm-build
 cd /opt/freecad-plm-build
-docker build --build-arg INSTALL_FREECAD=0 -t git.home.schumbi.de/ralf/freecad-plm-web:latest .
-docker build --build-arg INSTALL_FREECAD=1 -t git.home.schumbi.de/ralf/freecad-plm-worker:latest .
+docker build --target web -t git.home.schumbi.de/ralf/freecad-plm-web:latest .
+docker build --target worker -t git.home.schumbi.de/ralf/freecad-plm-worker:latest .
 docker push git.home.schumbi.de/ralf/freecad-plm-web:latest
 docker push git.home.schumbi.de/ralf/freecad-plm-worker:latest
 ```
@@ -352,7 +352,7 @@ Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Da
 
 ## FreeCADCmd
 
-Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf die Flatpak-Installation `org.freecad.FreeCAD` mit `--command=FreeCADCmd` und `/tmp`-Freigabe zurueck, wenn `flatpak` vorhanden ist.
+Exportjobs werden mit `FREECADCMD_COMMAND` ausgefuehrt. Das Docker-Worker-Image enthaelt FreeCAD 1.1.1 aus dem offiziellen x86_64-AppImage; Version und SHA-256 sind im Dockerfile fest gepinnt. Ohne eigene Einstellung versucht das PLM zuerst `FreeCADCmd` und faellt auf lokalen Installationen auf Flatpak `org.freecad.FreeCAD` mit `--command=FreeCADCmd` und `/tmp`-Freigabe zurueck, wenn Flatpak vorhanden ist.
 
 Beispiel fuer eine explizite Flatpak-Konfiguration:
 
