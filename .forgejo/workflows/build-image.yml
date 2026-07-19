@@ -42,6 +42,7 @@ jobs:
             | awk -v image="${IMAGE}" '$1 == image { print $2 }' \
             | sort -u \
             | xargs -r docker image rm --force
+          docker builder prune --all --force
 
       - name: Build worker image (mit FreeCAD)
         run: |
