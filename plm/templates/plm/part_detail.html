@@ -31,6 +31,38 @@
       </div>
       <p class="mobile-properties-link"><a href="{% url 'plm:part_properties' part.id %}">Eigenschaften anzeigen</a></p>
 
+      <div class="section-header">
+        <h2>FreeCAD-Anmerkungen</h2>
+        {% if annotations %}
+          <span class="muted">{{ open_annotations_count }} offen · {{ annotations|length }} gesamt</span>
+        {% endif %}
+      </div>
+      {% if annotations %}
+        <div class="annotation-list">
+          {% for annotation in annotations %}
+            <article class="annotation-card">
+              <div class="annotation-title-row">
+                <span class="status-badge status-{{ annotation.status }}">{{ annotation.get_status_display }}</span>
+                {% if annotation.revision %}
+                  <span class="revision-code">{{ annotation.revision.revision_code }}</span>
+                {% else %}
+                  <span class="meta-line">Teilübergreifend</span>
+                {% endif %}
+                {% if annotation.object_name %}
+                  <span class="artifact-pill">{{ annotation.object_name }}{% if annotation.subelement %} · {{ annotation.subelement }}{% endif %}</span>
+                {% elif annotation.subelement %}
+                  <span class="artifact-pill">{{ annotation.subelement }}</span>
+                {% endif %}
+              </div>
+              <p class="annotation-text">{{ annotation.text }}</p>
+              <p class="meta-line">{{ annotation.created_at|date:"d.m.Y H:i" }} · {{ annotation.created_by }}</p>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">Noch keine FreeCAD-Anmerkungen vorhanden.</div>
+      {% endif %}
+
       <div class="toolbar">
         <div class="toolbar-group">
           <span class="muted" id="revision-filter-count" data-filter-default="{{ revisions|length }} Revisionen">{{ revisions|length }} Revisionen</span>

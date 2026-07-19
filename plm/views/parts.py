@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ManufacturingFileUploadForm, PartForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
-from ..models import AuditEvent, ExportJob, Part, Project
+from ..models import Annotation, AuditEvent, ExportJob, Part, Project
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
 from ..services import create_revision_from_upload, next_part_number
 
@@ -77,6 +77,11 @@ def create_part(request, project_id):
 @login_required
 def part_detail(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    annotations = list(
+        part.annotations.select_related("created_by", "revision").order_by(
+            "status", "-created_at"
+        )
+    )
     revisions = (
         part.revisions.select_related("created_by")
         .prefetch_related("artifacts", "export_jobs", "manufacturing_files")
@@ -91,6 +96,11 @@ def part_detail(request, part_id):
         "plm/part_detail.html",
         {
             "part": part,
+            "annotations": annotations,
+            "open_annotations_count": sum(
+                annotation.status == Annotation.Status.OPEN
+                for annotation in annotations
+            ),
             "revisions": revisions,
             "selected_revision": selected_revision,
             "form": RevisionUploadForm(),

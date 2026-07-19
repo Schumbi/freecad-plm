@@ -970,6 +970,31 @@ main {
   min-width: 0;
 }
 
+.annotation-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.annotation-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+}
+
+.annotation-title-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.annotation-text {
+  margin: var(--space-3) 0 var(--space-2);
+  white-space: pre-wrap;
+}
+
 .revision-title-row {
   align-items: center;
   display: flex;
@@ -1033,13 +1058,15 @@ a.object-title:hover {
 }
 
 .status-running,
-.status-draft {
+.status-draft,
+.status-open {
   background: var(--accent-soft);
   color: var(--accent-dark);
 }
 
 .status-completed,
 .status-released,
+.status-resolved,
 .job-succeeded {
   background: var(--success-soft);
   color: var(--success);

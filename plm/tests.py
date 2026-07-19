@@ -1040,6 +1040,59 @@ class RevisionUploadViewTests(TestCase):
         self.assertContains(response, "Neue Revision hochladen")
         self.assertContains(response, "Revision hochladen")
 
+    def test_part_detail_shows_freecad_annotations_with_status_and_target(self):
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        Annotation.objects.create(
+            project=self.project,
+            part=self.part,
+            revision=revision,
+            object_name="Body",
+            subelement="Face12",
+            text="Kante beim nächsten Check-in abrunden.",
+            status=Annotation.Status.OPEN,
+            created_by=self.user,
+        )
+        Annotation.objects.create(
+            project=self.project,
+            part=self.part,
+            text="Druckprobe abgeschlossen.",
+            status=Annotation.Status.RESOLVED,
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, "FreeCAD-Anmerkungen")
+        self.assertContains(response, "1 offen · 2 gesamt")
+        self.assertContains(response, "Kante beim nächsten Check-in abrunden.")
+        self.assertContains(response, "Offen")
+        self.assertContains(response, revision.revision_code)
+        self.assertContains(response, "Body")
+        self.assertContains(response, "Face12")
+        self.assertContains(response, "Druckprobe abgeschlossen.")
+        self.assertContains(response, "Erledigt")
+        self.assertContains(response, "Teilübergreifend")
+
+    def test_part_detail_does_not_show_annotations_from_other_parts(self):
+        other_part = Part.objects.create(
+            project=self.project,
+            number="P-002",
+            name="Anderes Teil",
+        )
+        Annotation.objects.create(
+            project=self.project,
+            part=other_part,
+            text="Gehört nicht zu P-001.",
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertNotContains(response, "Gehört nicht zu P-001.")
+        self.assertContains(response, "Noch keine FreeCAD-Anmerkungen vorhanden.")
+
     def test_part_detail_shows_freecad_metadata(self):
         create_revision_from_upload(self.part, make_zip_upload(), self.user)
         self.client.force_login(self.user)
