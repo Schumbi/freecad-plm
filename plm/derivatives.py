@@ -1,6 +1,11 @@
 from django.conf import settings
 
-from .freecadcmd import PNG_VIEW_NAMES, create_export_job, process_export_job
+from .freecadcmd import (
+    PNG_VIEW_NAMES,
+    PREVIEW_GENERATOR_VERSION,
+    create_export_job,
+    process_export_job,
+)
 from .models import ExportJob, RevisionArtifact
 
 JOB_ACTIVE_STATUSES = (
@@ -14,6 +19,7 @@ def revision_png_view_names(revision):
         revision.artifacts.filter(
             artifact_type=RevisionArtifact.ArtifactType.PNG,
             view_name__in=PNG_VIEW_NAMES,
+            metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
         ).values_list("view_name", flat=True)
     )
 

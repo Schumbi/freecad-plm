@@ -267,13 +267,15 @@ def build_revision_compare_pairs(left_revision, right_revision):
     left_pngs = {
         artifact.view_name: artifact
         for artifact in left_revision.artifacts.filter(
-            artifact_type=RevisionArtifact.ArtifactType.PNG
+            artifact_type=RevisionArtifact.ArtifactType.PNG,
+            metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
         )
     }
     right_pngs = {
         artifact.view_name: artifact
         for artifact in right_revision.artifacts.filter(
-            artifact_type=RevisionArtifact.ArtifactType.PNG
+            artifact_type=RevisionArtifact.ArtifactType.PNG,
+            metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
         )
     }
     comparisons = []

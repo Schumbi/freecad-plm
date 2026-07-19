@@ -16,7 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .mesh_preview import render_stl_views
-from .models import AuditEvent, ExportJob, Revision, RevisionArtifact
+from .models import AuditEvent, ExportJob, RevisionArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 2
+PREVIEW_GENERATOR_VERSION = 3
 
 
 FREECADCMD_SCRIPT = r'''
@@ -426,42 +426,27 @@ def run_freecadcmd_job(job):
 
 
 def stage_revision_inputs(job, workdir):
+    # Lokaler Import vermeidet einen Modulzyklus: services.checkouts startet
+    # seinerseits Ableitungsjobs ueber plm.derivatives/freecadcmd.
+    from .services.manifests import manifest_entries_for_revision
+
     root_revision = job.revision
-    root_filename = Path(root_revision.original_filename).name
-    root_path = workdir / root_filename
-    copy_revision_file(root_revision, root_path)
-
-    project_revisions = Revision.objects.filter(
-        part__project=root_revision.part.project
-    ).exclude(pk=root_revision.pk).select_related("part").order_by(
-        "part_id",
-        "-created_at",
-        "-id",
+    root_entry = (
+        root_revision.snapshot_entries.select_related("snapshot")
+        .order_by("snapshot__created_at", "id")
+        .first()
     )
-    candidates = {}
-    for revision in project_revisions:
-        filename = Path(revision.original_filename).name
-        candidates.setdefault(filename.lower(), revision)
+    snapshot = root_entry.snapshot if root_entry else None
+    entries = manifest_entries_for_revision(root_revision, snapshot=snapshot)
+    root_path = None
+    for entry in entries:
+        target_path = workdir / Path(entry["path"])
+        copy_revision_file(entry["revision"], target_path)
+        if entry["is_root"]:
+            root_path = target_path
 
-    staged = {root_filename.lower()}
-    queue = list(referenced_fcstd_files(root_revision))
-    while queue:
-        reference = queue.pop(0)
-        reference_path = safe_relative_fcstd_path(reference)
-        if reference_path is None:
-            continue
-        key = reference_path.name.lower()
-        if key in staged:
-            continue
-        dependency = candidates.get(key)
-        if dependency is None:
-            continue
-
-        target_path = workdir / reference_path
-        copy_revision_file(dependency, target_path)
-        staged.add(key)
-        queue.extend(referenced_fcstd_files(dependency))
-
+    if root_path is None:
+        raise RuntimeError("Die Hauptdatei fehlt im Projektstand des FreeCAD-Jobs.")
     return root_path
 
 
@@ -469,24 +454,6 @@ def copy_revision_file(revision, target_path):
     target_path.parent.mkdir(parents=True, exist_ok=True)
     with revision.file.open("rb") as source:
         target_path.write_bytes(source.read())
-
-
-def referenced_fcstd_files(revision):
-    document = (revision.extracted_metadata or {}).get("freecad_document") or {}
-    references = document.get("references") or []
-    files = []
-    for reference in references:
-        filename = reference.get("file") if isinstance(reference, dict) else ""
-        if filename and filename.lower().endswith(".fcstd"):
-            files.append(filename)
-    return files
-
-
-def safe_relative_fcstd_path(filename):
-    path = Path(filename)
-    if path.is_absolute() or ".." in path.parts:
-        return None
-    return path
 
 
 def freecadcmd_command(job=None):

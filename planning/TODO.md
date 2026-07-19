@@ -102,6 +102,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Recovery haengengebliebener Exportjobs (`EXPORT_JOB_STALE_SECONDS`).
 - Globale PLM-Suche unter `/search/` fuer Projekte, Teile, Revisionen und Dateipfade in Projektstaenden.
 - Freigegebene Revisionen koennen in der Web-UI als obsolet markiert werden (`revision_obsoleted` im Audit-Trail).
-- Forgejo-CI fuehrt vor dem Push die 192 Tests im gebauten Image aus; Testlauf durch MD5-Hasher im Testmodus und `--parallel` von ~266s auf wenige Sekunden beschleunigt.
+- Forgejo-CI fuehrt vor dem Push die 194 Tests im gebauten Image aus; Testlauf durch MD5-Hasher im Testmodus und `--parallel` von ~266s auf wenige Sekunden beschleunigt.
 - Web- und Worker-Image als getrennte Docker-Targets; Web ohne FreeCAD, Worker mit dem offiziellen, per SHA-256 gepinnten FreeCAD-1.1.1-AppImage; CI baut/pusht beide Images.
 - Kernmodule `services.py`, `views.py` und `api.py` in Pakete `plm/services/`, `plm/views/`, `plm/api/` mit re-exportierender Fassade aufgeteilt (Finding 2.1 / A5).

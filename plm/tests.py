@@ -71,6 +71,7 @@ from .freecadcmd import (
     process_export_job,
     process_queued_export_jobs,
     recover_stale_export_jobs,
+    stage_revision_inputs,
     with_flatpak_worker_options,
 )
 from .mesh_preview import render_stl_views
@@ -964,6 +965,7 @@ class RevisionUploadViewTests(TestCase):
                 original_filename=f"{revision.revision_code}-{view_name}.png",
                 sha256=f"{revision.id:032d}{len(view_name):032d}",
                 size_bytes=len(content),
+                metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION},
             )
 
     def create_viewer_stl_artifact(self, revision):
@@ -1542,6 +1544,36 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(ExportJob.objects.exists())
         self.assertContains(response, "front")
+
+    def test_revision_compare_ignores_pngs_from_older_preview_generator(self):
+        self.client.force_login(self.user)
+        left = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        right = self.create_second_revision()
+        for revision in (left, right):
+            for view_name in PNG_VIEW_NAMES:
+                RevisionArtifact.objects.create(
+                    revision=revision,
+                    artifact_type=RevisionArtifact.ArtifactType.PNG,
+                    view_name=view_name,
+                    file=ContentFile(b"legacy", name=f"legacy-{view_name}.png"),
+                    original_filename=f"legacy-{view_name}.png",
+                    sha256=f"{revision.id:032d}{len(view_name):032d}",
+                    size_bytes=6,
+                    metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION - 1},
+                )
+
+        with override_settings(PROCESS_EXPORT_JOBS_INLINE=False):
+            response = self.client.get(
+                reverse("plm:revision_compare", args=[self.part.id]),
+                {"left": left.id, "right": right.id},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["comparisons"], [])
+        self.assertEqual(
+            set(ExportJob.objects.values_list("revision_id", flat=True)),
+            {left.id, right.id},
+        )
 
     def test_process_export_jobs_button_runs_queued_jobs_once(self):
         self.client.force_login(self.user)
@@ -3113,6 +3145,56 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
             ).count(),
             7,
         )
+
+    def test_job_stages_dependencies_from_first_snapshot_containing_revision(self):
+        root_bytes = make_fcstd_bytes(
+            "Druck",
+            object_type="Assembly::AssemblyObject",
+            xlinks=[("Box.FCStd", "Body")],
+        )
+        first = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(
+                name="first.zip",
+                members={
+                    "Box.FCStd": make_fcstd_bytes("Box alt"),
+                    "Druck.FCStd": root_bytes,
+                },
+            ),
+            self.user,
+            name="Erster Stand",
+        )
+        second = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(
+                name="second.zip",
+                members={
+                    "Box.FCStd": make_fcstd_bytes("Box neu"),
+                    "Druck.FCStd": root_bytes,
+                },
+            ),
+            self.user,
+            name="Zweiter Stand",
+        )
+        root_revision = first.entries.get(path="Druck.FCStd").revision
+        self.assertEqual(
+            second.entries.get(path="Druck.FCStd").revision_id,
+            root_revision.id,
+        )
+        old_dependency = first.entries.get(path="Box.FCStd").revision
+        new_dependency = second.entries.get(path="Box.FCStd").revision
+        self.assertNotEqual(old_dependency.id, new_dependency.id)
+        job = create_export_job(
+            revision=root_revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            root_path = stage_revision_inputs(job, Path(temp_dir))
+            staged_dependency = root_path.parent / "Box.FCStd"
+            with old_dependency.file.open("rb") as source:
+                self.assertEqual(staged_dependency.read_bytes(), source.read())
 
     def test_missing_freecadcmd_marks_job_failed(self):
         job = create_export_job(
