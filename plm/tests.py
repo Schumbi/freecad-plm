@@ -1223,7 +1223,9 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
 
         self.assertContains(response, "Neue Revision hochladen")
-        self.assertContains(response, "Revision hochladen")
+        self.assertContains(response, "Neue Revision anlegen")
+        self.assertContains(response, "Die Revisionsnummer wird automatisch fortgeführt")
+        self.assertContains(response, "data-cad-file-guide")
 
     def test_part_detail_offers_external_snapshot_as_optional_replacement(self):
         snapshot = self.create_external_snapshot()
@@ -1232,7 +1234,18 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
 
         self.assertContains(response, "Optional in Projektstand übernehmen")
+        self.assertContains(response, "Der bestehende Stand bleibt erhalten")
+        self.assertContains(response, "data-snapshot-toggle")
         self.assertContains(response, f'value="{snapshot.id}"')
+
+    def test_project_detail_explains_snapshot_import_formats(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+
+        self.assertContains(response, "Ordnerstruktur als Projektstand übernehmen")
+        self.assertContains(response, "FCStd-, STEP- und STL-Dateien")
+        self.assertContains(response, "Projektstand importieren")
 
     def test_fcstd_upload_option_creates_new_replacement_snapshot(self):
         source = self.create_external_snapshot()
@@ -2782,6 +2795,9 @@ class RolePermissionTests(TestCase):
         response = self.client.get(reverse("plm:create_part", args=[self.project.id]))
 
         self.assertContains(response, "Neues Teil oder Baugruppe")
+        self.assertContains(response, "CAD-Datei auswählen")
+        self.assertContains(response, "Teil mit Revision anlegen")
+        self.assertContains(response, "data-cad-file-guide")
         self.assertNotContains(response, "Lieferant")
 
     def test_revision_properties_can_be_shown_in_sidebar_or_page(self):
@@ -3756,6 +3772,126 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["part"]["number"], "P-002")
         self.assertTrue(Part.objects.filter(number="P-002").exists())
+
+    def test_api_creates_fcstd_part_revision_and_checkout_atomically(self):
+        self.authorize_token([ApiToken.Scope.WRITE, ApiToken.Scope.CHECKOUT])
+
+        response = self.client.post(
+            reverse("plm:api_create_fcstd_part", args=[self.project.id]),
+            {
+                "name": "Klebeschale",
+                "category": Part.Category.PART,
+                "workspace_hint": "/workspace",
+                "file": make_zip_upload(
+                    "Klebeschale.FCStd",
+                    members={"Document.xml": "<Document />"},
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        part = Part.objects.get(name="Klebeschale")
+        revision = part.revisions.get()
+        checkout = part.checkouts.get()
+        self.assertEqual(part.number, "P-002")
+        self.assertEqual(revision.revision_code, "R0001")
+        self.assertEqual(revision.original_filename, "Klebeschale.FCStd")
+        self.assertEqual(checkout.status, Checkout.Status.ACTIVE)
+        self.assertEqual(checkout.workspace_hint, "/workspace")
+        self.assertEqual(payload["part"]["id"], part.id)
+        self.assertEqual(payload["revision"]["id"], revision.id)
+        self.assertEqual(payload["checkout"]["id"], checkout.id)
+        self.assertEqual(payload["manifest"]["base_revision"]["id"], revision.id)
+
+    def test_api_creates_fcstd_part_inside_active_project_checkout(self):
+        self.authorize_token([ApiToken.Scope.WRITE, ApiToken.Scope.CHECKOUT])
+        root_revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload("Assembly.FCStd"),
+            self.user,
+            normalize_plm_revision=True,
+        )
+        snapshot = ProjectSnapshot.objects.create(
+            project=self.project,
+            name="Arbeitsstand",
+            created_by=self.user,
+        )
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            revision=root_revision,
+            path="Assembly.FCStd",
+        )
+        checkout = create_checkout(root_revision, self.user, snapshot=snapshot)
+
+        response = self.client.post(
+            reverse("plm:api_create_fcstd_part", args=[self.project.id]),
+            {
+                "name": "Deckel",
+                "category": Part.Category.PART,
+                "checkout_id": checkout.id,
+                "file": make_zip_upload(
+                    "Deckel.FCStd",
+                    members={"Document.xml": "<Document />"},
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        part = Part.objects.get(name="Deckel")
+        revision = part.revisions.get()
+        addition = CheckoutFileAddition.objects.get(checkout=checkout)
+        self.assertEqual(addition.revision, revision)
+        self.assertEqual(addition.path, "Deckel.FCStd")
+        self.assertEqual(payload["checkout"]["id"], checkout.id)
+        self.assertEqual(payload["added_file"]["revision_id"], revision.id)
+        self.assertIn("Deckel.FCStd", [item["path"] for item in payload["manifest"]["files"]])
+
+    def test_api_fcstd_part_creation_requires_checkout_scope(self):
+        self.authorize_token([ApiToken.Scope.WRITE])
+
+        response = self.client.post(
+            reverse("plm:api_create_fcstd_part", args=[self.project.id]),
+            {
+                "name": "Nicht erlaubt",
+                "file": make_zip_upload(
+                    "Blocked.FCStd",
+                    members={"Document.xml": "<Document />"},
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Part.objects.filter(name="Nicht erlaubt").exists())
+
+    def test_api_fcstd_part_creation_rolls_back_when_checkout_cannot_accept_file(self):
+        self.authorize_token([ApiToken.Scope.WRITE, ApiToken.Scope.CHECKOUT])
+        root_revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload("Standalone.FCStd"),
+            self.user,
+            normalize_plm_revision=True,
+        )
+        checkout = create_checkout(root_revision, self.user)
+
+        response = self.client.post(
+            reverse("plm:api_create_fcstd_part", args=[self.project.id]),
+            {
+                "name": "Nicht halb anlegen",
+                "checkout_id": checkout.id,
+                "file": make_zip_upload(
+                    "Rollback.FCStd",
+                    members={"Document.xml": "<Document />"},
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Part.objects.filter(name="Nicht halb anlegen").exists())
+        self.assertFalse(
+            AuditEvent.objects.filter(metadata__source="addon_blank_fcstd").exists()
+        )
 
     def test_api_admin_token_can_update_project_metadata(self):
         self.authorize_token([ApiToken.Scope.ADMIN])

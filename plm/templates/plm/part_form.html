@@ -22,9 +22,38 @@
   <div class="data-card form-shell wide">
     <form class="form-card" method="post" enctype="multipart/form-data">
       {% csrf_token %}
-      {% include "plm/includes/form_fields.html" with form=form %}
+      <section class="form-section">
+        <div class="form-section-heading">
+          <span class="form-step">1</span>
+          <div>
+            <h2>CAD-Datei auswählen</h2>
+            <p>Dateityp und ursprünglicher Dateiname werden automatisch erkannt.</p>
+          </div>
+        </div>
+        {% include "plm/includes/form_field.html" with field=form.file %}
+        {% include "plm/includes/cad_file_guide.html" %}
+      </section>
+
+      <section class="form-section">
+        <div class="form-section-heading">
+          <span class="form-step">2</span>
+          <div>
+            <h2>Teil beschreiben</h2>
+            <p>Nummer und Name dürfen leer bleiben und werden dann aus Datei oder FreeCAD-Modell abgeleitet.</p>
+          </div>
+        </div>
+        <div class="form-grid two-columns">
+          {% include "plm/includes/form_field.html" with field=form.number %}
+          {% include "plm/includes/form_field.html" with field=form.name %}
+          {% include "plm/includes/form_field.html" with field=form.category %}
+          {% include "plm/includes/form_field.html" with field=form.material %}
+        </div>
+        {% include "plm/includes/form_field.html" with field=form.description %}
+        {% include "plm/includes/form_field.html" with field=form.tags %}
+        {% include "plm/includes/form_field.html" with field=form.change_summary %}
+      </section>
       <div class="form-actions">
-        <button type="submit">Anlegen</button>
+        <button type="submit">Teil mit Revision anlegen</button>
         <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Abbrechen</a>
       </div>
     </form>

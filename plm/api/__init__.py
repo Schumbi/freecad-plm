@@ -25,6 +25,7 @@ from .projects import (
     projects_api,
 )
 from .parts import (
+    create_fcstd_part_api,
     part_api,
     project_parts_api,
 )

@@ -90,6 +90,7 @@
                     <td>
                       {% if latest %}
                         <span class="status-badge status-{{ latest.status }}">{{ latest.revision_code }}</span>
+                        <span class="artifact-pill">{{ latest.get_file_format_display }}</span>
                       {% else %}
                         <span class="muted">–</span>
                       {% endif %}
@@ -187,18 +188,20 @@
         <div class="plm-dialog-body">
           <form class="form-card" method="post" action="{% url 'plm:upload_project_snapshot' project.id %}" enctype="multipart/form-data">
             {% csrf_token %}
-            <p>
-              {{ snapshot_form.name.label_tag }}
-              {{ snapshot_form.name }}
-            </p>
-            <p>
-              {{ snapshot_form.file.label_tag }}
-              {{ snapshot_form.file }}
-              {% if snapshot_form.file.errors %}
-                <span class="errors">{{ snapshot_form.file.errors }}</span>
-              {% endif %}
-            </p>
-            <button type="submit">Importieren</button>
+            <div class="cad-format-guide format-external">
+              <div class="cad-format-guide-icon">ZIP</div>
+              <div>
+                <strong>Ordnerstruktur als Projektstand übernehmen</strong>
+                <p>FCStd-, STEP- und STL-Dateien werden als Revisionen angelegt. Pfade und Baugruppenstruktur bleiben im neuen Projektstand erhalten.</p>
+              </div>
+            </div>
+            {% include "plm/includes/form_field.html" with field=snapshot_form.name %}
+            {% include "plm/includes/form_field.html" with field=snapshot_form.file %}
+            <p class="field-hint">Bereits bekannte, identische Dateien werden wiederverwendet und nicht doppelt gespeichert.</p>
+            <div class="form-actions">
+              <button type="submit">Projektstand importieren</button>
+              <button type="button" class="btn btn-outline-secondary" data-dialog-close>Abbrechen</button>
+            </div>
           </form>
         </div>
       </div>

@@ -114,6 +114,85 @@
     });
   }
 
+  function cadFileDetails(filename) {
+    var lower = (filename || "").toLowerCase();
+    if (lower.endsWith(".fcstd")) {
+      return {
+        format: "FCStd",
+        kind: "fcstd",
+        text: "Bearbeitbare FreeCAD-Quelle. Diese Revision kann im Addon ausgecheckt und später wieder eingecheckt werden.",
+      };
+    }
+    if (lower.endsWith(".step") || lower.endsWith(".stp")) {
+      return {
+        format: "STEP",
+        kind: "external",
+        text: "Neutrales Austauschmodell. Es bleibt als Originalrevision erhalten und wird im Addon schreibgeschützt geöffnet.",
+      };
+    }
+    if (lower.endsWith(".stl")) {
+      return {
+        format: "STL",
+        kind: "external",
+        text: "Dreiecksnetz ohne parametrisches FreeCAD-Modell. Es bleibt als Originalrevision erhalten und wird schreibgeschützt geöffnet.",
+      };
+    }
+    return null;
+  }
+
+  function setupCadFileGuides() {
+    document.querySelectorAll("[data-cad-file-guide]").forEach(function (guide) {
+      var form = guide.closest("form");
+      var input = form && form.querySelector('input[type="file"][accept*="FCStd"]');
+      if (!input) return;
+
+      var title = guide.querySelector("[data-cad-file-title]");
+      var text = guide.querySelector("[data-cad-file-text]");
+      var icon = guide.querySelector("[data-cad-file-icon]");
+      var replacement = form.querySelector("[data-snapshot-replacement]");
+      var toggle = replacement && replacement.querySelector("[data-snapshot-toggle]");
+      var fields = replacement && replacement.querySelector("[data-snapshot-fields]");
+      var select = fields && fields.querySelector("select");
+
+      function setSnapshotEnabled(enabled) {
+        if (!toggle) return;
+        toggle.disabled = !enabled;
+        if (!enabled) toggle.checked = false;
+        if (!enabled && select) select.value = "";
+        if (fields) fields.hidden = !toggle.checked;
+        if (select) select.disabled = !toggle.checked;
+      }
+
+      function update() {
+        var file = input.files && input.files[0];
+        var details = cadFileDetails(file && file.name);
+        guide.classList.remove("format-fcstd", "format-external");
+        if (!details) {
+          if (title) title.textContent = "Datei auswählen";
+          if (text) text.textContent = "FCStd bleibt in FreeCAD bearbeitbar. STEP und STL werden als schreibgeschützte Austauschmodelle verwaltet.";
+          if (icon) icon.textContent = "CAD";
+          return;
+        }
+        guide.classList.add("format-" + details.kind);
+        if (title) title.textContent = details.format + " erkannt · " + file.name;
+        if (text) text.textContent = details.text;
+        if (icon) icon.textContent = details.format;
+        if (replacement) setSnapshotEnabled(details.kind === "fcstd");
+      }
+
+      if (toggle) {
+        toggle.addEventListener("change", function () {
+          if (fields) fields.hidden = !toggle.checked;
+          if (select) select.disabled = !toggle.checked;
+          if (toggle.checked && select) select.focus();
+        });
+        if (select) select.disabled = !toggle.checked;
+      }
+      input.addEventListener("change", update);
+      update();
+    });
+  }
+
   function setupSidebarToggle() {
     var toggle = document.querySelector("[data-sidebar-toggle]");
     var shell = document.querySelector(".app-shell");
@@ -297,6 +376,7 @@
   setupActionMenus();
   setupMessages();
   setupListFilters();
+  setupCadFileGuides();
   setupSidebarToggle();
   setupExportJobsPolling();
   setupCompareStatusPolling();

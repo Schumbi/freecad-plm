@@ -342,3 +342,11 @@ Akzeptanz:
 - Neues Datenmodell fuer Stuecklisten.
 - Vollstaendige SPA.
 - Worker-Architektur-Umbau.
+
+## Umgesetzt: Format- und Revisionsführung 2026-08-05
+
+- Die Teilanlage führt zuerst über die CAD-Datei und danach über die optional ableitbaren Stammdaten.
+- Eine unmittelbare Dateiformat-Erkennung erklärt den Unterschied zwischen bearbeitbarer FCStd-Quelle und schreibgeschütztem STEP-/STL-Austauschmodell.
+- Die neueste Revision ist als `Aktuell` markiert; Format, Download-Aktion und Bearbeitbarkeit sind direkt an der Revision sichtbar.
+- Die optionale Übernahme einer neuen FCStd-Revision in einen Projektstand ist eine bewusst zu aktivierende Zusatzoption. Der bestehende Projektstand bleibt unverändert.
+- Der ZIP-Import erklärt vor dem Start, welche CAD-Dateien zu Revisionen werden und dass identische Dateien wiederverwendet werden.

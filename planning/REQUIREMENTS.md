@@ -67,7 +67,8 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Das FreeCAD-Addon kann optional ein neues Projekt mit Code, Name, Status, Datum und Beschreibung anlegen und direkt mit dem Import befuellen.
 - Nach einem Addon-Import kann ein importiertes Teil oder eine importierte Baugruppe direkt ausgecheckt werden.
 - Wenn der direkte Checkout nach dem Import erfolgreich war, kann das Addon den urspruenglichen lokalen Importordner nach `~/FreeCAD-PLM/imported/...` verschieben.
-- Das FreeCAD-Addon kann neue PLM-Teile oder Baugruppen ohne initiale CAD-Datei als Metadatensatz anlegen; die CAD-Quelle entsteht danach ueber Checkout/Check-in oder Ordnerimport.
+- Das FreeCAD-Addon kann ein neues Teil oder eine Baugruppe mit Name, optionaler Teilenummer und Typ direkt anlegen. Es erzeugt intern eine leere FCStd-Datei, legt atomar Revision `R0001` an und öffnet sie ohne manuelles lokales Speichern.
+- Wenn ein lokal geöffneter Projekt-Checkout aktiv ist, wird die neue `R0001` direkt als zusätzliche Datei in diesen Checkout aufgenommen. Ohne aktiven Checkout entsteht ein eigener Checkout für das neue Teil.
 
 ## Nicht Ziel Fuer V1
 

@@ -199,6 +199,11 @@ urlpatterns = [
         api.project_parts_api,
         name="api_project_parts",
     ),
+    path(
+        "api/projects/<int:project_id>/parts/create-fcstd/",
+        api.create_fcstd_part_api,
+        name="api_create_fcstd_part",
+    ),
     path("api/parts/<int:part_id>/", api.part_api, name="api_part"),
     path(
         "api/parts/<int:part_id>/annotations/",

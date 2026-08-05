@@ -92,6 +92,9 @@
               <div class="revision-main">
                 <div class="revision-title-row">
                   <span class="revision-code">{{ revision.revision_code }}</span>
+                  {% if forloop.first %}
+                    <span class="current-pill">Aktuell</span>
+                  {% endif %}
                   <span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span>
                   <span class="artifact-pill">{{ revision.get_file_format_display }}</span>
                   {% if revision.released_at %}
@@ -99,6 +102,11 @@
                   {% endif %}
                 </div>
                 <p class="meta-line">{{ revision.original_filename }} - {{ revision.created_at|date:"d.m.Y H:i" }} - {{ revision.created_by }}</p>
+                {% if revision.file_format == "fcstd" %}
+                  <p class="revision-workflow-hint">Bearbeitbare FreeCAD-Quelle · im Addon auscheckbar</p>
+                {% else %}
+                  <p class="revision-workflow-hint">Austauschmodell · im Addon schreibgeschützt öffnen</p>
+                {% endif %}
                 {% if revision.notes %}
                   <p class="notes-text">{{ revision.notes|truncatechars:180 }}</p>
                 {% endif %}
@@ -117,7 +125,7 @@
 
               <div class="revision-actions">
                 <div class="revision-actions-primary">
-                  <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">Herunterladen</a>
+                  <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">{{ revision.get_file_format_display }} laden</a>
                   <button
                     type="button"
                     class="btn btn-outline-secondary btn-sm"
@@ -478,31 +486,29 @@
         <div class="plm-dialog-body">
           <form class="form-card" method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
             {% csrf_token %}
-            <p>
-              {{ form.file.label_tag }}
-              {{ form.file }}
-              {% if form.file.errors %}
-                <span class="errors">{{ form.file.errors }}</span>
-              {% endif %}
-            </p>
-            <p>
-              {{ form.change_summary.label_tag }}
-              {{ form.change_summary }}
-              {% if form.change_summary.errors %}
-                <span class="errors">{{ form.change_summary.errors }}</span>
-              {% endif %}
-            </p>
-            <p>
-              {{ form.target_snapshot.label_tag }}
-              {{ form.target_snapshot }}
-              {% if form.target_snapshot.help_text %}
-                <span class="helptext">{{ form.target_snapshot.help_text }}</span>
-              {% endif %}
-              {% if form.target_snapshot.errors %}
-                <span class="errors">{{ form.target_snapshot.errors }}</span>
-              {% endif %}
-            </p>
-            <button type="submit">Revision hochladen</button>
+            <p class="dialog-intro">Die Revisionsnummer wird automatisch fortgeführt. Die bisherige Revision bleibt unverändert erhalten.</p>
+            {% include "plm/includes/form_field.html" with field=form.file %}
+            {% include "plm/includes/cad_file_guide.html" %}
+            {% include "plm/includes/form_field.html" with field=form.change_summary %}
+            {% if form.target_snapshot.field.queryset.exists %}
+              <div class="snapshot-replacement" data-snapshot-replacement>
+                <label class="choice-row">
+                  <input type="checkbox" data-snapshot-toggle{% if form.target_snapshot.value %} checked{% endif %}>
+                  <span>
+                    <strong>Optional in Projektstand übernehmen</strong>
+                    <small>Nur auswählen, wenn die neue FCStd-Datei das bisherige STEP-/STL-Modell dort ersetzen soll.</small>
+                  </span>
+                </label>
+                <div class="snapshot-replacement-fields" data-snapshot-fields{% if not form.target_snapshot.value %} hidden{% endif %}>
+                  {% include "plm/includes/form_field.html" with field=form.target_snapshot %}
+                  <p class="field-hint">Der bestehende Stand bleibt erhalten; das PLM erzeugt einen neuen Projektstand.</p>
+                </div>
+              </div>
+            {% endif %}
+            <div class="form-actions">
+              <button type="submit">Neue Revision anlegen</button>
+              <button type="button" class="btn btn-outline-secondary" data-dialog-close>Abbrechen</button>
+            </div>
           </form>
         </div>
       </div>

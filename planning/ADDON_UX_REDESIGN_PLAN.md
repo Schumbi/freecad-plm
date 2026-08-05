@@ -294,3 +294,21 @@ Wenn die Änderung klein genug bleibt, kann beides auch ein Commit sein:
 ```text
 Improve FreeCAD addon checkout UX
 ```
+
+## Umgesetzt: Formatabhängiger Revisionsablauf 2026-08-05
+
+- Revisionslabels zeigen übersetzten Status, Dateiformat, Dateiname und Datum.
+- FCStd ist eindeutig als bearbeitbare Checkout-Revision gekennzeichnet.
+- STEP und STL sind eindeutig als schreibgeschützte Austauschmodelle gekennzeichnet.
+- Doppelklick führt die passende Hauptaktion aus: FCStd auschecken, STEP/STL schreibgeschützt öffnen.
+- Buttons und Tooltips wechseln passend zum ausgewählten Revisionsformat.
+- Nach einem reinen STEP-/STL-Projektimport verweist die Rückmeldung auf die Revisionsliste und das schreibgeschützte Öffnen, statt einen fehlenden Checkout-Kandidaten als Fehler erscheinen zu lassen.
+
+## Umgesetzt: Neues FreeCAD-Teil ohne manuellen Dateischritt 2026-08-05
+
+- `Neues Teil` verwendet einen einzigen Dialog für Name, optionale Teilenummer und Typ.
+- Der zukünftige FCStd-Dateiname wird unmittelbar angezeigt und aus dem Namen abgeleitet.
+- FreeCAD erzeugt die leere Datei nur intern; der Nutzer muss weder einen Speicherort noch eine vorhandene Datei auswählen.
+- Der Server legt Teil, Revision `R0001` und Checkout atomar an.
+- Bei einem geöffneten Projekt-Checkout wird `R0001` direkt als zusätzliche Datei aufgenommen und in FreeCAD geöffnet.
+- Ohne aktiven Checkout wird das neue Teil als eigener Checkout geöffnet.
