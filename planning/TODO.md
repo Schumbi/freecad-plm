@@ -58,7 +58,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Teile und Baugruppen koennen in der Weboberflaeche innerhalb eines Projekts angelegt werden.
 - Leere Teilenummern werden automatisch als `P-001`, `P-002`, ... pro Projekt vergeben.
 - FreeCAD-Property `Id` wird als Dokumentmetadatum extrahiert.
-- Teil-/Baugruppenanlage erfordert eine initiale `.FCStd` und erzeugt direkt `R0001`.
+- Teil-/Baugruppenanlage in der Web-UI erfordert eine initiale FCStd-, STEP- oder STL-Datei und erzeugt direkt `R0001`.
 - Leere Teilenummer nutzt zuerst FreeCAD-`Id`, sonst automatische Nummerierung.
 - Leerer Name nutzt FreeCAD-`Label`.
 - Projektstaende/Snapshots fuer mehrere `FCStd`-Dateien aus ZIP angelegt.
@@ -86,6 +86,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Objektbezogene Anmerkungen fuer Teile/Revisionen angelegt.
 - Addon-Uebergabeplan mit API-Vertrag und Implementierungsvorgaben in `planning/FREECAD_ADDON_PLAN.md` angelegt.
 - FreeCAD-Addon-Grundworkflow gegen die `/api/`-Schnittstelle umgesetzt: Verbinden, Lesen, read-only Oeffnen, Checkout, Check-in, Cancel, aktive Checkouts, Notizen, Anmerkungen, Teilanlage, Projektmetadaten und Projektimport.
+- Addon-Teilanlage ohne vorheriges lokales Speichern umgesetzt: leere FCStd intern erzeugen, Teil und `R0001` serverseitig gemeinsam anlegen und in einen geöffneten Projekt-Checkout oder einen eigenen Checkout übernehmen.
+- FCStd, STEP/STP und STL als primäre CAD-Revisionen umgesetzt; nur FCStd bleibt bearbeitbar, eine spätere FCStd-Übernahme in einen Projektstand ist ausdrücklich optional.
 - Projektbearbeitung und Archivierung ausserhalb der Django-Admin-Oberflaeche umgesetzt.
 - Bestehende FreeCAD-Ordnerimport-Funktion fuer das Addon umgesetzt und dokumentiert.
 - Manufacturing-Dateien fuer gedruckte Revisionen angelegt: Datenmodell, Upload, Download, 3MF-Basisvalidierung, Maschinenbezug und spaeter erweiterbare Fertigungslauf-/Anhangmodelle.
@@ -102,7 +104,7 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Recovery haengengebliebener Exportjobs (`EXPORT_JOB_STALE_SECONDS`).
 - Globale PLM-Suche unter `/search/` fuer Projekte, Teile, Revisionen und Dateipfade in Projektstaenden.
 - Freigegebene Revisionen koennen in der Web-UI als obsolet markiert werden (`revision_obsoleted` im Audit-Trail).
-- Forgejo-CI fuehrt vor dem Push die 196 Tests im gebauten Image aus; Testlauf durch MD5-Hasher im Testmodus und `--parallel` von ~266s auf wenige Sekunden beschleunigt.
+- Forgejo-CI führt aktuell 219 Servertests vor dem Push im gebauten Image aus; Testlauf durch MD5-Hasher im Testmodus und `--parallel` von ~266s auf wenige Sekunden beschleunigt.
 - FreeCAD-Anmerkungen werden in der Web-Teileansicht mit Status, Revisionsbezug, Objekt/Subelement und Urheber angezeigt.
 - Web- und Worker-Image als getrennte Docker-Targets; Web ohne FreeCAD, Worker mit dem offiziellen, per SHA-256 gepinnten FreeCAD-1.1.1-AppImage; CI baut/pusht beide Images.
 - Kernmodule `services.py`, `views.py` und `api.py` in Pakete `plm/services/`, `plm/views/`, `plm/api/` mit re-exportierender Fassade aufgeteilt (Finding 2.1 / A5).

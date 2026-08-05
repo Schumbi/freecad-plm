@@ -357,7 +357,7 @@ Jeder eingeloggte Nutzer sieht/lädt alle Projekte/Teile/Revisionen. Für ein kl
 ## 8. Verifikation
 
 ```bash
-cd /home/ralf/devel/freecad-plm
+cd /home/ralf/devel/freecad-plm/freecad-plm
 .venv/bin/python manage.py check          # 0 issues (nach .dockerignore-Fix)
 .venv/bin/python manage.py test plm       # 150 Tests OK (Referenzstand)
 ```

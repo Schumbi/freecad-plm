@@ -62,8 +62,15 @@ Die V1-Roadmap ist im Code umgesetzt. Docker Compose, Worker, Addon-API und mode
 
 Betriebsreife und Wartbarkeit ausgebaut:
 
-- Forgejo-CI fuehrt die 196 Tests vor jedem Push aus (beschleunigt via MD5-Hasher im Testmodus + `--parallel`).
+- Forgejo-CI führt aktuell 219 Servertests vor jedem Push aus (beschleunigt via MD5-Hasher im Testmodus + `--parallel`).
 - Getrennte Web-/Worker-Targets; Web-Image ohne FreeCAD, Worker mit dem offiziellen, per SHA-256 gepinnten FreeCAD-1.1.1-AppImage.
 - Kernmodule `services.py`/`views.py`/`api.py` in Pakete (`plm/services/`, `plm/views/`, `plm/api/`) mit re-exportierender Fassade aufgeteilt (Finding 2.1 / A5 erledigt).
 
 Weiterhin offen fuer V1.0: dokumentierte Browser-Abnahme und Betriebsabnahme auf dem Zielserver.
+
+## Implementierungsstand 2026-08-05
+
+- FCStd, STEP/STP und STL können als primäre CAD-Revisionen verwaltet werden; nur FCStd ist auscheck- und bearbeitbar.
+- Eine spätere FCStd-Revision kann optional in einen neuen, von einem STEP/STL-Projektstand abgeleiteten Stand übernommen werden.
+- Das Addon legt neue FreeCAD-Teile samt `R0001` ohne vorheriges lokales Speichern an und öffnet sie im aktiven Projekt-Checkout oder in einem eigenen Checkout.
+- Aktueller Prüfstand: 219 Servertests und 138 Addon-Tests.

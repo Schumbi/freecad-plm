@@ -237,7 +237,7 @@ Addon-Verhalten:
 ```text
 Projekt importieren
 -> Ordner auswaehlen
--> alle .FCStd unterhalb des Ordners als ZIP mit relativen Pfaden packen
+-> alle .FCStd-, .step-, .stp- und .stl-Dateien darunter als ZIP mit relativen Pfaden packen
 -> vorhandenes Projekt importieren oder neues Projekt plus Import anlegen
 -> Projekt-/Teileliste aktualisieren
 ```
@@ -284,6 +284,24 @@ Request:
 ```
 
 `category` ist `part` oder `assembly`. Wenn `number` leer ist, vergibt der Server automatisch die naechste Nummer.
+
+`POST /api/projects/<project_id>/parts/create-fcstd/`
+
+Dieser Multipart-Endpunkt bildet die Addon-Aktion `Neues Teil` ab. Er benötigt
+`write` und `checkout` und erhält:
+
+- `file`: vom Addon temporär mit FreeCAD erzeugte leere FCStd-Datei,
+- `name`: erforderlicher Anzeigename,
+- `number`: optionale Teilenummer,
+- `category`: `part` oder `assembly`,
+- `workspace_hint`: optionaler lokaler Workspace,
+- `checkout_id`: optionaler, im Addon lokal geöffneter Projekt-Checkout.
+
+Der Server legt Teil und Revision `R0001` gemeinsam an. Mit `checkout_id` wird
+die neue Datei zum bestehenden Checkout-Manifest hinzugefügt; ohne
+`checkout_id` entsteht ein eigener Checkout. Die Antwort enthält `part`,
+`revision`, `checkout` und `manifest`, bei der Aufnahme in einen bestehenden
+Checkout zusätzlich `added_file`.
 
 `GET /api/parts/<part_id>/`
 
@@ -806,6 +824,16 @@ Regeln:
 9. Addon prueft SHA-256.
 10. Addon speichert `manifest.json`.
 11. Addon oeffnet Root-Datei mit `FreeCAD.openDocument(root_path)`.
+
+### Neues FreeCAD-Teil Anlegen
+
+1. Nutzer wählt ein Projekt und `Neues Teil`.
+2. Addon fragt Name, optionale Teilenummer und Typ ab; ein Dateidialog ist nicht erforderlich.
+3. Addon erzeugt temporär eine leere FCStd-Datei mit der FreeCAD-API.
+4. Ist ein Projekt-Checkout aktiv, muss er lokal geöffnet sein und wird als `checkout_id` übergeben.
+5. Addon ruft `POST /api/projects/<project_id>/parts/create-fcstd/` auf.
+6. Server legt Teil und `R0001` an und erzeugt einen eigenen Checkout oder ergänzt den vorhandenen.
+7. Addon lädt und prüft das zurückgegebene Manifest, schreibt die Workspace-Metadaten und öffnet die neue Datei.
 
 ### Einchecken
 

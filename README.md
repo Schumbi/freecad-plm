@@ -203,7 +203,7 @@ docker push git.home.schumbi.de/ralf/freecad-plm-worker:latest
 Im Normalfall reicht ein Push ins App-Repo:
 
 ```bash
-cd /home/ralf/devel/freecad-plm
+cd /home/ralf/devel/freecad-plm/freecad-plm
 git push
 ```
 
@@ -332,12 +332,17 @@ Token-Scopes:
 - `GET/POST /api/projects/<id>/`
 - `POST /api/projects/<id>/snapshots/import/`
 - `GET/POST /api/projects/<id>/parts/`
+- `POST /api/projects/<id>/parts/create-fcstd/`
 - `GET/POST /api/parts/<id>/`
 - `GET /api/revisions/<id>/`
 - `POST /api/revisions/<id>/notes/`
 - `GET /api/revisions/<id>/file/`
+- `GET /api/revisions/<id>/manifest/`
 - `POST /api/revisions/<id>/checkout/`
+- `GET /api/checkouts/active/`
 - `GET /api/checkouts/<id>/manifest/`
+- `POST /api/checkouts/<id>/files/add/`
+- `POST /api/checkouts/<id>/files/remove/`
 - `POST /api/checkouts/<id>/checkin/`
 - `POST /api/checkouts/<id>/cancel/`
 - `GET/POST /api/parts/<id>/annotations/`
@@ -352,6 +357,16 @@ sendet dafür ein ZIP mit relativen `.FCStd`-, `.step`-, `.stp`- und `.stl`-Pfad
 `POST /api/projects/<id>/snapshots/import/` mit Scope `write`. Fuer den
 Kombiflow "Projekt anlegen und ZIP importieren" nutzt es
 `POST /api/projects/import/` mit Scope `admin`.
+
+Für `Neues Teil` nutzt das Addon
+`POST /api/projects/<id>/parts/create-fcstd/` mit den Scopes `write` und
+`checkout`. Das Addon erzeugt die leere FCStd-Datei intern; eine vorher lokal
+gespeicherte Benutzerdatei ist nicht erforderlich. Der Server legt Teil und
+Revision `R0001` gemeinsam an. Mit `checkout_id` wird die neue Datei direkt in
+den lokal geöffneten Projekt-Checkout aufgenommen. Ohne `checkout_id` entsteht
+ein eigener Checkout für das neue Teil. Schlägt die serverseitige Teilanlage
+oder Aufnahme in den Checkout fehl, werden Teil, Revision und Audit-Einträge
+nicht als unvollständiger Datenbankstand gespeichert.
 
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 

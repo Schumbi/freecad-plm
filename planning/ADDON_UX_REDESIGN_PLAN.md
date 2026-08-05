@@ -14,7 +14,7 @@ Alle ergänzenden Informationen wie Projektstammdaten, technische Metadaten, Not
 
 ## Aktueller Befund
 
-Die zentrale UI liegt in `/home/ralf/devel/freecad-plm-addon/freecad_plm_addon/panel.py`.
+Die zentrale UI liegt in `/home/ralf/devel/freecad-plm/freecad-plm-addon/freecad_plm_addon/panel.py`.
 
 Aktuell zeigt das Dock sehr viele Dinge gleichzeitig:
 
@@ -250,7 +250,7 @@ Automatische Tests in `tests/test_panel.py` ergänzen:
 Bestehende Tests weiter ausführen:
 
 ```bash
-cd /home/ralf/devel/freecad-plm-addon
+cd /home/ralf/devel/freecad-plm/freecad-plm-addon
 python3 -m unittest discover -s tests
 ```
 

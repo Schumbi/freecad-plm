@@ -53,6 +53,9 @@ V1 ist erreicht, wenn ein kleines LAN-Team Projekte, Teile/Baugruppen und refere
 - Bei fehlender oder abweichender `PLMRevision` kann der Nutzer den Upload verwerfen oder eine normalisierte Kopie speichern.
 - Die Normalisierung veraendert nur `Document.xml` und speichert Original-Hash, hochgeladenen Wert, erwarteten Wert und gespeicherten Hash als Metadaten.
 - FreeCAD-Projekte mit mehreren referenzierten `.FCStd`-Dateien koennen als Projekt-ZIP importiert werden.
+- FCStd, STEP/STP und STL können als primäre CAD-Revisionen angelegt und in Projektständen geführt werden.
+- Nur FCStd-Revisionen sind bearbeitbare Checkout-Roots; STEP/STL bleiben schreibgeschützt.
+- Eine spätere FCStd-Revision kann nur nach ausdrücklicher Auswahl in einen neuen, vom bisherigen STEP/STL-Projektstand abgeleiteten Stand übernommen werden.
 - Ein Projektstand speichert konkrete Revisionen mit relativen Pfaden.
 - Projektstaende koennen wieder als ZIP mit den gespeicherten relativen Pfaden heruntergeladen werden.
 - Einzelne referenzierte Revisionen werden nur mit Snapshot-Kontext als ZIP inklusive rekursiv referenzierter Dateien ausgeliefert.
@@ -62,6 +65,8 @@ V1 ist erreicht, wenn ein kleines LAN-Team Projekte, Teile/Baugruppen und refere
 - Zwei Revisionen desselben Teils koennen anhand gleichnamiger PNG-Ansichten verglichen werden.
 - Suche nach Projekten, Teilen, Revisionen und Dateinamen ist vorhanden.
 - Die lokale Installation ist so dokumentiert, dass sie auf einem frischen Rechner nachvollziehbar ist.
+- Das FreeCAD-Addon kann ein neues Teil oder eine Baugruppe ohne vorheriges lokales Speichern anlegen, als `R0001` auschecken und direkt öffnen.
+- Bei lokal geöffnetem Projekt-Checkout nimmt die Addon-Teilanlage die neue `R0001` in diesen Checkout auf; ohne aktiven Checkout entsteht ein eigener Checkout.
 
 ## V1 Browser-Abnahme
 
@@ -69,6 +74,9 @@ V1 ist erreicht, wenn ein kleines LAN-Team Projekte, Teile/Baugruppen und refere
 - PLMRevision-Konfliktfall: fehlende Property verwerfen.
 - PLMRevision-Konfliktfall: fehlende oder abweichende Property als normalisierte Kopie speichern.
 - Projekt-ZIP importieren und erzeugten Projektstand pruefen.
+- Primäre STEP- und STL-Revision anlegen und jeweils schreibgeschützt öffnen.
+- Zu einem STEP/STL-Teil eine FCStd-Revision hochladen: einmal ohne Projektstand-Übernahme und einmal mit bewusst ausgewähltem Ausgangsstand prüfen.
+- Im Addon `Neues Teil` ohne vorherige lokale Datei testen: einmal ohne aktiven Checkout und einmal innerhalb eines lokal geöffneten Projekt-Checkouts.
 - Snapshot-Download oeffnen und Pfade mit dem Import-ZIP vergleichen.
 - Einzeldatei-Download einer referenzierten Baugruppe pruefen; Ergebnis muss ein ZIP mit rekursiven Referenzen sein.
 - FreeCADCmd-Analyse mit echter `.FCStd`-Datei ausfuehren.

@@ -15,8 +15,8 @@ Der Cursor-Workspace enthaelt vier relevante Verzeichnisse:
 
 | Pfad | Rolle | Git-Repo | Sicherheitsrelevanz |
 |------|-------|----------|---------------------|
-| `/home/ralf/devel/freecad-plm` | **Hauptserver** – Django-PLM mit Web-UI, REST-API, Storage, FreeCADCmd-Worker | Ja | **Primaeres Audit-Ziel** |
-| `/home/ralf/devel/freecad-plm-addon` | **FreeCAD-Workbench** – HTTP-Client, lokaler Workspace, Checkout/Check-in | Ja | Client-seitige Secrets, Pfadvalidierung, Token-Handling |
+| `/home/ralf/devel/freecad-plm/freecad-plm` | **Hauptserver** – Django-PLM mit Web-UI, REST-API, Storage, FreeCADCmd-Worker | Ja | **Primaeres Audit-Ziel** |
+| `/home/ralf/devel/freecad-plm/freecad-plm-addon` | **FreeCAD-Workbench** – HTTP-Client, lokaler Workspace, Checkout/Check-in | Ja | Client-seitige Secrets, Pfadvalidierung, Token-Handling |
 | `/home/ralf/freecad-plm-testing` | **Laufende Test-/Staging-Instanz** – Docker Compose, `storage/`, `staticfiles/`, `.env` | Nein | Betriebsgeheimnisse in `.env`; reale CAD-Daten in `storage/` |
 | `/home/ralf/FreeCAD-PLM` | **Lokale Addon-Workspaces** – Checkout-Ordner mit `manifest.json` und `.FCStd`-Dateien | Nein | Enthaelt reale Arbeitskopien; keine Server-Logik |
 
@@ -328,7 +328,7 @@ Dateinamen im Storage nutzen SHA-256-basierte Namen (nicht reine Benutzereingabe
 
 ## 11. FreeCAD-Addon (Client-Audit)
 
-Repository: `/home/ralf/devel/freecad-plm-addon`
+Repository: `/home/ralf/devel/freecad-plm/freecad-plm-addon`
 
 | Modul | Aufgabe | Audit-Fokus |
 |-------|---------|-------------|
@@ -372,7 +372,7 @@ Sicherheitsrelevant: `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`
 
 ```bash
 # Server (Entwicklung)
-cd /home/ralf/devel/freecad-plm
+cd /home/ralf/devel/freecad-plm/freecad-plm
 .venv/bin/python manage.py check
 .venv/bin/python manage.py test plm
 
@@ -381,7 +381,7 @@ DJANGO_DEBUG=0 DJANGO_SECRET_KEY=test-secret DJANGO_ALLOWED_HOSTS=localhost \
   .venv/bin/python manage.py check --deploy
 
 # Addon
-cd /home/ralf/devel/freecad-plm-addon
+cd /home/ralf/devel/freecad-plm/freecad-plm-addon
 python3 -m unittest discover -s tests
 ```
 

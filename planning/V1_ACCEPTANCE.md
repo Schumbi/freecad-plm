@@ -4,13 +4,13 @@
 
 Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierbare manuelle Abnahme. Sie dient als Nachweis, dass V1 im Alltag nutzbar ist — nicht nur in Tests und auf dem Papier.
 
-**Stand der Implementierung:** 2026-07-10 — alle V1-Kriterien sind im Code umgesetzt; die Browser-Abnahme steht noch aus.
+**Stand der Implementierung:** 2026-08-05 — die V1-Kriterien einschließlich primärer STEP/STL-Revisionen und vereinfachter Addon-Teilanlage sind im Code umgesetzt; die dokumentierte Abnahme steht noch aus.
 
 ## Vorbereitung
 
 - Testnutzer mit Rollen `admin`, `editor` und `reader` anlegen (`manage.py setup_plm_roles`).
 - Laufende Instanz: lokal oder Zielserver mit Docker Compose und FreeCADCmd-Worker.
-- Echte `.FCStd`-Testdateien bereithalten, idealerweise inklusive referenzierter Baugruppe.
+- Echte `.FCStd`-, STEP- und STL-Testdateien bereithalten, idealerweise inklusive referenzierter Baugruppe.
 
 | Feld | Wert |
 |------|------|
@@ -54,6 +54,10 @@ Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierb
 | 16 | 3D-Viewer mit FCStd/STEP/STL/3MF | x | x | x | |
 | 17 | Hintergrundjobs in Sidebar sichtbar (Polling) | x | x | | |
 | 18 | FreeCAD-Addon: Checkout, Bearbeitung, Check-in E2E | x | x | | |
+| 19 | Primäre STEP- und STL-Revision anlegen und schreibgeschützt öffnen | x | x | x | |
+| 20 | STEP/STL-Teil um FCStd ergänzen: ohne und mit ausgewählter Projektstand-Übernahme | x | x | | |
+| 21 | Addon `Neues Teil`: ohne lokale Datei als eigenen Checkout anlegen und öffnen | x | x | | |
+| 22 | Addon `Neues Teil`: in lokal geöffneten Projekt-Checkout aufnehmen und verlinken | x | x | | |
 
 ## Betrieb Zielserver
 

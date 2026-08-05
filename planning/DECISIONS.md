@@ -267,3 +267,32 @@ Grund:
 - Ein neutraler Import soll nicht künstlich in eine leere FCStd-Hülle verpackt werden müssen.
 
 Status: entschieden.
+
+## 2026-08-05: Addon legt neue FreeCAD-Teile ohne vorherige lokale Datei an
+
+Entscheidung: Die Addon-Aktion `Neues Teil` verlangt keine bereits gespeicherte
+Benutzerdatei. Das Addon erzeugt eine leere FCStd-Datei temporär mit FreeCAD und
+übergibt sie zusammen mit Name, optionaler Teilenummer und Typ an das PLM.
+
+Regeln:
+
+- Der Server legt Teil und initiale Revision `R0001` in einem gemeinsamen
+  Vorgang an.
+- Ein lokal geöffneter Projekt-Checkout wird ausdrücklich als Ziel übergeben;
+  die neue Datei wird dort als zusätzliche, bearbeitbare FCStd aufgenommen.
+- Ohne aktiven Projekt-Checkout erzeugt der Server einen eigenen Checkout für
+  das neue Teil.
+- Ein serverseitig aktiver Checkout muss im Addon zuerst lokal geöffnet werden,
+  bevor `Neues Teil` ihn erweitert.
+- Die Aktion benötigt sowohl `write` als auch `checkout`.
+
+Grund:
+
+- Die erste lokale Speicherung war ein unnötiger Medienbruch und ließ den
+  eigentlichen PLM-Vorgang unfertig wirken.
+- Teil, erste Revision und Checkout sollen als ein verständlicher Arbeitsschritt
+  erscheinen.
+- Die vom PLM geführte Revision und der Workspace bleiben dadurch von Anfang an
+  eindeutig.
+
+Status: entschieden.
