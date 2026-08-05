@@ -16,7 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .mesh_preview import render_stl_views
-from .models import AuditEvent, ExportJob, RevisionArtifact
+from .models import AuditEvent, ExportJob, Revision, RevisionArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -338,6 +338,24 @@ def run_freecadcmd_job(job):
         result_path = workdir / "job_result.json"
         output_dir = workdir / "output"
         output_dir.mkdir()
+
+        if job.revision.file_format == Revision.FileFormat.STL:
+            if job.job_type != ExportJob.JobType.PNG_VIEWS:
+                raise RuntimeError(
+                    "Für primäre STL-Dateien sind nur Vorschau-Ansichten verfügbar."
+                )
+            artifacts = render_stl_views(
+                fcstd_path,
+                output_dir,
+                job.revision.revision_code,
+                width=getattr(settings, "PREVIEW_PNG_WIDTH", 400),
+                height=getattr(settings, "PREVIEW_PNG_HEIGHT", 300),
+            )
+            for artifact in artifacts:
+                path = Path(artifact["path"])
+                artifact["filename"] = path.name
+                artifact["content"] = path.read_bytes()
+            return {"metadata": {}, "artifacts": artifacts}
 
         script_path.write_text(FREECADCMD_SCRIPT, encoding="utf-8")
         spec_path.write_text(

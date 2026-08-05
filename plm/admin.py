@@ -39,12 +39,13 @@ class RevisionAdmin(admin.ModelAdmin):
         "part",
         "revision_code",
         "status",
+        "file_format",
         "original_filename",
         "size_bytes",
         "created_by",
         "created_at",
     )
-    list_filter = ("status", "part__project")
+    list_filter = ("status", "file_format", "part__project")
     search_fields = (
         "part__number",
         "part__name",

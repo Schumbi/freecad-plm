@@ -6,7 +6,7 @@ from .freecadcmd import (
     create_export_job,
     process_export_job,
 )
-from .models import ExportJob, RevisionArtifact
+from .models import ExportJob, Revision, RevisionArtifact
 
 JOB_ACTIVE_STATUSES = (
     ExportJob.Status.QUEUED,
@@ -88,10 +88,14 @@ def prepare_revision_derivatives(revisions, user):
     summary = {"created_jobs": 0, "ready": 0, "failed": 0, "pending": 0}
     for revision in unique_revisions.values():
         before_jobs = ExportJob.objects.filter(revision=revision).count()
-        statuses = [
-            ensure_revision_inspect_job(revision, user, process_inline=False),
-            ensure_revision_png_views(revision, user, process_inline=False),
-        ]
+        statuses = []
+        if revision.file_format != Revision.FileFormat.STL:
+            statuses.append(
+                ensure_revision_inspect_job(revision, user, process_inline=False)
+            )
+        statuses.append(
+            ensure_revision_png_views(revision, user, process_inline=False)
+        )
         after_jobs = ExportJob.objects.filter(revision=revision).count()
         summary["created_jobs"] += max(after_jobs - before_jobs, 0)
         summary["ready"] += statuses.count("ready")

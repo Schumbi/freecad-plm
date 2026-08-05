@@ -62,6 +62,7 @@ PLM_UID=1000
 PLM_GID=1000
 FREECADCMD_COMMAND=freecadcmd
 PLM_MAX_FCSTD_UPLOAD_BYTES=200000000
+PLM_MAX_CAD_UPLOAD_BYTES=200000000
 PLM_MAX_PROJECT_ZIP_BYTES=500000000
 PLM_MAX_ZIP_MEMBERS=2000
 PLM_MAX_ZIP_UNCOMPRESSED_BYTES=2147483648
@@ -70,7 +71,7 @@ PLM_MAX_ZIP_MEMBER_BYTES=200000000
 
 Das Runtime-Image enthaelt den User `plm` mit UID/GID `1000:1000`. `PLM_USER` sollte deshalb auf `plm` bleiben. `PLM_UID` und `PLM_GID` dokumentieren, wem die lokalen Verzeichnisse auf dem Host gehoeren sollen; die Werte zeigt `id` oder `id <user>`.
 
-Die `PLM_MAX_*`-Werte begrenzen `FCStd`-, Projekt-ZIP- und 3MF-Uploads gegen sehr grosse Dateien und ZIP-Bomben. Die Defaults sind fuer ein LAN-Team konservativ und koennen bei Bedarf hoeher gesetzt werden.
+Die `PLM_MAX_*`-Werte begrenzen FCStd-, STEP-/STL-, Projekt-ZIP- und 3MF-Uploads gegen sehr große Dateien und ZIP-Bomben. Die Defaults sind für ein LAN-Team konservativ und können bei Bedarf höher gesetzt werden.
 Der Compose-Worker laeuft zusaetzlich mit `cap_drop: ALL`, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp` sowie einfachen CPU-/RAM-/PID-Grenzen.
 
 Lokale Verzeichnisse fuer Modelle/Uploads und statische Dateien anlegen:
@@ -280,8 +281,8 @@ Anlegen angezeigt; danach bleibt nur der Prefix sichtbar.
 ## Kurzworkflow
 
 1. Projekt als `admin`/Superuser in der PLM-Oberflaeche anlegen oder vorhandenes Projekt oeffnen.
-2. Teil oder Baugruppe im Projekt mit initialer `.FCStd`-Datei anlegen.
-3. FreeCAD-Metadaten pruefen. Teilenummer und Name koennen leer bleiben; dann nutzt das PLM FreeCAD-`Id`/`Label` oder automatisch `P-001`, `P-002`, ...
+2. Teil oder Baugruppe im Projekt mit initialer `.FCStd`-, `.step`-, `.stp`- oder `.stl`-Datei anlegen.
+3. Bei FCStd die FreeCAD-Metadaten prüfen. Teilenummer und Name können leer bleiben; dann nutzt das PLM FreeCAD-`Id`/`Label`. Bei STEP/STL wird der Dateiname als Name verwendet. Fehlt eine Nummer, vergibt das PLM automatisch `P-001`, `P-002`, ...
 4. Neue Revisionen werden automatisch kanonisch als `R0001`, `R0002`, ... vergeben; alte oder testweise abweichende Codes werden bei der naechsten Nummer ignoriert.
 5. Beim Hochladen einer neuen Revision fehlende oder abweichende FreeCAD-Property `PLMRevision` verwerfen oder als PLM-normalisierte Kopie speichern.
 6. Optional Anmerkungen ergaenzen.
@@ -295,7 +296,11 @@ Die globale Suche in der Topbar durchsucht Projekte, Teile, Revisionen und Datei
 
 ## Projektstaende
 
-FreeCAD-Projekte mit mehreren referenzierten `.FCStd`-Dateien koennen als ZIP importiert werden. Das PLM legt einen Projektstand an und speichert, welche Revisionen unter welchen relativen Pfaden zusammengehoeren. Der Projektstand kann wieder als ZIP heruntergeladen werden.
+Projekte mit `.FCStd`-, `.step`-, `.stp`- und `.stl`-Dateien können als ZIP importiert werden. Das PLM legt einen Projektstand an und speichert, welche Revisionen unter welchen relativen Pfaden zusammengehören. Der Projektstand kann wieder als ZIP heruntergeladen werden.
+
+STEP und STL können entweder primäre, unveränderliche CAD-Revisionen sein oder als von einer FCStd-Revision abgeleitete Artefakte vorliegen. Primäre STL-Dateien werden direkt im Web-Viewer angezeigt. Primäre STEP-Dateien laufen für Vorschau und Analyse durch den FreeCADCmd-Worker. Nur FCStd-Revisionen können ausgecheckt und bearbeitet werden; STEP/STL in einem FCStd-Projektstand bleiben schreibgeschützte Begleitdateien.
+
+Wird später eine FCStd-Revision zu einem bisher als STEP/STL geführten Teil hochgeladen, kann im Uploadformular optional ein Projektstand ausgewählt werden. Das PLM erzeugt dann einen neuen Stand, ersetzt darin den bisherigen STEP/STL-Pfad durch den FCStd-Pfad und lässt den gewählten Ausgangsstand unverändert. Ohne Auswahl wird nur die neue Revision angelegt.
 
 Der normale Download einer Revision liefert eine einzelne `.FCStd` nur dann, wenn sie keine FreeCAD-Referenzen enthaelt. Hat eine Datei Referenzen, liefert der Download automatisch ein ZIP mit der Datei und ihren rekursiv referenzierten Dateien aus demselben Projektstand.
 
@@ -343,7 +348,7 @@ akzeptiert dieselben Stammdaten wie das WebUI: `code`, `name`, `status`,
 `project_date`, `description` und `is_archived`.
 
 Lokale FreeCAD-Dateisets koennen als Projektstand importiert werden. Das Addon
-sendet dafuer ein ZIP mit relativen `.FCStd`-Pfaden an
+sendet dafür ein ZIP mit relativen `.FCStd`-, `.step`-, `.stp`- und `.stl`-Pfaden an
 `POST /api/projects/<id>/snapshots/import/` mit Scope `write`. Fuer den
 Kombiflow "Projekt anlegen und ZIP importieren" nutzt es
 `POST /api/projects/import/` mit Scope `admin`.

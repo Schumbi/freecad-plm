@@ -22,6 +22,10 @@ from .snapshots import (
 @transaction.atomic
 def create_checkout(base_revision, checked_out_by, snapshot=None, workspace_hint=""):
     part = base_revision.part
+    if base_revision.file_format != "fcstd":
+        raise ValidationError(
+            "Nur FreeCAD-Revisionen können ausgecheckt und bearbeitet werden."
+        )
     if Checkout.objects.filter(part=part, status=Checkout.Status.ACTIVE).exists():
         raise ValidationError("Dieses Teil ist bereits ausgecheckt.")
     if snapshot is None:
@@ -287,6 +291,10 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
 
         manifest_entry = manifest_by_path[path]
         manifest_revision = manifest_entry["revision"]
+        if manifest_revision.file_format != "fcstd":
+            raise ValidationError(
+                "STEP- und STL-Projektdateien sind im Checkout schreibgeschützt."
+            )
         if item.get("revision_id") != manifest_revision.id:
             raise ValidationError("Revision passt nicht zum Checkout-Manifest.")
         if item.get("base_sha256") != manifest_revision.sha256:

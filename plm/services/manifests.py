@@ -67,6 +67,7 @@ def manifest_file_payload(entry):
         "part_number": revision.part.number,
         "revision_code": revision.revision_code,
         "filename": revision.original_filename,
+        "file_format": revision.file_format,
         "sha256": revision.sha256,
         "size_bytes": revision.size_bytes,
     }
@@ -91,6 +92,7 @@ def revision_manifest(revision, snapshot=None):
             "revision_code": revision.revision_code,
             "status": revision.status,
             "original_filename": revision.original_filename,
+            "file_format": revision.file_format,
             "sha256": revision.sha256,
             "size_bytes": revision.size_bytes,
         },
@@ -126,6 +128,7 @@ def checkout_manifest(checkout):
             "id": checkout.base_revision_id,
             "revision_code": checkout.base_revision.revision_code,
             "sha256": checkout.base_revision.sha256,
+            "file_format": checkout.base_revision.file_format,
         },
         "snapshot": (
             {

@@ -6,6 +6,8 @@
   <dd><span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span></dd>
   <dt>Datei</dt>
   <dd>{{ revision.original_filename }}</dd>
+  <dt>Dateiformat</dt>
+  <dd>{{ revision.get_file_format_display }}</dd>
   <dt>Erstellt von</dt>
   <dd>{{ revision.created_by }}</dd>
   <dt>Erstellungsdatum</dt>

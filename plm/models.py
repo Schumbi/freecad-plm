@@ -121,6 +121,11 @@ def manufacturing_run_attachment_upload_path(instance, filename):
 
 
 class Revision(TimeStampedModel):
+    class FileFormat(models.TextChoices):
+        FCSTD = "fcstd", "FreeCAD"
+        STEP = "step", "STEP"
+        STL = "stl", "STL"
+
     class Status(models.TextChoices):
         DRAFT = "draft", "Entwurf"
         RELEASED = "released", "Freigegeben"
@@ -134,6 +139,11 @@ class Revision(TimeStampedModel):
         default=Status.DRAFT,
     )
     file = models.FileField(upload_to=revision_upload_path)
+    file_format = models.CharField(
+        max_length=10,
+        choices=FileFormat.choices,
+        default=FileFormat.FCSTD,
+    )
     original_filename = models.CharField(max_length=255)
     sha256 = models.CharField(max_length=64)
     size_bytes = models.PositiveBigIntegerField()

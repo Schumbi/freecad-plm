@@ -11,7 +11,7 @@ from django.urls import reverse
 from ..derivatives import revision_has_complete_png_views, revision_has_pending_png_job, revision_png_view_names
 from ..forms import user_role
 from ..freecadcmd import PREVIEW_GENERATOR_VERSION, create_export_job, process_export_job
-from ..models import ExportJob, ManufacturingFile, RevisionArtifact
+from ..models import ExportJob, ManufacturingFile, Revision, RevisionArtifact
 from ..permissions import ROLE_ADMIN, is_plm_admin
 from ..services import revision_reference_files, snapshot_entries_with_references
 
@@ -90,7 +90,13 @@ def token_status(token):
     return "Aktiv"
 
 
-def save_pending_revision_upload(part, uploaded_file, conflict, change_summary=""):
+def save_pending_revision_upload(
+    part,
+    uploaded_file,
+    conflict,
+    change_summary="",
+    target_snapshot=None,
+):
     pending_name = (
         f"pending_uploads/{uuid4().hex}-{PurePosixPath(uploaded_file.name).name}"
     )
@@ -106,6 +112,8 @@ def save_pending_revision_upload(part, uploaded_file, conflict, change_summary="
         "actual": conflict.actual,
         "original_sha256": conflict.original_sha256,
         "change_summary": change_summary,
+        "target_snapshot_id": target_snapshot.id if target_snapshot else None,
+        "target_snapshot_name": target_snapshot.name if target_snapshot else "",
     }
     return pending
 
@@ -178,6 +186,12 @@ def missing_viewer_preview_response():
 
 
 def viewer_status_payload(revision):
+    if revision.file_format == Revision.FileFormat.STL:
+        return {
+            "status": "ready",
+            "message": "3D-Vorschau ist bereit.",
+            "source_url": reverse("plm:revision_viewer_source", args=[revision.id]),
+        }
     artifact = revision_viewer_artifact(revision)
     if artifact:
         return {
@@ -300,6 +314,8 @@ def revision_png_status_needs_poll(status_payload):
 
 
 def ensure_revision_viewer_preview(revision, user, *, process_inline=True):
+    if revision.file_format == Revision.FileFormat.STL:
+        return "ready"
     if revision_viewer_artifact(revision):
         return "ready"
     if revision_has_pending_png_job(revision):

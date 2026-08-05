@@ -245,3 +245,25 @@ Grund:
 - Gecachte Preview-Dateien vermeiden wiederholte schwere Konvertierungen beim Anzeigen.
 
 Status: entschieden.
+
+## 2026-08-05: STEP und STL dürfen primäre CAD-Revisionen sein
+
+Entscheidung: Wenn für ein Teil kein FreeCAD-Modell existiert, darf eine STEP-, STP- oder STL-Datei die primäre, unveränderliche CAD-Revision bilden. Die bestehende Rolle von STEP/STL als abgeleitete Artefakte einer FCStd-Revision bleibt daneben erhalten.
+
+Regeln:
+
+- Der Dateityp wird pro Revision als `fcstd`, `step` oder `stl` gespeichert.
+- FCStd behält die PLMRevision-Normalisierung, XLink-Auswertung und technische Änderungssignatur.
+- STEP/STL werden strukturell validiert, aber nicht als FCStd behandelt.
+- Primäre STL-Dateien kann der Browser direkt anzeigen; primäre STEP-Dateien erhalten ihre Vorschau über den Worker.
+- Nur FCStd-Revisionen können Checkout-Root sein und neue Revisionen durch Check-in erzeugen.
+- STEP/STL dürfen als schreibgeschützte Begleitdateien in einem FCStd-Projektstand und Checkout enthalten sein.
+- Die Übernahme einer späteren FCStd-Revision in einen bestehenden STEP/STL-Projektstand erfolgt nur nach expliziter Auswahl beim Upload. Dabei wird der alte Stand nicht verändert, sondern ein neuer Stand mit passender FCStd-Dateiendung erzeugt.
+
+Grund:
+
+- Zuliefer- und Bestandsgeometrie liegt häufig nur als neutrales Austauschformat oder Mesh vor.
+- Diese Dateien brauchen trotzdem Teilezuordnung, Revision, Projektstand, Download und Vorschau.
+- Ein neutraler Import soll nicht künstlich in eine leere FCStd-Hülle verpackt werden müssen.
+
+Status: entschieden.

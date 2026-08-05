@@ -1,10 +1,21 @@
+from pathlib import PurePosixPath
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import Group
 
-from .fcstd import validate_fcstd_upload
-from .models import ApiToken, ExportJob, ManufacturingFile, ManufacturingMachine, Part, Project, Revision
+from .cad_files import validate_project_file_upload
+from .models import (
+    ApiToken,
+    ExportJob,
+    ManufacturingFile,
+    ManufacturingMachine,
+    Part,
+    Project,
+    ProjectSnapshot,
+    Revision,
+)
 from .permissions import ROLE_ADMIN, ROLE_EDITOR, ROLE_NAMES, ROLE_READER
 from .services import inspect_manufacturing_upload
 
@@ -190,7 +201,11 @@ class ProjectForm(forms.ModelForm):
 
 
 class PartForm(forms.ModelForm):
-    file = forms.FileField(label="Initiale FCStd-Datei")
+    file = forms.FileField(
+        label="Initiale CAD-Datei",
+        widget=forms.FileInput(attrs={"accept": ".FCStd,.step,.stp,.stl"}),
+        help_text="Unterstützt werden FreeCAD-, STEP- und STL-Dateien.",
+    )
     change_summary = forms.CharField(
         label="Aenderungen",
         required=False,
@@ -223,13 +238,13 @@ class PartForm(forms.ModelForm):
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.project = project
-        self.fcstd_metadata = None
+        self.project_file_metadata = None
         self.fields["number"].required = False
         self.fields["name"].required = False
         self.fields["number"].help_text = (
-            "Leer lassen, um die FreeCAD-Id oder automatisch P-001 zu nutzen."
+            "Leer lassen, um bei FreeCAD die Id oder sonst automatisch P-001 zu nutzen."
         )
-        self.fields["name"].help_text = "Leer lassen, um den FreeCAD-Label zu nutzen."
+        self.fields["name"].help_text = "Leer lassen, um FreeCAD-Label oder Dateiname zu nutzen."
 
     def clean_number(self):
         number = self.cleaned_data["number"].strip()
@@ -241,12 +256,12 @@ class PartForm(forms.ModelForm):
 
     def clean_file(self):
         uploaded_file = self.cleaned_data["file"]
-        self.fcstd_metadata = validate_fcstd_upload(uploaded_file)
+        self.project_file_metadata = validate_project_file_upload(uploaded_file)
         return uploaded_file
 
     def clean(self):
         cleaned_data = super().clean()
-        metadata = self.fcstd_metadata or {}
+        metadata = self.project_file_metadata or {}
         properties = metadata.get("freecad_document", {}).get("properties", {})
 
         number = (cleaned_data.get("number") or "").strip()
@@ -261,24 +276,70 @@ class PartForm(forms.ModelForm):
 
         name = (cleaned_data.get("name") or "").strip()
         if not name:
-            name = properties.get("Label") or metadata.get("original_filename", "Teil")
+            original_filename = metadata.get("original_filename", "Teil")
+            name = properties.get("Label") or PurePosixPath(original_filename).stem
             cleaned_data["name"] = name
 
         return cleaned_data
 
 
 class RevisionUploadForm(forms.Form):
-    file = forms.FileField(label="FCStd-Datei")
+    file = forms.FileField(
+        label="CAD-Datei",
+        widget=forms.FileInput(attrs={"accept": ".FCStd,.step,.stp,.stl"}),
+        help_text="Unterstützt werden FreeCAD-, STEP- und STL-Dateien.",
+    )
     change_summary = forms.CharField(
         label="Aenderungen",
         required=False,
         widget=forms.Textarea(attrs={"rows": 4}),
     )
+    target_snapshot = forms.ModelChoiceField(
+        label="Optional in Projektstand übernehmen",
+        queryset=ProjectSnapshot.objects.none(),
+        required=False,
+        empty_label="Nicht übernehmen",
+        help_text=(
+            "Erzeugt einen neuen Projektstand und ersetzt dort die STEP-/STL-Datei "
+            "dieses Teils durch die neue FCStd-Revision."
+        ),
+    )
+
+    def __init__(self, *args, part=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.part = part
+        self.project_file_metadata = None
+        if part is not None:
+            self.fields["target_snapshot"].queryset = (
+                ProjectSnapshot.objects.filter(
+                    project=part.project,
+                    entries__revision__part=part,
+                    entries__revision__file_format__in=[
+                        Revision.FileFormat.STEP,
+                        Revision.FileFormat.STL,
+                    ],
+                )
+                .distinct()
+                .order_by("-created_at", "-id")
+            )
 
     def clean_file(self):
         uploaded_file = self.cleaned_data["file"]
-        validate_fcstd_upload(uploaded_file)
+        self.project_file_metadata = validate_project_file_upload(uploaded_file)
         return uploaded_file
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if (
+            cleaned_data.get("target_snapshot") is not None
+            and (self.project_file_metadata or {}).get("file_format")
+            != Revision.FileFormat.FCSTD
+        ):
+            self.add_error(
+                "target_snapshot",
+                "Nur eine neue FCStd-Revision kann eine STEP-/STL-Datei im Projektstand ersetzen.",
+            )
+        return cleaned_data
 
 
 class ProjectSnapshotUploadForm(forms.Form):

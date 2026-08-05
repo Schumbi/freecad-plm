@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 
+from ..cad_files import PROJECT_FILE_EXTENSIONS, validate_project_file_upload
 from ..fcstd import (
     DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
     DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES,
@@ -14,7 +15,6 @@ from ..fcstd import (
     DEFAULT_PLM_MAX_ZIP_UNCOMPRESSED_BYTES,
     read_uploaded_file,
     setting_int,
-    validate_fcstd_upload,
     validate_uploaded_file_size,
     validate_zip_archive_budget,
 )
@@ -38,7 +38,7 @@ from .revisions import create_or_reuse_revision, part_identity_from_metadata
 SNAPSHOT_VERSION_SUFFIX_RE = re.compile(r" - (?:Checkout \d+|V\d+)$")
 
 
-def iter_fcstd_zip_members(uploaded_zip):
+def iter_project_zip_members(uploaded_zip):
     max_project_zip_bytes = setting_int(
         "PLM_MAX_PROJECT_ZIP_BYTES",
         DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
@@ -73,7 +73,7 @@ def iter_fcstd_zip_members(uploaded_zip):
                 if info.is_dir():
                     continue
                 path = safe_snapshot_path(info.filename)
-                if not path.lower().endswith(".fcstd"):
+                if PurePosixPath(path).suffix.lower() not in PROJECT_FILE_EXTENSIONS:
                     continue
                 yield ProjectZipMember(path=path, data=archive.read(info))
     except BadZipFile as exc:
@@ -82,9 +82,9 @@ def iter_fcstd_zip_members(uploaded_zip):
 
 @transaction.atomic
 def import_project_snapshot(project, uploaded_zip, created_by, name=""):
-    members = list(iter_fcstd_zip_members(uploaded_zip))
+    members = list(iter_project_zip_members(uploaded_zip))
     if not members:
-        raise ValidationError("Das ZIP enthaelt keine FCStd-Dateien.")
+        raise ValidationError("Das ZIP enthält keine FreeCAD-, STEP- oder STL-Dateien.")
 
     snapshot = ProjectSnapshot.objects.create(
         project=project,
@@ -99,7 +99,7 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
     }
 
     for member in members:
-        metadata = validate_fcstd_upload(
+        metadata = validate_project_file_upload(
             SimpleUploadedFile(PurePosixPath(member.path).name, member.data)
         )
         part, created_part = part_identity_from_metadata(project, member.path, metadata)
@@ -135,6 +135,7 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
                 "part_number": part.number,
                 "revision_id": revision.id,
                 "revision_code": revision.revision_code,
+                "file_format": revision.file_format,
                 "created_part": created_part,
                 "created_revision": created_revision,
             }
@@ -150,6 +151,7 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
                     "revision_code": revision.revision_code,
                     "sha256": revision.sha256,
                     "original_filename": revision.original_filename,
+                    "file_format": revision.file_format,
                     "snapshot_path": member.path,
                     "plm_revision": revision.extracted_metadata.get("plm_revision", {}),
                 },
@@ -173,6 +175,10 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
     )
     snapshot.import_summary = import_summary
     return snapshot
+
+
+# Rückwärtskompatibler Name für bestehende Importe.
+iter_fcstd_zip_members = iter_project_zip_members
 
 
 @transaction.atomic
@@ -323,6 +329,82 @@ def snapshot_base_name(name):
 
 def checkout_snapshot_name(source_snapshot_name, checkout_id):
     return f"{snapshot_base_name(source_snapshot_name)} - V{checkout_id}"
+
+
+@transaction.atomic
+def create_snapshot_with_replaced_external_revision(
+    source_snapshot,
+    part,
+    revision,
+    actor,
+):
+    source_snapshot = ProjectSnapshot.objects.select_for_update().get(
+        pk=source_snapshot.pk
+    )
+    if source_snapshot.project_id != part.project_id or revision.part_id != part.id:
+        raise ValidationError("Projektstand, Teil und Revision passen nicht zusammen.")
+    if revision.file_format != Revision.FileFormat.FCSTD:
+        raise ValidationError("Als Ersatz im Projektstand ist nur eine FCStd-Revision erlaubt.")
+
+    entries = list(
+        source_snapshot.entries.select_related("revision", "revision__part").order_by(
+            "path"
+        )
+    )
+    replacements = [
+        entry
+        for entry in entries
+        if entry.revision.part_id == part.id
+        and entry.revision.file_format
+        in {Revision.FileFormat.STEP, Revision.FileFormat.STL}
+    ]
+    if not replacements:
+        raise ValidationError(
+            "Der gewählte Projektstand enthält keine STEP-/STL-Datei dieses Teils."
+        )
+
+    replacement_paths = {}
+    occupied_paths = {entry.path for entry in entries if entry not in replacements}
+    filename = PurePosixPath(revision.original_filename).name
+    for entry in replacements:
+        parent = PurePosixPath(entry.path).parent
+        path = safe_snapshot_path(str(parent / filename))
+        if path in occupied_paths or path in replacement_paths.values():
+            raise ValidationError(
+                f"Der Ersatzpfad ist im Projektstand bereits belegt: {path}"
+            )
+        replacement_paths[entry.id] = path
+
+    snapshot = ProjectSnapshot.objects.create(
+        project=source_snapshot.project,
+        name=f"{snapshot_base_name(source_snapshot.name)} - {revision.revision_code}",
+        created_by=actor,
+    )
+    for entry in entries:
+        replacement_path = replacement_paths.get(entry.id)
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            path=replacement_path or entry.path,
+            revision=revision if replacement_path else entry.revision,
+        )
+
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.PROJECT_SNAPSHOT_CREATED,
+        object_repr=str(snapshot),
+        metadata={
+            "project_id": snapshot.project_id,
+            "snapshot_id": snapshot.id,
+            "source_snapshot_id": source_snapshot.id,
+            "replacement_revision_id": revision.id,
+            "replaced_part_id": part.id,
+            "replaced_paths": {
+                entry.path: replacement_paths[entry.id] for entry in replacements
+            },
+            "entry_count": snapshot.entries.count(),
+        },
+    )
+    return snapshot
 
 
 def create_snapshot_from_checkout_revisions(checkout, actor, revisions):

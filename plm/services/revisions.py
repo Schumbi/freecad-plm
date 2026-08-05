@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.utils import timezone
 
+from ..cad_files import CAD_FORMAT_FCSTD, validate_project_file_upload
 from ..fcstd import (
     PLM_REVISION_PROPERTY,
     fcstd_with_plm_revision,
@@ -71,13 +72,17 @@ def next_revision_code(part):
 
 
 def revision_metadata_from_validation(metadata, plm_revision=None):
-    extracted = {
-        "zip_member_count": metadata["zip_member_count"],
-        "has_document_xml": metadata["has_document_xml"],
-        "has_gui_document_xml": metadata["has_gui_document_xml"],
-        "technical_signature": metadata["technical_signature"],
-        "freecad_document": metadata["freecad_document"],
-    }
+    extracted = {"file_format": metadata["file_format"]}
+    if metadata["file_format"] == CAD_FORMAT_FCSTD:
+        extracted.update(
+            {
+                "zip_member_count": metadata["zip_member_count"],
+                "has_document_xml": metadata["has_document_xml"],
+                "has_gui_document_xml": metadata["has_gui_document_xml"],
+                "technical_signature": metadata["technical_signature"],
+                "freecad_document": metadata["freecad_document"],
+            }
+        )
     if plm_revision:
         extracted["plm_revision"] = plm_revision
     return extracted
@@ -182,18 +187,25 @@ def part_identity_from_metadata(project, path, metadata):
 
 def create_or_reuse_revision(part, path, data, created_by):
     upload = SimpleUploadedFile(PurePosixPath(path).name, data)
-    metadata = validate_fcstd_upload(upload)
+    metadata = validate_project_file_upload(upload)
     existing = existing_revision_for_upload_hash(part, metadata["sha256"])
     if existing:
         return existing, False
 
     revision_code = next_revision_code(part)
-    uploaded_plm_revision = freecad_plm_revision(metadata)
+    uploaded_plm_revision = (
+        freecad_plm_revision(metadata)
+        if metadata["file_format"] == CAD_FORMAT_FCSTD
+        else ""
+    )
     original_sha256 = metadata["sha256"]
-    normalized = uploaded_plm_revision != revision_code
+    normalized = (
+        metadata["file_format"] == CAD_FORMAT_FCSTD
+        and uploaded_plm_revision != revision_code
+    )
     if normalized:
         data = fcstd_with_plm_revision(data, revision_code)
-        metadata = validate_fcstd_upload(
+        metadata = validate_project_file_upload(
             SimpleUploadedFile(PurePosixPath(path).name, data)
         )
 
@@ -202,18 +214,23 @@ def create_or_reuse_revision(part, path, data, created_by):
         revision_code=revision_code,
         status=Revision.Status.DRAFT,
         file=ContentFile(data, name=PurePosixPath(path).name),
+        file_format=metadata["file_format"],
         original_filename=PurePosixPath(path).name,
         sha256=metadata["sha256"],
         size_bytes=metadata["size_bytes"],
         extracted_metadata=revision_metadata_from_validation(
             metadata,
-            {
-                "expected": revision_code,
-                "uploaded": uploaded_plm_revision,
-                "normalized": normalized,
-                "original_upload_sha256": original_sha256,
-                "stored_sha256": metadata["sha256"],
-            },
+            (
+                {
+                    "expected": revision_code,
+                    "uploaded": uploaded_plm_revision,
+                    "normalized": normalized,
+                    "original_upload_sha256": original_sha256,
+                    "stored_sha256": metadata["sha256"],
+                }
+                if metadata["file_format"] == CAD_FORMAT_FCSTD
+                else None
+            ),
         ),
         created_by=created_by,
     )
@@ -264,19 +281,23 @@ def create_revision_from_upload(
     normalize_plm_revision=False,
     notes="",
 ):
-    metadata = validate_fcstd_upload(uploaded_file)
+    metadata = validate_project_file_upload(uploaded_file)
     file_data = read_uploaded_file(uploaded_file)
     code = validate_revision_code_argument(revision_code) or next_revision_code(part)
-    uploaded_plm_revision = freecad_plm_revision(metadata)
+    uploaded_plm_revision = (
+        freecad_plm_revision(metadata)
+        if metadata["file_format"] == CAD_FORMAT_FCSTD
+        else ""
+    )
     original_sha256 = metadata["sha256"]
 
     if existing_revision_for_upload_hash(part, original_sha256):
         raise ValidationError(
-            "Diese FCStd-Datei wurde fuer dieses Teil bereits hochgeladen."
+            "Diese CAD-Datei wurde für dieses Teil bereits hochgeladen."
         )
 
     normalized = False
-    if uploaded_plm_revision != code:
+    if metadata["file_format"] == CAD_FORMAT_FCSTD and uploaded_plm_revision != code:
         if not normalize_plm_revision:
             raise PLMRevisionConflict(
                 expected=code,
@@ -286,14 +307,14 @@ def create_revision_from_upload(
             )
         file_data = fcstd_with_plm_revision(file_data, code)
         uploaded_file = ContentFile(file_data, name=metadata["original_filename"])
-        metadata = validate_fcstd_upload(
+        metadata = validate_project_file_upload(
             SimpleUploadedFile(metadata["original_filename"], file_data)
         )
         normalized = True
 
     if part.revisions.filter(sha256=metadata["sha256"]).exists():
         raise ValidationError(
-            "Diese FCStd-Datei wurde fuer dieses Teil bereits hochgeladen."
+            "Diese CAD-Datei wurde für dieses Teil bereits hochgeladen."
         )
 
     revision = Revision.objects.create(
@@ -301,19 +322,24 @@ def create_revision_from_upload(
         revision_code=code,
         status=Revision.Status.DRAFT,
         file=uploaded_file,
+        file_format=metadata["file_format"],
         original_filename=metadata["original_filename"],
         sha256=metadata["sha256"],
         size_bytes=metadata["size_bytes"],
         notes=notes.strip(),
         extracted_metadata=revision_metadata_from_validation(
             metadata,
-            {
-                "expected": code,
-                "uploaded": uploaded_plm_revision,
-                "normalized": normalized,
-                "original_upload_sha256": original_sha256,
-                "stored_sha256": metadata["sha256"],
-            },
+            (
+                {
+                    "expected": code,
+                    "uploaded": uploaded_plm_revision,
+                    "normalized": normalized,
+                    "original_upload_sha256": original_sha256,
+                    "stored_sha256": metadata["sha256"],
+                }
+                if metadata["file_format"] == CAD_FORMAT_FCSTD
+                else None
+            ),
         ),
         created_by=created_by,
     )
@@ -331,7 +357,8 @@ def create_revision_from_upload(
             "revision_code": revision.revision_code,
             "sha256": revision.sha256,
             "original_filename": revision.original_filename,
-            "plm_revision": revision.extracted_metadata["plm_revision"],
+            "file_format": revision.file_format,
+            "plm_revision": revision.extracted_metadata.get("plm_revision", {}),
             "change_summary": revision.notes,
         },
     )

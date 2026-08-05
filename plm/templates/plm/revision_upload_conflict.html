@@ -32,6 +32,10 @@
           <dd>{% if pending.actual %}{{ pending.actual }}{% else %}keine PLMRevision{% endif %}</dd>
           <dt>Original-SHA-256</dt>
           <dd><code>{{ pending.original_sha256 }}</code></dd>
+          {% if pending.target_snapshot_name %}
+            <dt>Neuer Projektstand aus</dt>
+            <dd>{{ pending.target_snapshot_name }}</dd>
+          {% endif %}
         </dl>
       </div>
 

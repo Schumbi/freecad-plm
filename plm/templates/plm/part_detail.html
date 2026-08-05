@@ -88,11 +88,12 @@
             <article
               class="revision-card"
               data-filter-item
-              data-filter-text="{{ revision.revision_code }} {{ revision.status }} {{ revision.original_filename }} {{ revision.notes }}">
+              data-filter-text="{{ revision.revision_code }} {{ revision.status }} {{ revision.file_format }} {{ revision.original_filename }} {{ revision.notes }}">
               <div class="revision-main">
                 <div class="revision-title-row">
                   <span class="revision-code">{{ revision.revision_code }}</span>
                   <span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span>
+                  <span class="artifact-pill">{{ revision.get_file_format_display }}</span>
                   {% if revision.released_at %}
                     <span class="meta-line">freigegeben {{ revision.released_at|date:"d.m.Y H:i" }}</span>
                   {% endif %}
@@ -489,6 +490,16 @@
               {{ form.change_summary }}
               {% if form.change_summary.errors %}
                 <span class="errors">{{ form.change_summary.errors }}</span>
+              {% endif %}
+            </p>
+            <p>
+              {{ form.target_snapshot.label_tag }}
+              {{ form.target_snapshot }}
+              {% if form.target_snapshot.help_text %}
+                <span class="helptext">{{ form.target_snapshot.help_text }}</span>
+              {% endif %}
+              {% if form.target_snapshot.errors %}
+                <span class="errors">{{ form.target_snapshot.errors }}</span>
               {% endif %}
             </p>
             <button type="submit">Revision hochladen</button>

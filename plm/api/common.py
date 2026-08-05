@@ -50,6 +50,7 @@ def revision_payload(revision, request=None):
         "revision_code": revision.revision_code,
         "status": revision.status,
         "original_filename": revision.original_filename,
+        "file_format": revision.file_format,
         "sha256": revision.sha256,
         "size_bytes": revision.size_bytes,
         "notes": revision.notes,
@@ -119,6 +120,7 @@ def snapshot_payload(snapshot):
                 "part_number": entry.revision.part.number,
                 "part_name": entry.revision.part.name,
                 "part_category": entry.revision.part.category,
+                "file_format": entry.revision.file_format,
             }
             for entry in snapshot.entries.select_related("revision", "revision__part").order_by("path")
         ],

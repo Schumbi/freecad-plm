@@ -4,15 +4,35 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import transaction
 from django.http import FileResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from ..derivatives import ensure_revision_png_views, prepare_revision_derivatives
-from ..forms import ManufacturingFileUploadForm, RevisionExportJobForm, RevisionNotesForm, RevisionUploadForm
+from ..forms import (
+    ManufacturingFileUploadForm,
+    RevisionExportJobForm,
+    RevisionNotesForm,
+    RevisionUploadForm,
+)
 from ..freecadcmd import create_export_job, process_export_job
-from ..models import AuditEvent, ExportJob, Part, Revision, RevisionArtifact
+from ..models import (
+    AuditEvent,
+    ExportJob,
+    Part,
+    ProjectSnapshot,
+    Revision,
+    RevisionArtifact,
+)
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
-from ..services import PLMRevisionConflict, create_revision_from_upload, obsolete_revision, release_revision, revision_reference_files
+from ..services import (
+    PLMRevisionConflict,
+    create_revision_from_upload,
+    create_snapshot_with_replaced_external_revision,
+    obsolete_revision,
+    release_revision,
+    revision_reference_files,
+)
 
 from .common import (
     PENDING_REVISION_UPLOAD_SESSION_KEY,
@@ -57,21 +77,34 @@ def upload_revision(request, part_id):
     if request.method != "POST":
         return redirect("plm:part_detail", part_id=part.id)
 
-    form = RevisionUploadForm(request.POST, request.FILES)
+    form = RevisionUploadForm(request.POST, request.FILES, part=part)
     if form.is_valid():
         try:
-            revision = create_revision_from_upload(
-                part=part,
-                uploaded_file=form.cleaned_data["file"],
-                created_by=request.user,
-                notes=form.cleaned_data.get("change_summary", ""),
-            )
+            with transaction.atomic():
+                revision = create_revision_from_upload(
+                    part=part,
+                    uploaded_file=form.cleaned_data["file"],
+                    created_by=request.user,
+                    notes=form.cleaned_data.get("change_summary", ""),
+                )
+                target_snapshot = form.cleaned_data.get("target_snapshot")
+                replacement_snapshot = (
+                    create_snapshot_with_replaced_external_revision(
+                        target_snapshot,
+                        part,
+                        revision,
+                        request.user,
+                    )
+                    if target_snapshot
+                    else None
+                )
         except PLMRevisionConflict as exc:
             pending = save_pending_revision_upload(
                 part,
                 form.cleaned_data["file"],
                 exc,
                 change_summary=form.cleaned_data.get("change_summary", ""),
+                target_snapshot=form.cleaned_data.get("target_snapshot"),
             )
             request.session[PENDING_REVISION_UPLOAD_SESSION_KEY] = pending
             request.session.modified = True
@@ -88,11 +121,17 @@ def upload_revision(request, part_id):
             form.add_error("file", exc)
         else:
             derivative_summary = prepare_revision_derivatives([revision], request.user)
+            snapshot_message = (
+                f" Neuer Projektstand {replacement_snapshot.name} wurde erzeugt."
+                if replacement_snapshot
+                else ""
+            )
             messages.success(
                 request,
                 (
                     f"Revision {revision.revision_code} wurde hochgeladen. "
                     f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
+                    f"{snapshot_message}"
                 ),
             )
             return redirect("plm:part_detail", part_id=part.id)
@@ -143,22 +182,49 @@ def confirm_revision_upload(request, part_id):
                 pending["original_filename"],
                 source.read(),
             )
-        revision = create_revision_from_upload(
-            part=part,
-            uploaded_file=uploaded_file,
-            created_by=request.user,
-            normalize_plm_revision=True,
-            notes=pending.get("change_summary", ""),
-        )
+        with transaction.atomic():
+            revision = create_revision_from_upload(
+                part=part,
+                uploaded_file=uploaded_file,
+                created_by=request.user,
+                normalize_plm_revision=True,
+                notes=pending.get("change_summary", ""),
+            )
+            target_snapshot = None
+            if pending.get("target_snapshot_id"):
+                target_snapshot = ProjectSnapshot.objects.filter(
+                    id=pending["target_snapshot_id"],
+                    project=part.project,
+                ).first()
+                if target_snapshot is None:
+                    raise ValidationError(
+                        "Der ausgewählte Projektstand ist nicht mehr verfügbar."
+                    )
+            replacement_snapshot = (
+                create_snapshot_with_replaced_external_revision(
+                    target_snapshot,
+                    part,
+                    revision,
+                    request.user,
+                )
+                if target_snapshot
+                else None
+            )
     except ValidationError as exc:
         messages.error(request, exc.messages[0])
     else:
         derivative_summary = prepare_revision_derivatives([revision], request.user)
+        snapshot_message = (
+            f" Neuer Projektstand {replacement_snapshot.name} wurde erzeugt."
+            if replacement_snapshot
+            else ""
+        )
         messages.success(
             request,
             (
                 f"Revision {revision.revision_code} wurde an das PLM angepasst und hochgeladen. "
                 f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
+                f"{snapshot_message}"
             ),
         )
     finally:
@@ -442,6 +508,8 @@ def revision_viewer_source(request, revision_id):
         Revision.objects.select_related("part", "created_by").prefetch_related("artifacts"),
         id=revision_id,
     )
+    if revision.file_format == Revision.FileFormat.STL:
+        return viewer_file_response(revision.file, revision.original_filename, "stl")
     artifact = revision_viewer_artifact(revision)
     if not artifact:
         return missing_viewer_preview_response()

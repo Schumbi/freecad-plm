@@ -103,7 +103,7 @@ def part_detail(request, part_id):
             ),
             "revisions": revisions,
             "selected_revision": selected_revision,
-            "form": RevisionUploadForm(),
+            "form": RevisionUploadForm(part=part),
             "manufacturing_form": ManufacturingFileUploadForm(),
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),

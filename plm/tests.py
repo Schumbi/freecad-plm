@@ -20,6 +20,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from .auth import create_api_token
+from .cad_files import validate_project_file_upload
 from .fcstd import fcstd_with_plm_revision, validate_fcstd_upload
 from .fcstd_signature import fcstd_document_signature
 from .models import (
@@ -54,6 +55,7 @@ from .services import (
     create_checkout,
     create_manufacturing_file_from_upload,
     create_revision_from_upload,
+    create_snapshot_with_replaced_external_revision,
     import_project_snapshot,
     next_revision_code,
     obsolete_revision,
@@ -102,6 +104,27 @@ FREECAD_DOCUMENT_XML = """
     </Document>
 """
 
+STEP_DATA = b"""ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('test'),'2;1');
+ENDSEC;
+DATA;
+#1=CARTESIAN_POINT('',(0.,0.,0.));
+ENDSEC;
+END-ISO-10303-21;
+"""
+
+ASCII_STL_DATA = b"""solid test
+facet normal 0 0 1
+  outer loop
+    vertex 0 0 0
+    vertex 1 0 0
+    vertex 0 1 0
+  endloop
+endfacet
+endsolid test
+"""
+
 
 def write_zip_member(archive, name, content):
     info = ZipInfo(name)
@@ -129,6 +152,14 @@ def make_zip_upload(name="part.FCStd", members=None):
         for member_name, content in members.items():
             write_zip_member(archive, member_name, content)
     return SimpleUploadedFile(name, buffer.getvalue())
+
+
+def make_step_upload(name="part.step"):
+    return SimpleUploadedFile(name, STEP_DATA)
+
+
+def make_stl_upload(name="part.stl"):
+    return SimpleUploadedFile(name, ASCII_STL_DATA)
 
 
 class UploadWithoutReportedSize(BytesIO):
@@ -513,6 +544,32 @@ class FcstdValidationTests(SimpleTestCase):
             validate_fcstd_upload(upload)
 
 
+class ProjectFileValidationTests(SimpleTestCase):
+    def test_accepts_step_and_stp(self):
+        for filename in ("part.step", "part.stp", "PART.STEP"):
+            metadata = validate_project_file_upload(make_step_upload(filename))
+
+            self.assertEqual(metadata["file_format"], "step")
+            self.assertEqual(metadata["original_filename"], filename)
+            self.assertEqual(metadata["size_bytes"], len(STEP_DATA))
+            self.assertEqual(len(metadata["sha256"]), 64)
+
+    def test_accepts_ascii_stl(self):
+        metadata = validate_project_file_upload(make_stl_upload())
+
+        self.assertEqual(metadata["file_format"], "stl")
+        self.assertEqual(metadata["size_bytes"], len(ASCII_STL_DATA))
+
+    def test_rejects_invalid_step_and_stl(self):
+        for filename in ("part.step", "part.stl"):
+            with self.subTest(filename=filename), self.assertRaises(ValidationError):
+                validate_project_file_upload(SimpleUploadedFile(filename, b"invalid"))
+
+    def test_rejects_unsupported_project_file(self):
+        with self.assertRaises(ValidationError):
+            validate_project_file_upload(SimpleUploadedFile("part.obj", b"object"))
+
+
 class RevisionUploadServiceTests(TestCase):
     def setUp(self):
         self.media_root = TemporaryDirectory()
@@ -603,6 +660,93 @@ class RevisionUploadServiceTests(TestCase):
         )
         self.assertTrue(revision.file.storage.exists(revision.file.name))
         self.assertEqual(AuditEvent.objects.count(), 1)
+
+    def test_create_step_revision_without_fcstd_revision_property(self):
+        revision = create_revision_from_upload(self.part, make_step_upload(), self.user)
+
+        self.assertEqual(revision.revision_code, "R0001")
+        self.assertEqual(revision.file_format, Revision.FileFormat.STEP)
+        self.assertEqual(revision.original_filename, "part.step")
+        self.assertEqual(revision.extracted_metadata["file_format"], "step")
+        self.assertNotIn("freecad_document", revision.extracted_metadata)
+
+    def test_create_stl_revision_without_fcstd_revision_property(self):
+        revision = create_revision_from_upload(self.part, make_stl_upload(), self.user)
+
+        self.assertEqual(revision.revision_code, "R0001")
+        self.assertEqual(revision.file_format, Revision.FileFormat.STL)
+        self.assertEqual(revision.original_filename, "part.stl")
+        self.assertEqual(revision.extracted_metadata["file_format"], "stl")
+
+    def test_step_revision_cannot_be_checked_out_as_editable_root(self):
+        revision = create_revision_from_upload(self.part, make_step_upload(), self.user)
+
+        with self.assertRaisesRegex(ValidationError, "Nur FreeCAD-Revisionen"):
+            create_checkout(revision, self.user)
+
+    def test_fcstd_revision_can_replace_external_file_in_new_snapshot(self):
+        external_revision = create_revision_from_upload(
+            self.part,
+            make_step_upload("Bracket.step"),
+            self.user,
+        )
+        other_part = Part.objects.create(
+            project=self.project,
+            number="P-002",
+            name="Other",
+        )
+        other_revision = create_revision_from_upload(
+            other_part,
+            make_zip_upload("Other.FCStd"),
+            self.user,
+            normalize_plm_revision=True,
+        )
+        source = ProjectSnapshot.objects.create(
+            project=self.project,
+            name="Lieferstand",
+            created_by=self.user,
+        )
+        ProjectSnapshotEntry.objects.create(
+            snapshot=source,
+            path="vendor/Bracket.step",
+            revision=external_revision,
+        )
+        ProjectSnapshotEntry.objects.create(
+            snapshot=source,
+            path="Other.FCStd",
+            revision=other_revision,
+        )
+        fcstd_revision = create_revision_from_upload(
+            self.part,
+            make_zip_upload(
+                "Bracket.FCStd",
+                members={
+                    "Document.xml": FREECAD_DOCUMENT_XML.replace("R0001", "R0002")
+                },
+            ),
+            self.user,
+        )
+
+        replacement = create_snapshot_with_replaced_external_revision(
+            source,
+            self.part,
+            fcstd_revision,
+            self.user,
+        )
+
+        self.assertEqual(replacement.name, "Lieferstand - R0002")
+        self.assertEqual(
+            source.entries.get(path="vendor/Bracket.step").revision_id,
+            external_revision.id,
+        )
+        self.assertEqual(
+            replacement.entries.get(path="vendor/Bracket.FCStd").revision_id,
+            fcstd_revision.id,
+        )
+        self.assertEqual(
+            replacement.entries.get(path="Other.FCStd").revision_id,
+            other_revision.id,
+        )
 
     def test_create_revision_from_upload_increments_revision_code(self):
         create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -733,6 +877,29 @@ class RevisionUploadServiceTests(TestCase):
                 ]
             },
             {"Box.FCStd", "Deckel.FCStd"},
+        )
+
+    def test_import_project_snapshot_accepts_step_and_stl_files(self):
+        snapshot = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(
+                "vendor-files.zip",
+                members={
+                    "vendor/Bracket.step": STEP_DATA,
+                    "mesh/Handle.stl": ASCII_STL_DATA,
+                },
+            ),
+            self.user,
+        )
+
+        self.assertEqual(snapshot.entries.count(), 2)
+        self.assertEqual(
+            set(Revision.objects.values_list("file_format", flat=True)),
+            {Revision.FileFormat.STEP, Revision.FileFormat.STL},
+        )
+        self.assertEqual(
+            set(snapshot.entries.values_list("path", flat=True)),
+            {"vendor/Bracket.step", "mesh/Handle.stl"},
         )
 
     def test_import_project_snapshot_reuses_unchanged_revision(self):
@@ -991,6 +1158,24 @@ class RevisionUploadViewTests(TestCase):
             metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION},
         )
 
+    def create_external_snapshot(self):
+        revision = create_revision_from_upload(
+            self.part,
+            make_step_upload("Bracket.step"),
+            self.user,
+        )
+        snapshot = ProjectSnapshot.objects.create(
+            project=self.project,
+            name="Lieferstand",
+            created_by=self.user,
+        )
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            path="vendor/Bracket.step",
+            revision=revision,
+        )
+        return snapshot
+
     def test_project_list_requires_login(self):
         response = self.client.get(reverse("plm:project_list"))
 
@@ -1039,6 +1224,62 @@ class RevisionUploadViewTests(TestCase):
 
         self.assertContains(response, "Neue Revision hochladen")
         self.assertContains(response, "Revision hochladen")
+
+    def test_part_detail_offers_external_snapshot_as_optional_replacement(self):
+        snapshot = self.create_external_snapshot()
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertContains(response, "Optional in Projektstand übernehmen")
+        self.assertContains(response, f'value="{snapshot.id}"')
+
+    def test_fcstd_upload_option_creates_new_replacement_snapshot(self):
+        source = self.create_external_snapshot()
+        self.client.force_login(self.user)
+        upload = make_zip_upload(
+            "Bracket.FCStd",
+            members={
+                "Document.xml": FREECAD_DOCUMENT_XML.replace("R0001", "R0002")
+            },
+        )
+
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": upload, "target_snapshot": source.id},
+        )
+
+        revision = self.part.revisions.get(revision_code="R0002")
+        replacement = ProjectSnapshot.objects.exclude(id=source.id).get()
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        self.assertEqual(replacement.entries.count(), 1)
+        self.assertEqual(
+            replacement.entries.get(path="vendor/Bracket.FCStd").revision_id,
+            revision.id,
+        )
+        self.assertEqual(
+            source.entries.get(path="vendor/Bracket.step").revision.file_format,
+            Revision.FileFormat.STEP,
+        )
+
+    def test_fcstd_upload_without_option_keeps_snapshot_list_unchanged(self):
+        source = self.create_external_snapshot()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {
+                "file": make_zip_upload(
+                    "Bracket.FCStd",
+                    members={
+                        "Document.xml": FREECAD_DOCUMENT_XML.replace("R0001", "R0002")
+                    },
+                )
+            },
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        self.assertEqual(list(ProjectSnapshot.objects.all()), [source])
 
     def test_part_detail_shows_freecad_annotations_with_status_and_target(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -1153,6 +1394,37 @@ class RevisionUploadViewTests(TestCase):
         )
         self.assertEqual(AuditEvent.objects.count(), 3)
 
+    def test_upload_step_revision_prepares_freecadcmd_jobs(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_step_upload()},
+        )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision = Revision.objects.get()
+        self.assertEqual(revision.file_format, Revision.FileFormat.STEP)
+        self.assertEqual(
+            set(revision.export_jobs.values_list("job_type", flat=True)),
+            {ExportJob.JobType.INSPECT, ExportJob.JobType.PNG_VIEWS},
+        )
+
+    def test_upload_stl_revision_is_immediately_available_in_viewer(self):
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_stl_upload()},
+        )
+        revision = Revision.objects.get()
+
+        status = self.client.get(reverse("plm:revision_viewer_status", args=[revision.id]))
+        source = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+
+        self.assertEqual(status.json()["status"], "ready")
+        self.assertEqual(source.status_code, 200)
+        self.assertEqual(source["Content-Type"], "model/stl")
+
     def test_duplicate_upload_shows_error_and_creates_no_new_revision(self):
         self.client.force_login(self.user)
         self.client.post(
@@ -1232,6 +1504,48 @@ class RevisionUploadViewTests(TestCase):
         )
         self.assertTrue(revision.extracted_metadata["plm_revision"]["normalized"])
         self.assertEqual(revision.export_jobs.count(), 2)
+
+    def test_pending_normalization_keeps_optional_snapshot_replacement(self):
+        source = self.create_external_snapshot()
+        self.client.force_login(self.user)
+
+        conflict_response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {
+                "file": make_zip_upload(
+                    "Bracket.FCStd",
+                    members={"Document.xml": "<Document />"},
+                ),
+                "target_snapshot": source.id,
+            },
+        )
+        response = self.client.post(
+            reverse("plm:confirm_revision_upload", args=[self.part.id]),
+            {"action": "normalize"},
+        )
+
+        self.assertContains(conflict_response, "Lieferstand", status_code=409)
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        revision = self.part.revisions.get(revision_code="R0002")
+        replacement = ProjectSnapshot.objects.exclude(id=source.id).get()
+        self.assertEqual(
+            replacement.entries.get(path="vendor/Bracket.FCStd").revision_id,
+            revision.id,
+        )
+
+    def test_external_upload_cannot_replace_external_snapshot_entry(self):
+        source = self.create_external_snapshot()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("plm:upload_revision", args=[self.part.id]),
+            {"file": make_stl_upload("Bracket.stl"), "target_snapshot": source.id},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Nur eine neue FCStd-Revision", status_code=400)
+        self.assertEqual(self.part.revisions.count(), 1)
+        self.assertEqual(ProjectSnapshot.objects.count(), 1)
 
     def test_download_revision_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
@@ -2416,7 +2730,7 @@ class RolePermissionTests(TestCase):
         self.assertContains(response, "bereits", status_code=400)
         self.assertEqual(Part.objects.filter(number="P-001").count(), 1)
 
-    def test_create_part_requires_initial_fcstd_file(self):
+    def test_create_part_requires_initial_cad_file(self):
         self.client.force_login(self.editor)
 
         response = self.client.post(
@@ -2430,6 +2744,24 @@ class RolePermissionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Part.objects.filter(name="Ohne Datei").exists())
+
+    def test_create_part_from_step_uses_filename_and_stores_format(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("plm:create_part", args=[self.project.id]),
+            {
+                "number": "",
+                "name": "",
+                "category": Part.Category.PART,
+                "file": make_step_upload("VendorBracket.step"),
+            },
+        )
+
+        part = Part.objects.get(name="VendorBracket")
+        self.assertRedirects(response, reverse("plm:part_detail", args=[part.id]))
+        self.assertEqual(part.number, "P-002")
+        self.assertEqual(part.revisions.get().file_format, Revision.FileFormat.STEP)
 
     def test_part_detail_uses_properties_sidebar_and_fallback_page(self):
         self.client.force_login(self.reader)
@@ -3006,6 +3338,31 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
     def test_export_job_stale_seconds_defaults_to_timeout_plus_grace(self):
         with override_settings(FREECADCMD_TIMEOUT_SECONDS=300, EXPORT_JOB_STALE_SECONDS=None):
             self.assertEqual(export_job_stale_seconds(), 600)
+
+    def test_primary_stl_png_job_does_not_start_freecadcmd(self):
+        stl_revision = create_revision_from_upload(
+            self.part,
+            make_stl_upload(),
+            self.user,
+        )
+        job = create_export_job(
+            revision=stl_revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            created_by=self.user,
+        )
+
+        with override_settings(FREECADCMD_COMMAND="/does/not/exist"):
+            process_export_job(job)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, ExportJob.Status.SUCCEEDED)
+        self.assertEqual(
+            RevisionArtifact.objects.filter(
+                job=job,
+                artifact_type=RevisionArtifact.ArtifactType.PNG,
+            ).count(),
+            len(PNG_VIEW_NAMES),
+        )
 
     def test_recover_stale_export_jobs_marks_old_running_jobs_failed(self):
         job = create_export_job(
@@ -3958,6 +4315,7 @@ class AddonApiWorkflowTests(TestCase):
                 "part_number": "P-001",
                 "revision_code": "R0001",
                 "filename": "part.FCStd",
+                "file_format": "fcstd",
                 "sha256": revision.sha256,
                 "size_bytes": revision.size_bytes,
                 "download_url": expected_download_url,

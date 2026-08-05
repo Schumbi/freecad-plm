@@ -26,7 +26,7 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - API-Token-Rechte werden ueber Presets vergeben: Nur Lesen, Addon Standard und Admin/Vollzugriff.
 - Projekte koennen angelegt, bearbeitet und archiviert werden.
 - Teile oder Baugruppen koennen einem Projekt zugeordnet werden.
-- `FCStd`-Dateien koennen manuell ueber die Weboberflaeche hochgeladen werden.
+- `FCStd`-, STEP- und STL-Dateien können manuell über die Weboberfläche als primäre CAD-Revision hochgeladen werden.
 - Jeder Upload erzeugt eine neue unveraenderliche Revision.
 - Revisionen haben Status, mindestens `draft`, `released`, `obsolete`.
 - Freigegebene Revisionen duerfen nicht ueberschrieben werden.
@@ -43,10 +43,10 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Aenderungen an FreeCAD-Dokumentmetadaten wie License, Label oder Comment erzeugen durch erneuten Upload eine neue Revision; bestehende Revisionen werden nicht veraendert.
 - Teilenummern koennen manuell vergeben werden oder leer bleiben; bei leerer Nummer vergibt das PLM pro Projekt automatisch `P-001`, `P-002`, ...
 - Die FreeCAD-Dokumenteigenschaft `Id` wird beim Upload mit extrahiert und kann spaeter als Quelle fuer eine Teilenummer genutzt werden.
-- Neue Teile/Baugruppen werden in der Weboberflaeche nur mit initialer `FCStd`-Datei angelegt.
+- Neue Teile/Baugruppen werden in der Weboberfläche mit initialer `FCStd`-, STEP- oder STL-Datei angelegt.
 - Wenn beim Anlegen die Teilenummer leer bleibt, nutzt das PLM zuerst FreeCAD-`Id`; wenn keine `Id` vorhanden ist, wird automatisch `P-001`, `P-002`, ... vergeben.
 - Wenn beim Anlegen der Name leer bleibt, nutzt das PLM FreeCAD-`Label`.
-- FreeCAD-Projekte mit mehreren referenzierten `FCStd`-Dateien koennen als Projekt-ZIP importiert werden.
+- Projekte mit `FCStd`-, STEP- und STL-Dateien können als Projekt-ZIP importiert werden.
 - Ein Projektstand/Snapshot speichert, welche konkreten Dateirevisionen mit welchen relativen Pfaden zusammengehoeren.
 - Projektstaende koennen wieder als ZIP mit den urspruenglichen relativen Pfaden heruntergeladen werden.
 - FreeCAD-Referenzen aus `XLink` werden ausgelesen und pro Revision als Metadaten gespeichert.
@@ -56,12 +56,14 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Wenn `PLMRevision` beim Revisionsupload fehlt oder abweicht, meldet die Weboberflaeche den Konflikt und bietet Verwerfen oder Speichern einer PLM-normalisierten Kopie an.
 - Bei einer PLM-normalisierten Kopie wird nur `Document.xml` angepasst; Original-Hash, urspruenglicher Wert und Normalisierung werden in Metadaten und Audit-Trail festgehalten.
 - FreeCADCmd-Jobs koennen pro Revision eine exportierbare Objektliste und vorhandene VarSet-Parameter auslesen.
-- STEP-, STL- und 3MF-Dateien koennen als abgeleitete Artefakte zu einer Revision erzeugt, gespeichert und heruntergeladen werden.
+- STEP und STL können sowohl primäre CAD-Revisionen als auch abgeleitete Artefakte einer FCStd-Revision sein; 3MF bleibt eine Fertigungsdatei bzw. ein abgeleitetes Artefakt.
 - PNG-Ansichten koennen als abgeleitete Artefakte zu einer Revision erzeugt und als Galerie angezeigt werden.
 - Zwei Revisionen desselben Teils koennen anhand gleichnamiger PNG-Ansichten nebeneinander verglichen werden.
 - Globale Suche nach Projekten, Teilen, Revisionen und Dateinamen (inkl. Pfade in Projektstaenden) ist in der Topbar erreichbar.
 - Beim Upload einer Revision kann eine Aenderungsnotiz erfasst werden.
-- Das FreeCAD-Addon kann lokale Ordner mit einer oder mehreren `.FCStd`-Dateien als Projektstand importieren.
+- Das FreeCAD-Addon kann lokale Ordner mit `.FCStd`-, `.step`-, `.stp`- und `.stl`-Dateien als Projektstand importieren.
+- Nur FCStd-Revisionen können ausgecheckt und eingecheckt werden. STEP/STL-Dateien können in einem FCStd-Checkout schreibgeschützt enthalten sein.
+- Beim Upload einer FCStd-Revision zu einem bisher als STEP/STL geführten Teil kann optional ein Projektstand ausgewählt werden. Das PLM erzeugt daraus einen neuen, unveränderlichen Stand mit aktualisiertem Dateipfad; ohne Auswahl bleiben alle Projektstände unverändert.
 - Das FreeCAD-Addon kann optional ein neues Projekt mit Code, Name, Status, Datum und Beschreibung anlegen und direkt mit dem Import befuellen.
 - Nach einem Addon-Import kann ein importiertes Teil oder eine importierte Baugruppe direkt ausgecheckt werden.
 - Wenn der direkte Checkout nach dem Import erfolgreich war, kann das Addon den urspruenglichen lokalen Importordner nach `~/FreeCAD-PLM/imported/...` verschieben.
