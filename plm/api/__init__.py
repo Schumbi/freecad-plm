@@ -9,6 +9,7 @@ from .common import (
     annotation_payload,
     checkout_payload,
     json_body,
+    manufacturing_file_payload,
     part_payload,
     project_import_payload,
     project_payload,
@@ -47,4 +48,8 @@ from .checkouts import (
 from .annotations import (
     annotation_api,
     part_annotations_api,
+)
+from .manufacturing import (
+    manufacturing_file_api,
+    revision_slicer_project_api,
 )

@@ -338,6 +338,8 @@ Token-Scopes:
 - `POST /api/revisions/<id>/notes/`
 - `GET /api/revisions/<id>/file/`
 - `GET /api/revisions/<id>/manifest/`
+- `GET/POST /api/revisions/<id>/slicer-project/`
+- `GET /api/manufacturing-files/<id>/file/`
 - `POST /api/revisions/<id>/checkout/`
 - `GET /api/checkouts/active/`
 - `GET /api/checkouts/<id>/manifest/`
@@ -367,6 +369,13 @@ den lokal geöffneten Projekt-Checkout aufgenommen. Ohne `checkout_id` entsteht
 ein eigener Checkout für das neue Teil. Schlägt die serverseitige Teilanlage
 oder Aufnahme in den Checkout fehl, werden Teil, Revision und Audit-Einträge
 nicht als unvollständiger Datenbankstand gespeichert.
+
+Mit `GET/POST /api/revisions/<id>/slicer-project/` verwaltet das Addon genau
+einen bearbeitbaren 3MF-Slicer-Arbeitsstand je CAD-Revision. Ein Update sendet
+den zuletzt gelesenen Server-Hash als `base_sha256`; ein veralteter Stand wird
+mit HTTP `409` abgelehnt und niemals still überschrieben. Normale hochgeladene
+Slicer-/Fertigungsdateien bleiben davon getrennt und unveränderlich. Der
+Arbeitsstand wird im WebUI als `Slicer-Projekt (Arbeitsstand)` angezeigt.
 
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 

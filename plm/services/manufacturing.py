@@ -501,3 +501,149 @@ def create_manufacturing_file_from_upload(
         },
     )
     return manufacturing_file
+
+
+@transaction.atomic
+def sync_slicer_project_from_upload(
+    *,
+    revision,
+    uploaded_file,
+    uploaded_by,
+    base_sha256="",
+    label="",
+    slicer_name="",
+    slicer_version="",
+):
+    """Create or replace the single editable slicer project for a revision.
+
+    ``base_sha256`` is an optimistic lock.  Existing content is only replaced
+    when the client proves which server version it edited.
+    """
+    info = inspect_manufacturing_upload(uploaded_file)
+    if PurePosixPath(info["original_filename"]).suffix.lower() != ".3mf":
+        raise ValidationError("Ein Slicer-Projekt muss eine 3MF-Datei sein.")
+
+    existing = (
+        ManufacturingFile.objects.select_for_update()
+        .filter(
+            revision=revision,
+            file_type=ManufacturingFile.FileType.SLICER_PROJECT_3MF,
+        )
+        .first()
+    )
+    normalized_base = base_sha256.strip().lower()
+    if existing is not None and info["sha256"] == existing.sha256:
+        return existing, False, False
+    if existing is not None and normalized_base != existing.sha256:
+        raise ValidationError(
+            "Das Slicer-Projekt wurde zwischenzeitlich geaendert. "
+            "Bitte zuerst den aktuellen Serverstand laden."
+        )
+    duplicate_query = ManufacturingFile.objects.filter(
+        revision=revision,
+        sha256=info["sha256"],
+    )
+    if existing is not None:
+        duplicate_query = duplicate_query.exclude(pk=existing.pk)
+    if duplicate_query.exists():
+        raise ValidationError(
+            "Eine andere Fertigungsdatei mit identischem Inhalt ist bereits vorhanden."
+        )
+
+    extracted = info.get("extracted_fields", {})
+    if existing is None:
+        project = ManufacturingFile(
+            revision=revision,
+            file_type=ManufacturingFile.FileType.SLICER_PROJECT_3MF,
+            purpose=ManufacturingFile.Purpose.PRINT,
+            status=ManufacturingFile.Status.DRAFT,
+            uploaded_by=uploaded_by,
+        )
+        created = True
+        old_file_name = ""
+        old_thumbnail_name = ""
+        generation = 1
+    else:
+        project = existing
+        created = False
+        old_file_name = project.file.name
+        old_thumbnail_name = project.thumbnail.name if project.thumbnail else ""
+        generation = int(project.metadata.get("sync_generation", 1)) + 1
+
+    project.file = uploaded_file
+    project.original_filename = info["original_filename"]
+    project.sha256 = info["sha256"]
+    project.size_bytes = info["size_bytes"]
+    project.label = label.strip() or project.label or "Slicer-Projekt"
+    project.slicer_name = (
+        slicer_name.strip() or extracted.get("slicer_name", "") or project.slicer_name
+    )
+    project.slicer_version = (
+        slicer_version.strip()
+        or extracted.get("slicer_version", "")
+        or project.slicer_version
+    )
+    project.machine_label = extracted.get("machine_label", "") or project.machine_label
+    project.printer_profile = (
+        extracted.get("printer_profile", "") or project.printer_profile
+    )
+    project.material = extracted.get("material", "") or project.material
+    project.material_brand = (
+        extracted.get("material_brand", "") or project.material_brand
+    )
+    project.nozzle_diameter = (
+        extracted.get("nozzle_diameter") or project.nozzle_diameter
+    )
+    project.layer_height = extracted.get("layer_height") or project.layer_height
+    project.estimated_print_time_seconds = (
+        extracted.get("estimated_print_time_seconds")
+        or project.estimated_print_time_seconds
+    )
+    project.estimated_material_g = (
+        extracted.get("estimated_material_g") or project.estimated_material_g
+    )
+    project.metadata = {
+        **info["metadata"],
+        "editable_working_copy": True,
+        "sync_generation": generation,
+    }
+    thumbnail = info.get("thumbnail")
+    if thumbnail:
+        project.thumbnail.save(
+            thumbnail["name"], ContentFile(thumbnail["content"]), save=False
+        )
+        project.thumbnail_original_filename = thumbnail["name"]
+    elif existing is not None:
+        project.thumbnail = ""
+        project.thumbnail_original_filename = ""
+    project.save()
+
+    def delete_replaced_files():
+        if old_file_name and old_file_name != project.file.name:
+            project.file.storage.delete(old_file_name)
+        if old_thumbnail_name and (
+            not project.thumbnail or old_thumbnail_name != project.thumbnail.name
+        ):
+            project.thumbnail.storage.delete(old_thumbnail_name)
+
+    transaction.on_commit(delete_replaced_files)
+    AuditEvent.objects.create(
+        actor=uploaded_by,
+        action=(
+            AuditEvent.Action.MANUFACTURING_FILE_UPLOADED
+            if created
+            else AuditEvent.Action.MANUFACTURING_FILE_UPDATED
+        ),
+        object_repr=str(project),
+        metadata={
+            "manufacturing_file_id": project.id,
+            "revision_id": revision.id,
+            "part_id": revision.part_id,
+            "sha256": project.sha256,
+            "base_sha256": normalized_base,
+            "file_type": project.file_type,
+            "sync_generation": generation,
+            "source": "freecad_addon_slicer_sync",
+        },
+    )
+    return project, created, True

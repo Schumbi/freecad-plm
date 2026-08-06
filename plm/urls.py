@@ -231,6 +231,16 @@ urlpatterns = [
         name="api_revision_manifest",
     ),
     path(
+        "api/revisions/<int:revision_id>/slicer-project/",
+        api.revision_slicer_project_api,
+        name="api_revision_slicer_project",
+    ),
+    path(
+        "api/manufacturing-files/<int:manufacturing_file_id>/file/",
+        api.manufacturing_file_api,
+        name="api_manufacturing_file",
+    ),
+    path(
         "api/revisions/<int:revision_id>/checkout/",
         api.revision_checkout_api,
         name="api_revision_checkout",

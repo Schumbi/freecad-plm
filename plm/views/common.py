@@ -34,6 +34,7 @@ VIEWER_SUPPORTED_ARTIFACT_TYPES = {
 
 VIEWER_SUPPORTED_MANUFACTURING_TYPES = {
     ManufacturingFile.FileType.SLICER_3MF,
+    ManufacturingFile.FileType.SLICER_PROJECT_3MF,
     ManufacturingFile.FileType.STL_PRINT,
     ManufacturingFile.FileType.STEP_VENDOR,
 }

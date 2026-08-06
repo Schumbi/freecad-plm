@@ -292,6 +292,7 @@ class ManufacturingMachine(TimeStampedModel):
 class ManufacturingFile(TimeStampedModel):
     class FileType(models.TextChoices):
         SLICER_3MF = "slicer_3mf", "Slicer-3MF"
+        SLICER_PROJECT_3MF = "slicer_project_3mf", "Slicer-Projekt (Arbeitsstand)"
         GCODE = "gcode", "G-Code"
         BGCODE = "bgcode", "Bambu/Prusa BGCode"
         STL_PRINT = "stl_print", "STL Fertigung"
@@ -374,6 +375,11 @@ class ManufacturingFile(TimeStampedModel):
             models.UniqueConstraint(
                 fields=["revision", "sha256"],
                 name="unique_manufacturing_file_sha_per_revision",
+            ),
+            models.UniqueConstraint(
+                fields=["revision", "file_type"],
+                condition=models.Q(file_type="slicer_project_3mf"),
+                name="unique_slicer_project_per_revision",
             ),
         ]
 
@@ -697,6 +703,7 @@ class AuditEvent(models.Model):
         EXPORT_JOB_FAILED = "export_job_failed", "Exportjob fehlgeschlagen"
         REVISION_ARTIFACT_CREATED = "revision_artifact_created", "Revisionsartefakt angelegt"
         MANUFACTURING_FILE_UPLOADED = "manufacturing_file_uploaded", "Fertigungsdatei hochgeladen"
+        MANUFACTURING_FILE_DOWNLOADED = "manufacturing_file_downloaded", "Fertigungsdatei heruntergeladen"
         MANUFACTURING_FILE_UPDATED = "manufacturing_file_updated", "Fertigungsdatei geaendert"
         MANUFACTURING_FILE_STATUS_CHANGED = "manufacturing_file_status_changed", "Fertigungsdatei-Status geaendert"
         MANUFACTURING_RUN_CREATED = "manufacturing_run_created", "Fertigungslauf angelegt"

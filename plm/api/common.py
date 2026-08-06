@@ -65,6 +65,44 @@ def revision_payload(revision, request=None):
     return payload
 
 
+def manufacturing_file_payload(manufacturing_file, request=None):
+    payload = {
+        "id": manufacturing_file.id,
+        "revision_id": manufacturing_file.revision_id,
+        "file_type": manufacturing_file.file_type,
+        "purpose": manufacturing_file.purpose,
+        "status": manufacturing_file.status,
+        "original_filename": manufacturing_file.original_filename,
+        "sha256": manufacturing_file.sha256,
+        "size_bytes": manufacturing_file.size_bytes,
+        "label": manufacturing_file.label,
+        "slicer_name": manufacturing_file.slicer_name,
+        "slicer_version": manufacturing_file.slicer_version,
+        "machine_label": manufacturing_file.machine_label,
+        "printer_profile": manufacturing_file.printer_profile,
+        "material": manufacturing_file.material,
+        "material_brand": manufacturing_file.material_brand,
+        "nozzle_diameter": (
+            str(manufacturing_file.nozzle_diameter)
+            if manufacturing_file.nozzle_diameter is not None
+            else None
+        ),
+        "layer_height": (
+            str(manufacturing_file.layer_height)
+            if manufacturing_file.layer_height is not None
+            else None
+        ),
+        "metadata": manufacturing_file.metadata,
+        "created_at": manufacturing_file.created_at.isoformat(),
+        "updated_at": manufacturing_file.updated_at.isoformat(),
+    }
+    if request is not None:
+        payload["download_url"] = request.build_absolute_uri(
+            reverse("plm:api_manufacturing_file", args=[manufacturing_file.id])
+        )
+    return payload
+
+
 def annotation_payload(annotation):
     return {
         "id": annotation.id,

@@ -62,6 +62,7 @@ from .services import (
     release_revision,
     search_plm,
     snapshot_base_name,
+    sync_slicer_project_from_upload,
 )
 from .freecadcmd import (
     FREECADCMD_SCRIPT,
@@ -4019,6 +4020,115 @@ class AddonApiWorkflowTests(TestCase):
         response = self.client.get(reverse("plm:api_projects"))
 
         self.assertEqual(response.status_code, 401)
+
+    def test_api_creates_updates_and_downloads_slicer_project(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])
+        revision = create_revision_from_upload(
+            self.part, make_zip_upload("Part.FCStd"), self.user
+        )
+        first_upload = make_3mf_upload("Part_R0001.3mf")
+
+        created = self.client.post(
+            reverse("plm:api_revision_slicer_project", args=[revision.id]),
+            {
+                "file": first_upload,
+                "label": "Druckprojekt",
+                "slicer_name": "Bambu Studio",
+            },
+        )
+
+        self.assertEqual(created.status_code, 201)
+        first_payload = created.json()["slicer_project"]
+        self.assertEqual(first_payload["file_type"], "slicer_project_3mf")
+        self.assertEqual(first_payload["status"], ManufacturingFile.Status.DRAFT)
+        self.assertTrue(first_payload["metadata"]["editable_working_copy"])
+        self.assertEqual(ManufacturingFile.objects.count(), 1)
+
+        duplicate = self.client.post(
+            reverse("plm:api_revision_slicer_project", args=[revision.id]),
+            {"file": make_3mf_upload("Part_R0001.3mf")},
+        )
+        self.assertEqual(duplicate.status_code, 200)
+        self.assertFalse(duplicate.json()["changed"])
+
+        second_upload = make_3mf_upload(
+            "Part_R0001.3mf",
+            members={
+                "3D/3dmodel.model": "<model unit=\"millimeter\"><resources /></model>",
+                "Metadata/project_settings.config": "layer_height = 0.12",
+            },
+        )
+        updated = self.client.post(
+            reverse("plm:api_revision_slicer_project", args=[revision.id]),
+            {
+                "file": second_upload,
+                "base_sha256": first_payload["sha256"],
+            },
+        )
+
+        self.assertEqual(updated.status_code, 200)
+        second_payload = updated.json()["slicer_project"]
+        self.assertNotEqual(second_payload["sha256"], first_payload["sha256"])
+        self.assertEqual(second_payload["metadata"]["sync_generation"], 2)
+        self.assertEqual(ManufacturingFile.objects.count(), 1)
+
+        current = self.client.get(
+            reverse("plm:api_revision_slicer_project", args=[revision.id])
+        )
+        self.assertEqual(current.status_code, 200)
+        self.assertEqual(
+            current.json()["slicer_project"]["sha256"], second_payload["sha256"]
+        )
+
+        download = self.client.get(
+            reverse("plm:api_manufacturing_file", args=[second_payload["id"]])
+        )
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(
+            b"".join(download.streaming_content), make_3mf_upload(
+                "Part_R0001.3mf",
+                members={
+                    "3D/3dmodel.model": "<model unit=\"millimeter\"><resources /></model>",
+                    "Metadata/project_settings.config": "layer_height = 0.12",
+                },
+            ).read(),
+        )
+
+    def test_api_rejects_stale_slicer_project_upload(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])
+        revision = create_revision_from_upload(
+            self.part, make_zip_upload("Part.FCStd"), self.user
+        )
+        project, _created, _changed = sync_slicer_project_from_upload(
+            revision=revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("plm:api_revision_slicer_project", args=[revision.id]),
+            {
+                "file": make_3mf_upload(
+                    members={"3D/3dmodel.model": "<model><resources /></model>"}
+                ),
+                "base_sha256": "0" * 64,
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        project.refresh_from_db()
+        self.assertNotEqual(project.sha256, "0" * 64)
+
+    def test_api_slicer_project_requires_write_scope_and_editor_role(self):
+        revision = create_revision_from_upload(
+            self.part, make_zip_upload("Part.FCStd"), self.user
+        )
+        self.authorize_token([ApiToken.Scope.READ])
+        response = self.client.post(
+            reverse("plm:api_revision_slicer_project", args=[revision.id]),
+            {"file": make_3mf_upload()},
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_api_rejects_browser_session_without_token(self):
         self.client.force_login(self.user)

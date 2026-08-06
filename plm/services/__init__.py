@@ -24,6 +24,7 @@ from .manufacturing import (
     parse_slicer_config,
     parse_slicer_xml_config,
     select_3mf_thumbnail_name,
+    sync_slicer_project_from_upload,
     slicer_config_priority,
     thumbnail_candidate_score,
     unique_values,
