@@ -10,7 +10,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - V0-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` mitlaufen lassen, falls noch nicht erledigt.
 - Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit FreeCADCmd auf dem Zielserver abhaken.
 - PNG-Ansichten, 3D-Preview und Revisionsvergleich auf der laufenden Instanz mit echtem Worker pruefen.
-- FreeCAD-Addon End-to-End gegen die laufende Instanz einmal durchspielen.
+- Slicer-Projekt-Synchronisation auf einem zweiten Rechner prüfen, inklusive
+  Konfliktfall bei paralleler Änderung.
 - Docker-Compose-Stack und Backup-Strategie fuer `storage/` und PostgreSQL auf dem Zielserver festhalten.
 
 ## Als Naechstes
@@ -92,6 +93,10 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Bestehende FreeCAD-Ordnerimport-Funktion fuer das Addon umgesetzt und dokumentiert.
 - Manufacturing-Dateien fuer gedruckte Revisionen angelegt: Datenmodell, Upload, Download, 3MF-Basisvalidierung, Maschinenbezug und spaeter erweiterbare Fertigungslauf-/Anhangmodelle.
 - Schwebenden 3D-Viewer fuer Revisionen, Artefakte und Fertigungsdateien angelegt; STL/3MF werden direkt angezeigt, FCStd/STEP nutzen ein gespeichertes STL-Preview-Artefakt.
+- Slicer-Projekt-Synchronisation im Addon auf einem Rechner manuell abgenommen:
+  Start aus FreeCAD Flatpak, 3MF-Erzeugung, automatischer Upload, erneutes
+  Öffnen, Metadatenanzeige sowie schreibgeschütztes STL-/STEP-Öffnen; nur der
+  Zwei-Rechner-Konflikttest bleibt offen.
 - Upload-/ZIP-Budgets fuer FCStd, Projekt-ZIP und 3MF eingefuehrt; grobe DoS-/Zip-Bomb-Grenzen liegen jetzt als konfigurierbare `PLM_MAX_*`-Werte in den Settings.
 - Worker-Container im Compose gehärtet: keine Linux-Caps, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp`, sowie einfache CPU-/RAM-/PID-Limits.
 - Snapshot-Projektprüfung im Checkout-API-Pfad umgesetzt; fremde `snapshot_id`-Werte liefern jetzt `404`.

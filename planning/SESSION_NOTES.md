@@ -676,3 +676,23 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
   `annotations`.
 - Commits `28ee770` (services), `c26007d` (views), `ad2cfa8` (api); nach jedem
   Split `manage.py check` sauber und 184 Tests gruen.
+
+## 2026-08-07
+
+### Slicer-Projekt-Synchronisation Manuell Abgenommen
+
+- Anwender hat die bereitgestellte Einzelrechner-Testreihe mit FreeCAD Flatpak
+  und Bambu Studio Flatpak vollständig und erfolgreich durchgeführt.
+- Bestätigt sind Slicer-Start, generische 3MF-Erzeugung, automatischer Upload,
+  erneutes Öffnen des Serverstands, Slicer-Metadaten sowie die dynamische
+  Fertigungsdetailanzeige.
+- Der FCStd-zu-3MF-Export filtert geometrische Kindobjekte, wenn ein sichtbarer
+  geometrischer Elterncontainer dieselbe Form bereits repräsentiert. Dadurch
+  werden `PartDesign::Body` und sichtbares Tip-Feature nicht doppelt exportiert.
+- Primäre STL-Revisionen werden über `Mesh.insert()` und STEP/STP über
+  `Import.insert()` in ein neues schreibgeschütztes Arbeitsdokument geladen;
+  `FreeCAD.openDocument()` bleibt nativen FCStd-Dateien vorbehalten.
+- Automatisierter Stand: 222 Servertests und 155 Addon-Tests erfolgreich.
+- Offen bleibt der manuelle Zwei-Rechner-Test für Serverdownload und echten
+  Paralleländerungskonflikt. Dieser Punkt wird nicht durch den vorhandenen
+  automatisierten Hash-Konflikttest als fachlich abgenommen betrachtet.

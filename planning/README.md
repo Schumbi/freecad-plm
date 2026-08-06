@@ -24,7 +24,10 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 - Der alte nanoPLM-Code wurde nach `old/` verschoben.
 - Django ist die technische Basis; Docker Compose mit PostgreSQL, Media-Volume und FreeCADCmd-Worker ist umgesetzt.
 - V1-Funktionsumfang ist im Code weitgehend vollständig (Stand 2026-08-05, 219 Servertests und 138 Addon-Tests).
-- Offen fuer V1.0: dokumentierte Browser-Abnahme gemaess `planning/V1_ACCEPTANCE.md`, Betriebsabnahme auf Zielserver und optional Addon-E2E mit echtem FreeCAD.
+- Offen fuer V1.0: allgemeine Browser-Abnahme gemaess
+  `planning/V1_ACCEPTANCE.md`, abschließende Betriebsabnahme und der manuelle
+  Zwei-Rechner-Test der Slicer-Synchronisation. Der Einzelrechner-Addon-E2E mit
+  echtem FreeCAD und Bambu Studio ist am 2026-08-07 erfolgreich abgeschlossen.
 
 ## Lesereihenfolge
 

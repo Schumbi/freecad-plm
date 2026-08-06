@@ -4,7 +4,7 @@
 
 Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierbare manuelle Abnahme. Sie dient als Nachweis, dass V1 im Alltag nutzbar ist — nicht nur in Tests und auf dem Papier.
 
-**Stand der Implementierung:** 2026-08-05 — die V1-Kriterien einschließlich primärer STEP/STL-Revisionen und vereinfachter Addon-Teilanlage sind im Code umgesetzt; die dokumentierte Abnahme steht noch aus.
+**Stand der Implementierung:** 2026-08-07 — die V1-Kriterien einschließlich primärer STEP/STL-Revisionen, vereinfachter Addon-Teilanlage und automatischer Slicer-Projekt-Synchronisation sind im Code umgesetzt. Der Slicer-Workflow ist auf einem Rechner manuell abgenommen; die allgemeine V1-Browser-Abnahme und der Zwei-Rechner-Slicer-Test bleiben getrennt nachvollziehbar offen.
 
 ## Vorbereitung
 
@@ -69,6 +69,26 @@ Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierb
 | 4 | `docker compose pull && up -d` nach Image-Update | |
 | 5 | Logs ueber `docker compose logs web worker` auswertbar | |
 
+## Addon-Slicer-Abnahme
+
+Manuell bestätigt am 2026-08-07 mit FreeCAD Flatpak und Bambu Studio Flatpak:
+
+| # | Prüfpunkt | OK |
+|---|-----------|----|
+| 1 | Addon-Verbindung und Slicer-Erkennung | x |
+| 2 | Host-Slicer aus FreeCAD Flatpak starten | x |
+| 3 | Generische 3MF aus FCStd erzeugen und ohne doppelte Body-/Tip-Geometrie öffnen | x |
+| 4 | Slicer-Projekt speichern und automatisch zum PLM synchronisieren | x |
+| 5 | Vorhandenen Slicer-Arbeitsstand erneut öffnen | x |
+| 6 | Slicer, Druckprofil, Material, Düse und Layerhöhe auslesen und anzeigen | x |
+| 7 | Fertigungsdatensatz auswählen; Detailansicht aktualisiert sich ohne Seitenwechsel | x |
+| 8 | Primäre STL-Revision schreibgeschützt über den Mesh-Importer öffnen | x |
+| 9 | Zweiter Rechner lädt den Serverstand und erkennt parallele Änderung als Konflikt | offen |
+
+Ergebnis: Der Einzelrechner-Workflow ist fachlich abgenommen. Offen ist nur der
+echte Mehrrechnerfall; der automatisierte serverseitige Hash-Konflikttest
+ersetzt diese manuelle Abnahme nicht.
+
 ## Ergebnis
 
 - [ ] V0 fachlich abgenommen
@@ -77,7 +97,8 @@ Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierb
 
 ### Offene Punkte / Abweichungen
 
-_(Hier Eintraege mit Datum und kurzer Begruendung, falls etwas nicht OK ist.)_
+- 2026-08-07: Slicer-Zwei-Rechner-Test noch nicht durchgeführt, weil während
+  der Abnahme kein zweiter Rechner verfügbar war.
 
 ### Freigabe V1.0
 
