@@ -3002,6 +3002,16 @@ class ManufacturingFileTests(TestCase):
         self.assertContains(detail, "Fertigung")
         self.assertContains(detail, "Bambu PETG")
         self.assertContains(detail, "Bambu Studio")
+        self.assertContains(detail, "data-manufacturing-browser")
+        self.assertContains(
+            detail,
+            f'data-manufacturing-select="#manufacturing-detail-{manufacturing_file.id}"',
+        )
+        self.assertContains(detail, "Ausgewählte Fertigungsdatei")
+        self.assertContains(detail, "Druckprofil")
+        self.assertContains(detail, "Layerhöhe")
+        self.assertContains(detail, "Düse")
+        self.assertContains(detail, manufacturing_file.printer_profile)
         self.assertContains(
             detail,
             reverse("plm:manufacturing_file_thumbnail", args=[manufacturing_file.id]),

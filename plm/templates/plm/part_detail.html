@@ -309,6 +309,7 @@
                 <div class="plm-dialog-body">
                   <h5>Verwendbare Fertigungsdateien</h5>
                   {% if revision.manufacturing_files.all %}
+                    <div data-manufacturing-browser>
                     <div class="table-wrap">
                     <table>
                       <thead>
@@ -325,7 +326,11 @@
                       </thead>
                       <tbody>
                         {% for manufacturing_file in revision.manufacturing_files.all %}
-                          <tr>
+                          <tr
+                            class="clickable-row manufacturing-file-row{% if forloop.first %} is-selected{% endif %}"
+                            data-manufacturing-select="#manufacturing-detail-{{ manufacturing_file.id }}"
+                            tabindex="0"
+                            aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
                             <td>{{ manufacturing_file.label|default:manufacturing_file.original_filename }}</td>
                             <td>
                               {% if manufacturing_file.thumbnail %}
@@ -374,6 +379,40 @@
                         {% endfor %}
                       </tbody>
                     </table>
+                    </div>
+                    <section class="manufacturing-selection-details" aria-live="polite">
+                      {% for manufacturing_file in revision.manufacturing_files.all %}
+                        <article
+                          class="manufacturing-detail"
+                          id="manufacturing-detail-{{ manufacturing_file.id }}"
+                          {% if not forloop.first %}hidden{% endif %}>
+                          <div class="manufacturing-detail-header">
+                            <div>
+                              <span class="eyebrow">Ausgewählte Fertigungsdatei</span>
+                              <h5>{{ manufacturing_file.label|default:manufacturing_file.original_filename }}</h5>
+                            </div>
+                            <span class="status-badge">{{ manufacturing_file.get_status_display }}</span>
+                          </div>
+                          <dl class="manufacturing-detail-grid">
+                            <div><dt>Datei</dt><dd>{{ manufacturing_file.original_filename }}</dd></div>
+                            <div><dt>Typ</dt><dd>{{ manufacturing_file.get_file_type_display }}</dd></div>
+                            <div><dt>Slicer</dt><dd>{{ manufacturing_file.slicer_name|default:"-" }}{% if manufacturing_file.slicer_version %} {{ manufacturing_file.slicer_version }}{% endif %}</dd></div>
+                            <div><dt>Drucker</dt><dd>{% if manufacturing_file.machine %}{{ manufacturing_file.machine }}{% else %}{{ manufacturing_file.machine_label|default:"-" }}{% endif %}</dd></div>
+                            <div><dt>Druckprofil</dt><dd>{{ manufacturing_file.printer_profile|default:"-" }}</dd></div>
+                            <div><dt>Material</dt><dd>{{ manufacturing_file.material|default:"-" }}{% if manufacturing_file.material_brand %} · {{ manufacturing_file.material_brand }}{% endif %}</dd></div>
+                            <div><dt>Düse</dt><dd>{% if manufacturing_file.nozzle_diameter != None %}{{ manufacturing_file.nozzle_diameter }} mm{% else %}-{% endif %}</dd></div>
+                            <div><dt>Layerhöhe</dt><dd>{% if manufacturing_file.layer_height != None %}{{ manufacturing_file.layer_height }} mm{% else %}-{% endif %}</dd></div>
+                            <div><dt>Druckzeit</dt><dd>{% if manufacturing_file.estimated_print_time_seconds != None %}{{ manufacturing_file.estimated_print_time_seconds }} s{% else %}-{% endif %}</dd></div>
+                            <div><dt>Materialmenge</dt><dd>{% if manufacturing_file.estimated_material_g != None %}{{ manufacturing_file.estimated_material_g }} g{% else %}-{% endif %}</dd></div>
+                            <div><dt>Größe</dt><dd>{{ manufacturing_file.size_bytes|filesizeformat }}</dd></div>
+                            <div><dt>Aktualisiert</dt><dd>{{ manufacturing_file.updated_at|date:"d.m.Y H:i" }}</dd></div>
+                          </dl>
+                          {% if manufacturing_file.description %}
+                            <p class="manufacturing-detail-description">{{ manufacturing_file.description }}</p>
+                          {% endif %}
+                        </article>
+                      {% endfor %}
+                    </section>
                     </div>
                   {% else %}
                     <div class="empty-state">Noch keine verwendbare Fertigungsdatei fuer diese Revision.</div>

@@ -203,6 +203,42 @@
     });
   }
 
+  function setupManufacturingSelectors() {
+    document.querySelectorAll("[data-manufacturing-browser]").forEach(function (browser) {
+      var rows = browser.querySelectorAll("[data-manufacturing-select]");
+      var details = browser.querySelectorAll(".manufacturing-detail");
+      if (!rows.length || !details.length) return;
+
+      function selectRow(row) {
+        var selector = row.getAttribute("data-manufacturing-select");
+        var selectedDetail = selector && browser.querySelector(selector);
+        if (!selectedDetail) return;
+
+        rows.forEach(function (candidate) {
+          var selected = candidate === row;
+          candidate.classList.toggle("is-selected", selected);
+          candidate.setAttribute("aria-selected", selected ? "true" : "false");
+        });
+        details.forEach(function (detail) {
+          detail.hidden = detail !== selectedDetail;
+        });
+      }
+
+      rows.forEach(function (row) {
+        row.addEventListener("click", function () {
+          selectRow(row);
+        });
+        row.addEventListener("keydown", function (event) {
+          if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) {
+            return;
+          }
+          event.preventDefault();
+          selectRow(row);
+        });
+      });
+    });
+  }
+
   function jobStatusClass(status) {
     if (status === "running") return "job-running";
     if (status === "queued") return "job-queued";
@@ -378,6 +414,7 @@
   setupListFilters();
   setupCadFileGuides();
   setupSidebarToggle();
+  setupManufacturingSelectors();
   setupExportJobsPolling();
   setupCompareStatusPolling();
 })();
