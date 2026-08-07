@@ -40,6 +40,9 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       PROCESS_EXPORT_JOBS_INLINE: "0"
+      BAMBUDDY_URL: ${BAMBUDDY_URL:-}
+      BAMBUDDY_API_KEY: ${BAMBUDDY_API_KEY:-}
+      BAMBUDDY_TIMEOUT_SECONDS: ${BAMBUDDY_TIMEOUT_SECONDS:-10}
     volumes:
       - ./storage:/app/storage
       - ./staticfiles:/app/staticfiles
@@ -85,6 +88,9 @@ services:
       FREECADCMD_COMMAND: ${FREECADCMD_COMMAND:-freecadcmd}
       PREVIEW_PNG_WIDTH: ${PREVIEW_PNG_WIDTH:-400}
       PREVIEW_PNG_HEIGHT: ${PREVIEW_PNG_HEIGHT:-300}
+      BAMBUDDY_URL: ${BAMBUDDY_URL:-}
+      BAMBUDDY_API_KEY: ${BAMBUDDY_API_KEY:-}
+      BAMBUDDY_TIMEOUT_SECONDS: ${BAMBUDDY_TIMEOUT_SECONDS:-10}
       TMPDIR: /tmp
       # FreeCAD 1.0 braucht ein beschreibbares HOME (read-only Root-FS + tmpfs /tmp)
       HOME: /tmp

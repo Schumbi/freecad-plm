@@ -67,11 +67,21 @@ PLM_MAX_PROJECT_ZIP_BYTES=500000000
 PLM_MAX_ZIP_MEMBERS=2000
 PLM_MAX_ZIP_UNCOMPRESSED_BYTES=2147483648
 PLM_MAX_ZIP_MEMBER_BYTES=200000000
+BAMBUDDY_URL=http://bambuddy.example.local:8000
+BAMBUDDY_API_KEY=bb_...
+BAMBUDDY_TIMEOUT_SECONDS=10
 ```
 
 Das Runtime-Image enthaelt den User `plm` mit UID/GID `1000:1000`. `PLM_USER` sollte deshalb auf `plm` bleiben. `PLM_UID` und `PLM_GID` dokumentieren, wem die lokalen Verzeichnisse auf dem Host gehoeren sollen; die Werte zeigt `id` oder `id <user>`.
 
 Die `PLM_MAX_*`-Werte begrenzen FCStd-, STEP-/STL-, Projekt-ZIP- und 3MF-Uploads gegen sehr große Dateien und ZIP-Bomben. Die Defaults sind für ein LAN-Team konservativ und können bei Bedarf höher gesetzt werden.
+
+Für Bambuddy sollte ein eigener API-Key mit ausschließlich `Read Status`
+verwendet werden. Der Key bleibt in der Laufzeitumgebung und wird weder in der
+Datenbank noch im Browser ausgegeben. `BAMBUDDY_TIMEOUT_SECONDS` darf zwischen
+1 und 60 Sekunden liegen. Nach einem Neustart kann ein Admin die lesende
+Verbindung unter `Verwaltung -> Integrationen` testen.
+
 Der Compose-Worker laeuft zusaetzlich mit `cap_drop: ALL`, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp` sowie einfachen CPU-/RAM-/PID-Grenzen.
 
 Lokale Verzeichnisse fuer Modelle/Uploads und statische Dateien anlegen:

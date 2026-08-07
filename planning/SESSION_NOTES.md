@@ -679,6 +679,21 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 
 ## 2026-08-07
 
+### Bambuddy-Integration Begonnen
+
+- Der benötigte Bambuddy-API-Vertrag wurde auf die lesenden Archiv-Endpunkte
+  zum Auflisten, Anzeigen und Herunterladen einer 3MF eingegrenzt. Die
+  Authentifizierung erfolgt per `X-API-Key`; `Read Status` genügt.
+- `BAMBUDDY_URL`, `BAMBUDDY_API_KEY` und `BAMBUDDY_TIMEOUT_SECONDS` werden per
+  Umgebung an Web und Worker übergeben. Der Key wird nicht in der Datenbank
+  gespeichert oder in der Web-UI ausgegeben.
+- Ein gekapselter Bambuddy-Client und die Admin-Seite
+  `Verwaltung -> Integrationen` mit rein lesendem Verbindungstest sind
+  angelegt und automatisiert getestet.
+- Der weitere, bewusst stufenweise Ausbau ist in
+  `planning/BAMBUDDY_INTEGRATION_PLAN.md` festgehalten. Als Nächstes folgt ein
+  Archiveingang ohne automatische Dateizuordnung.
+
 ### Slicer-Projekt-Synchronisation Manuell Abgenommen
 
 - Anwender hat die bereitgestellte Einzelrechner-Testreihe mit FreeCAD Flatpak

@@ -1,0 +1,64 @@
+{% extends "plm/base.html" %}
+
+{% block title %}Integrationen · FreeCAD-PLM{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><span aria-current="page">Integrationen</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">Verwaltung</span>
+      <h1>Integrationen</h1>
+      <p class="lead-text">Externe Fertigungssysteme serverseitig anbinden und prüfen.</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="section-header">
+      <div>
+        <h2>Bambuddy</h2>
+        <p class="muted">Gedruckte 3MF-Dateien und Fertigungsdaten aus dem Bambuddy-Archiv übernehmen.</p>
+      </div>
+      {% if bambuddy_configured %}
+        <span class="status-badge status-released">Konfiguriert</span>
+      {% else %}
+        <span class="status-badge status-obsolete">Nicht konfiguriert</span>
+      {% endif %}
+    </div>
+
+    <dl class="manufacturing-detail-grid">
+      <div><dt>Server-URL</dt><dd>{{ bambuddy_url|default:"–" }}</dd></div>
+      <div><dt>API-Key</dt><dd>{% if bambuddy_api_key_configured %}Gesetzt (Wert verborgen){% else %}Nicht gesetzt{% endif %}</dd></div>
+      <div><dt>Zeitlimit</dt><dd>{{ bambuddy_timeout_seconds }} Sekunden</dd></div>
+      <div><dt>Berechtigung</dt><dd>Mindestens „Read Status“</dd></div>
+    </dl>
+
+    <div class="form-card mt-4">
+      <h3>Serverkonfiguration</h3>
+      <p>Die Zugangsdaten werden bewusst nicht in der PLM-Datenbank gespeichert. Setze auf dem PLM-Server:</p>
+      <pre><code>BAMBUDDY_URL=http://bambuddy.example.local:8000
+BAMBUDDY_API_KEY=bb_...
+BAMBUDDY_TIMEOUT_SECONDS=10</code></pre>
+      <p class="muted">Nach einer Änderung müssen Web- und Worker-Container neu erstellt werden.</p>
+    </div>
+
+    {% if connection_result %}
+      <div class="message mt-4"><span>{{ connection_result }}</span></div>
+    {% endif %}
+    {% if connection_error %}
+      <div class="form-errors mt-4">{{ connection_error }}</div>
+    {% endif %}
+
+    <form method="post" class="mt-4">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit"{% if not bambuddy_configured %} disabled{% endif %}>Verbindung testen</button>
+    </form>
+  </section>
+{% endblock %}

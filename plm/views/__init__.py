@@ -87,3 +87,4 @@ from .manufacturing import (
     obsolete_manufacturing_file,
     upload_manufacturing_file,
 )
+from .integrations import integration_settings

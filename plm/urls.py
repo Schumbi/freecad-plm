@@ -23,6 +23,11 @@ urlpatterns = [
         name="user_export_jobs_status",
     ),
     path("verwaltung/", views.user_management_list, name="user_management"),
+    path(
+        "verwaltung/integrationen/",
+        views.integration_settings,
+        name="integration_settings",
+    ),
     path("verwaltung/users/new/", views.create_user, name="create_user"),
     path("verwaltung/users/<int:user_id>/edit/", views.edit_user, name="edit_user"),
     path(

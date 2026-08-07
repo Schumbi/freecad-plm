@@ -16,6 +16,10 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Als Naechstes
 
+- Nur lesenden Bambuddy-Test-Key konfigurieren und die Verbindung zur echten
+  Instanz unter `Verwaltung -> Integrationen` testen.
+- Danach Phase B aus `planning/BAMBUDDY_INTEGRATION_PLAN.md` als lesenden
+  Archiveingang ohne automatische Zuordnung umsetzen.
 - Nach erfolgreicher Abnahme: Git-Tag `v1.0.0` und kurze Release-Notiz.
 - VarSet-Parameterbearbeitung und ManufacturingRun-UI planen (V2/spaeter).
 

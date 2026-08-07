@@ -1,0 +1,1 @@
+"""External manufacturing system integrations."""

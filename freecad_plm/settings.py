@@ -209,6 +209,10 @@ PROCESS_EXPORT_JOBS_INLINE = os.environ.get(
     '1',
 ).lower() in {'1', 'true', 'yes', 'on'}
 
+BAMBUDDY_URL = os.environ.get('BAMBUDDY_URL', '').strip().rstrip('/')
+BAMBUDDY_API_KEY = os.environ.get('BAMBUDDY_API_KEY', '').strip()
+BAMBUDDY_TIMEOUT_SECONDS = env_int('BAMBUDDY_TIMEOUT_SECONDS', 10)
+
 PLM_MAX_FCSTD_UPLOAD_BYTES = env_int('PLM_MAX_FCSTD_UPLOAD_BYTES', 200 * 1024 * 1024)
 PLM_MAX_CAD_UPLOAD_BYTES = env_int(
     'PLM_MAX_CAD_UPLOAD_BYTES',
