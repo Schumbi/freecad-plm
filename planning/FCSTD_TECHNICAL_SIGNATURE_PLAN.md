@@ -30,6 +30,11 @@ Speichern einer Baugruppe folgende Aenderungen beobachtet:
   aber nicht allein eine neue Revision ausloesen.
 - FreeCAD legt beim Speichern `.FCBak`-Dateien an; diese gehoeren nicht in die
   PLM-Revision.
+- Beim Wechsel von FreeCAD 1.1 Build R44874 auf R44987 wurde eine unveränderte
+  Datei beim Speichern migriert: `ProgramVersion` änderte sich, PartDesign-
+  Features erhielten den inaktiven Standardwert `FuzzyTolerance = -1`, und der
+  redundante Zahlenwert von `AttacherEngine` wurde neu geschrieben. Der
+  semantische `AttacherType`, Volumen, Fläche und Topologie blieben gleich.
 
 ## Anforderungen
 
@@ -43,6 +48,13 @@ berechnen:
     - `LastModifiedBy`
     - `LastModifiedDate`
     - `PLMRevision`
+  - `Document/@ProgramVersion` entfernen.
+  - den inaktiven, von neueren FreeCAD-Builds ergänzten Standardwert
+    `FuzzyTolerance = -1` aus Objekt-Properties entfernen; andere Werte bleiben
+    modellrelevant.
+  - die redundante Enum-Property `AttacherEngine` nur dann entfernen, wenn am
+    selben Objekt der semantische String `AttacherType` vorhanden ist. Ein
+    wirklicher Engine-Wechsel ändert `AttacherType` und bleibt erkennbar.
   - XML-Attribute mit diesen Namen aus allen Elementen entfernen:
     - `status`
     - `stamp`
@@ -72,6 +84,9 @@ Basisrevision vergleichen:
   Floating-Point-Rauschen betroffen, wird keine neue Revision angelegt.
 - Ist die normalisierte `Document.xml`-Signatur geaendert, wird wie bisher eine
   neue Revision erzeugt.
+- Ändert sich die Version der Signaturregeln, berechnet der Server die
+  Basissignatur aus der unveränderlichen Revisionsdatei neu. Signaturen aus
+  verschiedenen Regelversionen werden nie direkt verglichen.
 - Bei einem Multi-File-Check-in koennen einzelne Dateien herausgefiltert werden.
   Nur die fachlich geaenderten Dateien erzeugen Revisionen und Snapshot-
   Ersetzungen.
@@ -129,6 +144,12 @@ Serverseitige Tests sollen mindestens diese Szenarien abdecken:
 - Nur BREP-Dateien geaendert: keine Revision in v1.
 - Echte Modell-/Dokumenteigenschaft in normalisierter `Document.xml` geaendert:
   neue Revision.
+- FreeCAD-Buildmigration R44874 auf R44987 mit neuer `ProgramVersion`,
+  `FuzzyTolerance = -1` und umnummeriertem `AttacherEngine`: keine Revision.
+- Nicht standardmäßige `FuzzyTolerance` oder geänderter `AttacherType`: neue
+  Revision.
+- Alte gespeicherte Signaturregel gegen aktuelle Upload-Regel: Basissignatur
+  neu berechnen und korrekt vergleichen.
 - Multi-File-Check-in mit gemischten Dateien:
   nur fachlich geaenderte Dateien erzeugen Revisionen.
 - Multi-File-Check-in mit ausschliesslich nicht-fachlichen Aenderungen:

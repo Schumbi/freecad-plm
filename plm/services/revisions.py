@@ -15,6 +15,7 @@ from ..fcstd import (
     read_uploaded_file,
     validate_fcstd_upload,
 )
+from ..fcstd_signature import SIGNATURE_RULES_VERSION, fcstd_document_signature
 from ..models import (
     Annotation,
     AuditEvent,
@@ -117,9 +118,13 @@ def revision_metadata_from_validation(metadata, plm_revision=None):
 def revision_document_signature(revision):
     signature = (revision.extracted_metadata or {}).get("technical_signature", {})
     value = signature.get("document_xml_sha256")
-    if not value:
-        raise ValidationError("Basisrevision enthaelt keine technische FCStd-Signatur.")
-    return value
+    if value and signature.get("rules_version") == SIGNATURE_RULES_VERSION:
+        return value
+
+    # Revisions keep the signature rules version they were created with. After
+    # a normalization update, recalculate from the immutable source file so an
+    # old hash is never compared with a new-rules upload hash.
+    return fcstd_document_signature(revision.file)
 
 
 def uploaded_document_signature(uploaded_file):

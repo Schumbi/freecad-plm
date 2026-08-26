@@ -324,6 +324,50 @@ def noisy_fcstd_bytes(data, plm_revision="R0099"):
     return buffer.getvalue()
 
 
+def freecad_build_migration_bytes():
+    legacy_xml = """
+        <Document ProgramVersion="1.1R44874 (Git)">
+            <ObjectData>
+                <Object name="Sketch001">
+                    <Properties Count="2">
+                        <Property name="AttacherEngine" type="App::PropertyEnumeration">
+                            <Integer value="0" CustomEnum="true" />
+                            <CustomEnumList count="4">
+                                <Enum value="Engine 3D" />
+                                <Enum value="Engine Plane" />
+                                <Enum value="Engine Line" />
+                                <Enum value="Engine Point" />
+                            </CustomEnumList>
+                        </Property>
+                        <Property name="AttacherType" type="App::PropertyString">
+                            <String value="Attacher::AttachEnginePlane" />
+                        </Property>
+                    </Properties>
+                </Object>
+            </ObjectData>
+        </Document>
+    """
+    migrated_xml = legacy_xml.replace(
+        'ProgramVersion="1.1R44874 (Git)"',
+        'ProgramVersion="1.1R44987 (Git)"',
+    ).replace(
+        '<Integer value="0" CustomEnum="true" />',
+        '<Integer value="1" CustomEnum="true" />',
+    ).replace(
+        '<Properties Count="2">',
+        """
+        <Properties Count="3">
+            <Property name="FuzzyTolerance" type="App::PropertyLength">
+                <Float value="-1.0000000000000000" />
+            </Property>
+        """,
+    )
+    return (
+        make_zip_upload(members={"Document.xml": legacy_xml}).read(),
+        make_zip_upload(members={"Document.xml": migrated_xml}).read(),
+    )
+
+
 class SnapshotNamingTests(SimpleTestCase):
     def test_snapshot_base_name_strips_checkout_suffixes(self):
         self.assertEqual(
@@ -383,7 +427,7 @@ class FcstdValidationTests(SimpleTestCase):
             len(metadata["technical_signature"]["document_xml_sha256"]),
             64,
         )
-        self.assertEqual(metadata["technical_signature"]["rules_version"], 2)
+        self.assertEqual(metadata["technical_signature"]["rules_version"], 3)
         self.assertGreater(metadata["size_bytes"], 0)
 
     @override_settings(PLM_MAX_FCSTD_UPLOAD_BYTES=32)
@@ -504,6 +548,46 @@ class FcstdValidationTests(SimpleTestCase):
         self.assertEqual(
             fcstd_document_signature(base),
             fcstd_document_signature(rewritten),
+        )
+
+    def test_technical_signature_ignores_freecad_build_migration(self):
+        legacy, migrated = freecad_build_migration_bytes()
+
+        self.assertEqual(
+            fcstd_document_signature(legacy),
+            fcstd_document_signature(migrated),
+        )
+
+    def test_technical_signature_detects_non_default_fuzzy_tolerance(self):
+        _legacy, migrated = freecad_build_migration_bytes()
+        changed = replace_zip_member(
+            migrated,
+            "Document.xml",
+            lambda content: content.replace(
+                b"-1.0000000000000000",
+                b"0.0100000000000000",
+            ),
+        )
+
+        self.assertNotEqual(
+            fcstd_document_signature(migrated),
+            fcstd_document_signature(changed),
+        )
+
+    def test_technical_signature_detects_attacher_type_change(self):
+        _legacy, migrated = freecad_build_migration_bytes()
+        changed = replace_zip_member(
+            migrated,
+            "Document.xml",
+            lambda content: content.replace(
+                b"Attacher::AttachEnginePlane",
+                b"Attacher::AttachEngine3D",
+            ),
+        )
+
+        self.assertNotEqual(
+            fcstd_document_signature(migrated),
+            fcstd_document_signature(changed),
         )
 
     def test_technical_signature_changes_for_model_relevant_document_xml(self):
@@ -4849,6 +4933,47 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(payload["revisions"], [])
         self.assertEqual(
             payload["ignored_files"],
+            [{"path": "part.FCStd", "reason": "no_model_change"}],
+        )
+
+    def test_checkin_recalculates_base_signature_after_rules_update(self):
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
+        legacy, migrated = freecad_build_migration_bytes()
+        base_revision = create_revision_from_upload(
+            self.part,
+            SimpleUploadedFile("part.FCStd", legacy),
+            self.user,
+            normalize_plm_revision=True,
+        )
+        extracted_metadata = dict(base_revision.extracted_metadata)
+        extracted_metadata["technical_signature"] = {
+            "rules_version": 2,
+            "document_xml_sha256": "0" * 64,
+            "diagnostic_hashes": {"brep": {}},
+        }
+        base_revision.extracted_metadata = extracted_metadata
+        base_revision.save(update_fields=["extracted_metadata"])
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[base_revision.id]),
+            {},
+        )
+        checkout_id = checkout_response.json()["checkout"]["id"]
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {
+                "file": SimpleUploadedFile(
+                    "updated.FCStd",
+                    fcstd_with_plm_revision(migrated, "R0002"),
+                ),
+                "change_summary": "Nur mit neuer FreeCAD-Version gespeichert.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(Revision.objects.count(), 1)
+        self.assertEqual(
+            response.json()["ignored_files"],
             [{"path": "part.FCStd", "reason": "no_model_change"}],
         )
 
