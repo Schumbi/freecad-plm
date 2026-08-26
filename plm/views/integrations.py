@@ -23,7 +23,7 @@ def integration_settings(request):
             archive_count = (
                 str(info.total_archives)
                 if info.total_archives is not None
-                else "unbekannt"
+                else f"mindestens {info.returned_archives}"
             )
             connection_result = (
                 "Verbindung erfolgreich. "

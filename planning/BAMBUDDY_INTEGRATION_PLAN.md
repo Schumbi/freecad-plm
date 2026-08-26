@@ -12,9 +12,12 @@ keine automatische, möglicherweise falsche Verknüpfung erzeugen.
 Bambuddy stellt eine HTTP-API unter `/api/v1` bereit. Für den ersten Ausbau
 werden nur lesende Aufrufe benötigt:
 
-- `GET /api/v1/archives` listet Archive.
+- `GET /api/v1/archives/` listet Archive. Bambuddy-Versionen liefern dabei
+  entweder eine direkte JSON-Liste oder ein Objekt mit `archives` und `total`;
+  der Client unterstützt beide Formate.
 - `GET /api/v1/archives/{id}` liefert die Details eines Archivs.
-- `GET /api/v1/archives/{id}/3mf` lädt die archivierte 3MF-Datei.
+- `GET /api/v1/archives/{id}/download` lädt in der produktiv eingesetzten
+  Bambuddy-Version die archivierte 3MF-Datei.
 - Die Authentifizierung erfolgt über den Header `X-API-Key`.
 - Für diese Aufrufe genügt ein API-Key mit der Bambuddy-Berechtigung
   `Read Status`.

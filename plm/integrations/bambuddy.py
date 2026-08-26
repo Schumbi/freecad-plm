@@ -133,19 +133,24 @@ class BambuddyClient:
             ) from exc
 
     def test_connection(self):
-        payload = self.get_json("archives", {"limit": 1, "offset": 0})
-        if not isinstance(payload, dict) or not isinstance(
+        payload = self.get_json("archives/", {"limit": 1, "offset": 0})
+        if isinstance(payload, list):
+            archives = payload
+            total = None
+        elif isinstance(payload, dict) and isinstance(
             payload.get("archives"), list
         ):
+            archives = payload["archives"]
+            total = payload.get("total")
+        else:
             raise BambuddyProtocolError(
                 "Die Bambuddy-Archivantwort hat ein unbekanntes Format."
             )
-        total = payload.get("total")
         if total is not None and (not isinstance(total, int) or total < 0):
             raise BambuddyProtocolError(
                 "Die Bambuddy-Archivanzahl hat ein unbekanntes Format."
             )
         return BambuddyConnectionInfo(
             total_archives=total,
-            returned_archives=len(payload["archives"]),
+            returned_archives=len(archives),
         )
