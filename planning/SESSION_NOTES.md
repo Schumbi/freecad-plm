@@ -711,3 +711,52 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Offen bleibt der manuelle Zwei-Rechner-Test für Serverdownload und echten
   Paralleländerungskonflikt. Dieser Punkt wird nicht durch den vorhandenen
   automatisierten Hash-Konflikttest als fachlich abgenommen betrachtet.
+
+# 2026-08-26
+
+## Bambuddy-Verbindungstest kompatibel zur produktiven API
+
+- Die produktive Bambuddy-Version `1.2.5.2` stellt die Archivliste unter
+  `/api/v1/archives/` mit abschließendem Slash bereit; der bisherige Aufruf
+  ohne Slash erhielt HTTP 404.
+- Der Bambuddy-Client akzeptiert sowohl die dort gelieferte direkte JSON-Liste
+  als auch das bereits unterstützte Objektformat mit `archives` und `total`.
+- Fehlt im Listenformat eine Gesamtzahl, zeigt die Integrationsseite die Anzahl
+  der tatsächlich zurückgegebenen Archive als Mindestwert an.
+- Der Plan verwendet für die spätere unveränderte 3MF-Übernahme den live
+  veröffentlichten Download-Endpunkt `/api/v1/archives/{id}/download`.
+- Automatisierte Abnahme: 241 Servertests, `manage.py check` und
+  `makemigrations --check --dry-run` erfolgreich.
+
+## Checkout-Navigation und Aktionsleiste vereinfacht
+
+- Aktive Checkouts erscheinen nicht mehr in einer getrennten Auswahl, sondern
+  direkt an der zugehörigen Revision im Projektbaum.
+- Das Add-on klappt die Projekt- und Teilpfade aktiver Checkouts automatisch
+  auf und erhält die aktuelle Auswahl beim Aktualisieren, soweit die Entität
+  noch vorhanden ist.
+- Grün und fett kennzeichnet den lokal geöffneten Checkout, Orange einen nur
+  serverseitig aktiven Checkout und Rot einen Zuordnungs- oder Öffnungsfehler.
+- Die bisherigen unteren Button-Reihen und die Checkout-Karte wurden durch eine
+  einzige kontextabhängige Hauptaktion mit einem `Mehr`-Menü ersetzt.
+- Doppelklick öffnet einen vorhandenen Checkout und löst nicht versehentlich
+  einen Check-in aus.
+
+## Sieben UX-Punkte aus dem externen Review umgesetzt
+
+- Das FreeCAD-Add-on verwendet statt vier Listen einen lazy geladenen
+  Projekt-/Teile-/Revisionsbaum mit Kontextmenüs und Checkout-Markierungen.
+- Die Web-Suche besitzt Facetten für Projekt, Status, Format und Kategorie;
+  Revisionen und Fertigungsdateien können per Drag-and-drop hochgeladen werden.
+- Revisionskarten zeigen den letzten 3MF-Slicer-Stand. Ein gemeinsamer
+  Lebenszyklus verbindet CAD-, Slicer- und Fertigungsereignisse.
+- Baugruppen erhalten einen historischen BOM-Baum auf Basis des zugehörigen
+  Projektstands.
+- `freecad-plm://revision/...` verbindet die Web-Revisionskarte mit einem
+  streng validierten Add-on-Ablauf. Checkouts benötigen zusätzlich eine
+  Bestätigung.
+- Der Web-Viewer speichert punktgebundene PLM-Anmerkungen einschließlich
+  optionaler Kameraposition.
+- Migration `0018_annotation_viewer_position` ergänzt die dazu nötigen
+  JSON-Felder.
+- Automatisierte Abnahme: 241 Server- und 163 Add-on-Tests erfolgreich.
