@@ -1,0 +1,25 @@
+<li class="bom-node{% if node.missing %} bom-node-missing{% endif %}">
+  <div class="bom-node-row">
+    {% if node.children %}
+      <details open>
+        <summary>
+          {% if node.revision %}<a href="{% url 'plm:part_detail' node.revision.part_id %}">{{ node.label }}</a>{% else %}{{ node.label }}{% endif %}
+          {% if node.revision %}<span class="revision-code">{{ node.revision.revision_code }}</span>{% endif %}
+        </summary>
+        <ul class="bom-tree">
+          {% for child in node.children %}
+            {% include "plm/includes/bom_node.html" with node=child %}
+          {% endfor %}
+        </ul>
+      </details>
+    {% else %}
+      <span>
+        {% if node.revision %}<a href="{% url 'plm:part_detail' node.revision.part_id %}">{{ node.label }}</a>{% else %}{{ node.label }}{% endif %}
+        {% if node.revision %}<span class="revision-code">{{ node.revision.revision_code }}</span>{% endif %}
+        {% if node.missing %}<span class="status-badge status-obsolete">Nicht aufgelöst</span>{% endif %}
+        {% if node.cycle %}<span class="artifact-pill">Zyklus</span>{% endif %}
+      </span>
+    {% endif %}
+    <small>{{ node.path }}</small>
+  </div>
+</li>

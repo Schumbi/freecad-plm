@@ -137,6 +137,11 @@ urlpatterns = [
         name="revision_viewer_status",
     ),
     path(
+        "revisions/<int:revision_id>/viewer-annotations/",
+        views.revision_viewer_annotations,
+        name="revision_viewer_annotations",
+    ),
+    path(
         "revisions/<int:revision_id>/viewer-source/",
         views.revision_viewer_source,
         name="revision_viewer_source",

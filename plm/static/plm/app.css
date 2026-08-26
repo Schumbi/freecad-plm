@@ -1577,6 +1577,20 @@ td form {
   z-index: 2;
 }
 
+.viewer-annotation-form {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+}
+
+.viewer-annotation-form[hidden] {
+  display: none;
+}
+
 .login-page {
   align-items: center;
   background:
@@ -2007,4 +2021,112 @@ code {
 
 figure {
   margin: 0;
+}
+
+.search-facets {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+}
+
+.search-facets-main {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr));
+}
+
+.search-facets label,
+.file-drop-zone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.file-drop-zone {
+  background: var(--surface-muted);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  padding: var(--space-4);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.file-drop-zone.is-dragging {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.file-drop-name {
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.slicer-sync-pill {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.lifecycle-list {
+  list-style: none;
+  margin: 0 0 var(--space-5);
+  padding: 0 0 0 0.55rem;
+}
+
+.lifecycle-event {
+  border-left: 2px solid var(--border);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 0.8rem 1fr;
+  padding: 0 0 var(--space-4) var(--space-3);
+}
+
+.lifecycle-marker {
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  height: 0.8rem;
+  margin-left: -1.85rem;
+  width: 0.8rem;
+}
+
+.lifecycle-title-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.bom-tree {
+  list-style: none;
+  margin: var(--space-2) 0 0 var(--space-3);
+  padding-left: var(--space-3);
+}
+
+.bom-tree-root {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3);
+}
+
+.bom-node-row {
+  padding: var(--space-2) 0;
+}
+
+.bom-node-row small {
+  color: var(--muted);
+  display: block;
+  margin-left: var(--space-4);
+}
+
+.bom-node-missing {
+  color: var(--danger);
+}
+
+@media (max-width: 1100px) {
+  .search-facets-main {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
 }

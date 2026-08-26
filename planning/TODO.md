@@ -13,6 +13,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Slicer-Projekt-Synchronisation auf einem zweiten Rechner prüfen, inklusive
   Konfliktfall bei paralleler Änderung.
 - Docker-Compose-Stack und Backup-Strategie fuer `storage/` und PostgreSQL auf dem Zielserver festhalten.
+- Die UX-Änderungen aus `planning/UX_UI_REVIEW.md` im echten FreeCAD und im
+  Browser manuell abnehmen, insbesondere Baum, Drag-and-drop, 3D-Hotspots und
+  den Betriebssystem-Handler für `freecad-plm://`.
 
 ## Als Naechstes
 
@@ -29,6 +32,15 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Bulk-ZIP-Import aus `planning/BULK_IMPORT_PLAN.md` umsetzen.
 
 ## Erledigt
+
+- Add-on auf einen lazy geladenen Projekt-/Teile-/Revisionsbaum mit direkten
+  Checkout-Markierungen und kontextabhängiger Arbeitsleiste umgestellt.
+- Web-Suche um Facetten ergänzt; CAD- und Fertigungsuploads unterstützen
+  Drag-and-drop.
+- Slicer-Stand, gemeinsamer Teile-Lebenszyklus und historische
+  Baugruppenstruktur auf der Teilseite ergänzt.
+- Sichere Revisions-Deep-Links und punktgebundene Anmerkungen im 3D-Viewer
+  ergänzt.
 
 - Altes nanoPLM grob analysiert.
 - Altes nanoPLM nach `old/` verschoben.

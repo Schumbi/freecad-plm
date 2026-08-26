@@ -408,6 +408,52 @@
     fetchStatus();
   }
 
+  function setupFileDrops() {
+    document.querySelectorAll("[data-file-drop]").forEach(function (zone) {
+      var input = zone.querySelector('input[type="file"]');
+      var filename = zone.querySelector("[data-file-drop-name]");
+      if (!input) return;
+
+      function showSelection() {
+        if (!filename) return;
+        filename.textContent = input.files && input.files.length
+          ? input.files[0].name
+          : "";
+      }
+
+      ["dragenter", "dragover"].forEach(function (eventName) {
+        zone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          zone.classList.add("is-dragging");
+          if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+        });
+      });
+      ["dragleave", "drop"].forEach(function (eventName) {
+        zone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          zone.classList.remove("is-dragging");
+        });
+      });
+      zone.addEventListener("drop", function (event) {
+        if (!event.dataTransfer || !event.dataTransfer.files.length) return;
+        var transfer = new DataTransfer();
+        transfer.items.add(event.dataTransfer.files[0]);
+        input.files = transfer.files;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      zone.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          input.click();
+        }
+      });
+      input.addEventListener("change", showSelection);
+      showSelection();
+    });
+  }
+
   setupDialogs();
   setupActionMenus();
   setupMessages();
@@ -417,4 +463,5 @@
   setupManufacturingSelectors();
   setupExportJobsPolling();
   setupCompareStatusPolling();
+  setupFileDrops();
 })();

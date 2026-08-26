@@ -1,3 +1,4 @@
+import math
 import re
 from pathlib import PurePosixPath
 
@@ -36,6 +37,31 @@ REVISION_CODE_MAX_NUMBER = 10**REVISION_CODE_NUMBER_WIDTH - 1
 REVISION_CODE_PATTERN = re.compile(
     rf"^{re.escape(REVISION_CODE_PREFIX)}(\d{{{REVISION_CODE_NUMBER_WIDTH}}})$"
 )
+
+
+def viewer_vector(value):
+    if not isinstance(value, dict):
+        return {}
+    vector = {}
+    for axis in ("x", "y", "z"):
+        try:
+            number = float(value[axis])
+        except (KeyError, TypeError, ValueError):
+            return {}
+        if not math.isfinite(number) or abs(number) > 1_000_000_000:
+            return {}
+        vector[axis] = number
+    return vector
+
+
+def viewer_camera_state(value):
+    if not isinstance(value, dict):
+        return {}
+    position = viewer_vector(value.get("position"))
+    target = viewer_vector(value.get("target"))
+    if not position or not target:
+        return {}
+    return {"position": position, "target": target}
 
 
 def revision_code_number(code):
@@ -245,6 +271,8 @@ def create_annotation(
     revision=None,
     object_name="",
     subelement="",
+    viewer_anchor=None,
+    viewer_camera=None,
 ):
     object_name = object_name.strip() if isinstance(object_name, str) else ""
     subelement = subelement.strip() if isinstance(subelement, str) else ""
@@ -254,6 +282,8 @@ def create_annotation(
         revision=revision,
         object_name=object_name,
         subelement=subelement,
+        viewer_anchor=viewer_vector(viewer_anchor),
+        viewer_camera=viewer_camera_state(viewer_camera),
         text=text.strip(),
         created_by=created_by,
     )
@@ -267,6 +297,7 @@ def create_annotation(
             "revision_id": revision.id if revision else None,
             "object_name": annotation.object_name,
             "subelement": annotation.subelement,
+            "viewer_anchor": annotation.viewer_anchor,
         },
     )
     return annotation

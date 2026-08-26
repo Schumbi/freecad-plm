@@ -7,7 +7,7 @@ from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ProjectForm, ProjectSnapshotUploadForm
-from ..models import AuditEvent, Project, ProjectSnapshot
+from ..models import AuditEvent, Part, Project, ProjectSnapshot, Revision
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
 
@@ -15,7 +15,33 @@ from ..services import delete_project_tree, import_project_snapshot, search_plm
 @login_required
 def global_search(request):
     query = request.GET.get("q", "").strip()
-    results = search_plm(query) if query else None
+    project_id = request.GET.get("project", "").strip()
+    revision_status = request.GET.get("status", "").strip()
+    file_format = request.GET.get("format", "").strip()
+    category = request.GET.get("category", "").strip()
+    if revision_status not in {value for value, _label in Revision.Status.choices}:
+        revision_status = ""
+    if file_format not in {value for value, _label in Revision.FileFormat.choices}:
+        file_format = ""
+    if category not in {value for value, _label in Part.Category.choices}:
+        category = ""
+    try:
+        project_id_value = int(project_id) if project_id else None
+    except ValueError:
+        project_id_value = None
+        project_id = ""
+    filters_active = any((project_id_value, revision_status, file_format, category))
+    results = (
+        search_plm(
+            query,
+            project_id=project_id_value,
+            revision_status=revision_status,
+            file_format=file_format,
+            category=category,
+        )
+        if query or filters_active
+        else None
+    )
     total_hits = 0
     if results is not None:
         total_hits = (
@@ -31,6 +57,15 @@ def global_search(request):
             "query": query,
             "results": results,
             "total_hits": total_hits,
+            "filters_active": filters_active,
+            "projects": Project.objects.filter(is_archived=False).order_by("code"),
+            "selected_project_id": project_id_value,
+            "selected_revision_status": revision_status,
+            "selected_file_format": file_format,
+            "selected_category": category,
+            "revision_status_choices": Revision.Status.choices,
+            "file_format_choices": Revision.FileFormat.choices,
+            "category_choices": Part.Category.choices,
         },
     )
 

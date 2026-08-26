@@ -40,6 +40,8 @@ def part_annotations_api(request, part_id):
         text=text,
         object_name=data.get("object_name", ""),
         subelement=data.get("subelement", ""),
+        viewer_anchor=data.get("viewer_anchor"),
+        viewer_camera=data.get("viewer_camera"),
     )
     return JsonResponse({"annotation": annotation_payload(annotation)}, status=201)
 

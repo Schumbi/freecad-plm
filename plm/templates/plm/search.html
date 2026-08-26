@@ -27,6 +27,8 @@
           {% else %}
             Keine Treffer für „{{ query }}“.
           {% endif %}
+        {% elif filters_active %}
+          {{ total_hits }} Treffer für die gewählten Filter.
         {% else %}
           Suche nach Projektcode, Teilenummer, Revisionscode oder Dateiname.
         {% endif %}
@@ -34,7 +36,56 @@
     </div>
   </div>
 
-  {% if not query %}
+  <form class="search-facets" method="get" action="{% url 'plm:global_search' %}">
+    <div class="search-facets-main">
+      <label>
+        <span>Suchbegriff</span>
+        <input type="search" name="q" value="{{ query }}" placeholder="Code, Name, Revision oder Datei">
+      </label>
+      <label>
+        <span>Projekt</span>
+        <select name="project">
+          <option value="">Alle Projekte</option>
+          {% for project in projects %}
+            <option value="{{ project.id }}"{% if selected_project_id == project.id %} selected{% endif %}>{{ project.code }} · {{ project.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Revisionsstatus</span>
+        <select name="status">
+          <option value="">Alle Status</option>
+          {% for value, label in revision_status_choices %}
+            <option value="{{ value }}"{% if selected_revision_status == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Dateiformat</span>
+        <select name="format">
+          <option value="">Alle Formate</option>
+          {% for value, label in file_format_choices %}
+            <option value="{{ value }}"{% if selected_file_format == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Typ</span>
+        <select name="category">
+          <option value="">Teile und Baugruppen</option>
+          {% for value, label in category_choices %}
+            <option value="{{ value }}"{% if selected_category == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="form-actions">
+      <button type="submit">Suchen und filtern</button>
+      {% if query or filters_active %}<a class="btn btn-outline-secondary" href="{% url 'plm:global_search' %}">Zurücksetzen</a>{% endif %}
+    </div>
+  </form>
+
+  {% if not query and not filters_active %}
     <div class="empty-state">
       <strong>Suchbegriff eingeben</strong>
       Nutze das Suchfeld oben, um Projekte, Teile, Revisionen und Dateipfade zu finden.
@@ -42,7 +93,7 @@
   {% elif total_hits == 0 %}
     <div class="empty-state">
       <strong>Keine Treffer</strong>
-      Für „{{ query }}“ wurden keine passenden Einträge gefunden.
+      Für die gewählten Suchkriterien wurden keine passenden Einträge gefunden.
     </div>
   {% else %}
     {% if results.projects %}

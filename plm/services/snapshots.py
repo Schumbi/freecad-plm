@@ -277,15 +277,23 @@ def resolve_reference_path(source_path, reference_file):
     return str(source_dir / reference_file)
 
 
+def unique_entries_by_filename(entries):
+    candidates = {}
+    for entry in entries:
+        candidates.setdefault(PurePosixPath(entry.path).name, []).append(entry)
+    return {
+        filename: matches[0]
+        for filename, matches in candidates.items()
+        if len(matches) == 1
+    }
+
+
 def snapshot_entries_with_references(root_entry):
-    entries_by_path = {
-        entry.path: entry
-        for entry in root_entry.snapshot.entries.select_related("revision", "revision__part")
-    }
-    entries_by_name = {
-        PurePosixPath(entry.path).name: entry
-        for entry in root_entry.snapshot.entries.select_related("revision", "revision__part")
-    }
+    entries = list(
+        root_entry.snapshot.entries.select_related("revision", "revision__part")
+    )
+    entries_by_path = {entry.path: entry for entry in entries}
+    entries_by_name = unique_entries_by_filename(entries)
     selected = {}
     queue = [root_entry]
 

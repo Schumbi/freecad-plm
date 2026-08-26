@@ -77,6 +77,7 @@ from .revisions import (
     revision_properties,
     revision_viewer_source,
     revision_viewer_status,
+    revision_viewer_annotations,
     update_revision_notes,
     upload_revision,
 )

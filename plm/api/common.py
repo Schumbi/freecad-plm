@@ -111,6 +111,8 @@ def annotation_payload(annotation):
         "revision_id": annotation.revision_id,
         "object_name": annotation.object_name,
         "subelement": annotation.subelement,
+        "viewer_anchor": annotation.viewer_anchor,
+        "viewer_camera": annotation.viewer_camera,
         "text": annotation.text,
         "status": annotation.status,
         "created_by": annotation.created_by.username,

@@ -10,7 +10,12 @@ from ..forms import ManufacturingFileUploadForm, PartForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
 from ..models import Annotation, AuditEvent, ExportJob, Part, Project
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
-from ..services import create_revision_from_upload, next_part_number
+from ..services import (
+    assembly_bom_tree,
+    create_revision_from_upload,
+    next_part_number,
+    part_lifecycle_events,
+)
 
 
 @login_required
@@ -91,6 +96,7 @@ def part_detail(request, part_id):
     selected_revision_id = request.GET.get("properties_revision")
     if selected_revision_id:
         selected_revision = revisions.filter(id=selected_revision_id).first()
+    latest_revision = revisions.first()
     return render(
         request,
         "plm/part_detail.html",
@@ -103,6 +109,12 @@ def part_detail(request, part_id):
             ),
             "revisions": revisions,
             "selected_revision": selected_revision,
+            "lifecycle_events": part_lifecycle_events(part),
+            "bom_tree": (
+                assembly_bom_tree(latest_revision)
+                if part.category == Part.Category.ASSEMBLY
+                else None
+            ),
             "form": RevisionUploadForm(part=part),
             "manufacturing_form": ManufacturingFileUploadForm(),
             "can_upload": can_upload_revision(request.user),

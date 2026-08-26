@@ -106,12 +106,21 @@
             <div class="model-viewer-toolbar-actions">
               <button type="button" class="secondary" id="model-viewer-wireframe">Drahtgitter</button>
               <button type="button" class="secondary" id="model-viewer-reset">Ansicht zurücksetzen</button>
+              <button type="button" class="secondary" id="model-viewer-annotate" hidden>Anmerkung setzen</button>
               <a class="btn btn-outline-secondary btn-sm" id="model-viewer-download" href="#">Download</a>
             </div>
           </div>
           <div class="model-viewer-canvas" id="model-viewer-canvas">
             <div class="model-viewer-status" id="model-viewer-status">Bereit.</div>
           </div>
+          <form class="viewer-annotation-form" id="model-viewer-annotation-form" hidden>
+            <strong>Anmerkung am gewählten 3D-Punkt</strong>
+            <textarea id="model-viewer-annotation-text" rows="3" maxlength="2000" placeholder="Was soll hier geprüft oder geändert werden?"></textarea>
+            <div class="form-actions">
+              <button type="submit">Anmerkung speichern</button>
+              <button type="button" class="btn btn-outline-secondary" id="model-viewer-annotation-cancel">Abbrechen</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

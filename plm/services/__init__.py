@@ -52,6 +52,8 @@ from .revisions import (
     revision_metadata_from_validation,
     uploaded_document_signature,
     validate_revision_code_argument,
+    viewer_camera_state,
+    viewer_vector,
 )
 from .snapshots import (
     SNAPSHOT_VERSION_SUFFIX_RE,
@@ -90,3 +92,4 @@ from .search import (
     PlmSearchResults,
     search_plm,
 )
+from .ux import assembly_bom_tree, part_lifecycle_events

@@ -63,6 +63,47 @@
         <div class="empty-state">Noch keine FreeCAD-Anmerkungen vorhanden.</div>
       {% endif %}
 
+      {% if bom_tree %}
+        <section class="part-bom">
+          <div class="section-header">
+            <h2>Baugruppenstruktur</h2>
+            {% if bom_tree.snapshot %}<span class="muted">Projektstand {{ bom_tree.snapshot.name }}</span>{% endif %}
+          </div>
+          {% if not bom_tree.snapshot %}
+            <p class="field-hint">Die Referenzen werden aus der aktuellen Revision gelesen. Ohne Projektstand können Dateiverweise nicht sicher einem PLM-Teil zugeordnet werden.</p>
+          {% endif %}
+          <ul class="bom-tree bom-tree-root">
+            {% include "plm/includes/bom_node.html" with node=bom_tree %}
+          </ul>
+        </section>
+      {% endif %}
+
+      {% if lifecycle_events %}
+        <section class="part-lifecycle">
+          <div class="section-header">
+            <h2>Lebenszyklus</h2>
+            <span class="muted">CAD, Slicer und Fertigung</span>
+          </div>
+          <ol class="lifecycle-list">
+            {% for event in lifecycle_events %}
+              <li class="lifecycle-event lifecycle-{{ event.kind }}">
+                <span class="lifecycle-marker" aria-hidden="true"></span>
+                <div>
+                  <div class="lifecycle-title-row">
+                    <strong>{{ event.title }}</strong>
+                    <span class="status-badge status-{{ event.status }}">{{ event.timestamp|date:"d.m.Y H:i" }}</span>
+                  </div>
+                  <p class="meta-line">
+                    <a href="#revision-{{ event.revision.id }}">{{ event.revision.revision_code }}</a>
+                    {% if event.detail %} · {{ event.detail }}{% endif %}
+                  </p>
+                </div>
+              </li>
+            {% endfor %}
+          </ol>
+        </section>
+      {% endif %}
+
       <div class="toolbar">
         <div class="toolbar-group">
           <span class="muted" id="revision-filter-count" data-filter-default="{{ revisions|length }} Revisionen">{{ revisions|length }} Revisionen</span>
@@ -86,6 +127,7 @@
         <div class="object-list" id="revision-list">
           {% for revision in revisions %}
             <article
+              id="revision-{{ revision.id }}"
               class="revision-card"
               data-filter-item
               data-filter-text="{{ revision.revision_code }} {{ revision.status }} {{ revision.file_format }} {{ revision.original_filename }} {{ revision.notes }}">
@@ -115,7 +157,13 @@
                     <span class="artifact-pill">{{ artifact.artifact_type|upper }}{% if artifact.view_name %} {{ artifact.view_name }}{% endif %}</span>
                   {% endfor %}
                   {% for manufacturing_file in revision.manufacturing_files.all %}
-                    <span class="artifact-pill">Fertigung {{ manufacturing_file.get_file_type_display }}</span>
+                    {% if manufacturing_file.file_type == "slicer_project_3mf" %}
+                      <span class="artifact-pill slicer-sync-pill" title="Zuletzt synchronisiert {{ manufacturing_file.updated_at|date:'d.m.Y H:i' }}">
+                        Slicer-Stand · {{ manufacturing_file.updated_at|date:"d.m.Y H:i" }}
+                      </span>
+                    {% else %}
+                      <span class="artifact-pill">Fertigung {{ manufacturing_file.get_file_type_display }}</span>
+                    {% endif %}
                   {% endfor %}
                   {% for job in revision.export_jobs.all %}
                     <span class="job-status-pill job-{{ job.status }}">{{ job.get_job_type_display }}: {{ job.get_status_display }}</span>
@@ -126,12 +174,17 @@
               <div class="revision-actions">
                 <div class="revision-actions-primary">
                   <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">{{ revision.get_file_format_display }} laden</a>
+                  <a class="btn btn-outline-secondary btn-sm" href="freecad-plm://revision/{{ revision.id }}?project_id={{ part.project_id }}&amp;part_id={{ part.id }}&amp;action={% if revision.file_format == 'fcstd' %}checkout{% else %}readonly{% endif %}">
+                    {% if revision.file_format == "fcstd" %}In FreeCAD bearbeiten{% else %}In FreeCAD öffnen{% endif %}
+                  </a>
                   <button
                     type="button"
                     class="btn btn-outline-secondary btn-sm"
                     data-model-viewer-source="{% url 'plm:revision_viewer_source' revision.id %}"
                     data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
                     data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
+                    data-model-viewer-annotations="{% url 'plm:revision_viewer_annotations' revision.id %}"
+                    data-model-viewer-can-annotate="{% if can_edit_notes %}1{% else %}0{% endif %}"
                     data-model-viewer-format="stl"
                     data-model-viewer-title="{{ revision.revision_code }} - {{ revision.original_filename }}"
                     data-model-viewer-download="{% url 'plm:download_revision' revision.id %}">
@@ -362,6 +415,8 @@
                                   data-model-viewer-source="{% url 'plm:manufacturing_file_viewer_source' manufacturing_file.id %}"
                                   data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
                                   data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
+                                  data-model-viewer-annotations="{% url 'plm:revision_viewer_annotations' revision.id %}"
+                                  data-model-viewer-can-annotate="{% if can_edit_notes %}1{% else %}0{% endif %}"
                                   data-model-viewer-format="{% if manufacturing_file.file_type == "slicer_3mf" or manufacturing_file.file_type == "slicer_project_3mf" %}3mf{% else %}stl{% endif %}"
                                   data-model-viewer-title="{{ manufacturing_file.label|default:manufacturing_file.original_filename }}"
                                   data-model-viewer-download="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">
@@ -422,7 +477,15 @@
                     <h5>Fertigungsdatei hochladen</h5>
                     <form class="form-card" method="post" action="{% url 'plm:upload_manufacturing_file' revision.id %}" enctype="multipart/form-data">
                       {% csrf_token %}
-                      {{ manufacturing_form.as_p }}
+                      <div class="file-drop-zone" data-file-drop tabindex="0">
+                        <strong>Fertigungsdatei hierher ziehen</strong>
+                        <span class="muted">oder über das Dateifeld auswählen</span>
+                        {% include "plm/includes/form_field.html" with field=manufacturing_form.file %}
+                        <span class="file-drop-name" data-file-drop-name></span>
+                      </div>
+                      {% for field in manufacturing_form %}
+                        {% if field.name != "file" %}{% include "plm/includes/form_field.html" with field=field %}{% endif %}
+                      {% endfor %}
                       <button type="submit">Fertigungsdatei hochladen</button>
                     </form>
                   {% endif %}
@@ -467,6 +530,8 @@
                               data-model-viewer-source="{% url 'plm:artifact_viewer_source' artifact.id %}"
                               data-model-viewer-prepare="{% url 'plm:create_revision_viewer_preview' revision.id %}"
                               data-model-viewer-status="{% url 'plm:revision_viewer_status' revision.id %}"
+                              data-model-viewer-annotations="{% url 'plm:revision_viewer_annotations' revision.id %}"
+                              data-model-viewer-can-annotate="{% if can_edit_notes %}1{% else %}0{% endif %}"
                               data-model-viewer-format="{% if artifact.artifact_type == "3mf" %}3mf{% else %}stl{% endif %}"
                               data-model-viewer-title="{{ artifact.original_filename }}"
                               data-model-viewer-download="{% url 'plm:download_revision_artifact' artifact.id %}">
@@ -526,7 +591,12 @@
           <form class="form-card" method="post" action="{% url 'plm:upload_revision' part.id %}" enctype="multipart/form-data">
             {% csrf_token %}
             <p class="dialog-intro">Die Revisionsnummer wird automatisch fortgeführt. Die bisherige Revision bleibt unverändert erhalten.</p>
-            {% include "plm/includes/form_field.html" with field=form.file %}
+            <div class="file-drop-zone" data-file-drop tabindex="0">
+              <strong>CAD-Datei hierher ziehen</strong>
+              <span class="muted">oder über das Dateifeld auswählen</span>
+              {% include "plm/includes/form_field.html" with field=form.file %}
+              <span class="file-drop-name" data-file-drop-name></span>
+            </div>
             {% include "plm/includes/cad_file_guide.html" %}
             {% include "plm/includes/form_field.html" with field=form.change_summary %}
             {% if form.target_snapshot.field.queryset.exists %}

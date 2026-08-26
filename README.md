@@ -302,7 +302,18 @@ Anlegen angezeigt; danach bleibt nur der Prefix sichtbar.
 
 ## Suche
 
-Die globale Suche in der Topbar durchsucht Projekte, Teile, Revisionen und Dateipfade in Projektstaenden. Auf Listen-Seiten (Projekte, Teile, Revisionen) gibt es zusaetzlich einen lokalen Filter in der jeweiligen Toolbar.
+Die globale Suche in der Topbar durchsucht Projekte, Teile, Revisionen und
+Dateipfade in Projektständen. Auf der Ergebnisseite kann zusätzlich nach
+Projekt, Revisionsstatus, CAD-Format und Teilekategorie gefiltert werden; die
+Facetten funktionieren auch ohne Suchtext. Auf Listen-Seiten gibt es weiterhin
+einen lokalen Filter in der jeweiligen Toolbar.
+
+Die Teilseite verbindet Revisionen, Freigaben, synchronisierte
+3MF-Slicer-Stände, Fertigungsdateien und Fertigungsläufe in einem gemeinsamen
+Lebenszyklus. Baugruppen zeigen außerdem einen aufklappbaren Referenzbaum aus
+dem historischen Projektstand. CAD-Revisionen und Fertigungsdateien können per
+Drag-and-drop hochgeladen werden. Im 3D-Viewer lassen sich PLM-Anmerkungen an
+einem Modellpunkt verankern.
 
 ## Projektstaende
 

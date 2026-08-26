@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -8,6 +10,7 @@ from django.db import transaction
 from django.http import FileResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 from ..derivatives import ensure_revision_png_views, prepare_revision_derivatives
 from ..forms import (
     ManufacturingFileUploadForm,
@@ -28,10 +31,13 @@ from ..permissions import can_edit_revision_notes, can_release_revision, can_upl
 from ..services import (
     PLMRevisionConflict,
     create_revision_from_upload,
+    create_annotation,
     create_snapshot_with_replaced_external_revision,
     obsolete_revision,
     release_revision,
     revision_reference_files,
+    viewer_camera_state,
+    viewer_vector,
 )
 
 from .common import (
@@ -448,6 +454,69 @@ def revision_viewer_status(request, revision_id):
         id=revision_id,
     )
     return JsonResponse(viewer_status_payload(revision))
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def revision_viewer_annotations(request, revision_id):
+    revision = get_object_or_404(
+        Revision.objects.select_related("part", "part__project"),
+        id=revision_id,
+    )
+    if request.method == "GET":
+        annotations = revision.annotations.select_related("created_by").exclude(
+            viewer_anchor={}
+        )
+        return JsonResponse(
+            {
+                "annotations": [
+                    {
+                        "id": annotation.id,
+                        "text": annotation.text,
+                        "status": annotation.status,
+                        "viewer_anchor": annotation.viewer_anchor,
+                        "viewer_camera": annotation.viewer_camera,
+                        "created_by": annotation.created_by.username,
+                    }
+                    for annotation in annotations
+                ]
+            }
+        )
+
+    if not can_edit_revision_notes(request.user):
+        return JsonResponse({"error": "Keine Berechtigung für Anmerkungen."}, status=403)
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Ungültige JSON-Daten."}, status=400)
+    text = str(data.get("text") or "").strip()
+    anchor = viewer_vector(data.get("viewer_anchor"))
+    camera = viewer_camera_state(data.get("viewer_camera"))
+    if not text:
+        return JsonResponse({"error": "Text darf nicht leer sein."}, status=400)
+    if not anchor:
+        return JsonResponse({"error": "Kein gültiger 3D-Punkt gewählt."}, status=400)
+    annotation = create_annotation(
+        part=revision.part,
+        revision=revision,
+        created_by=request.user,
+        text=text,
+        viewer_anchor=anchor,
+        viewer_camera=camera,
+    )
+    return JsonResponse(
+        {
+            "annotation": {
+                "id": annotation.id,
+                "text": annotation.text,
+                "status": annotation.status,
+                "viewer_anchor": annotation.viewer_anchor,
+                "viewer_camera": annotation.viewer_camera,
+                "created_by": annotation.created_by.username,
+            }
+        },
+        status=201,
+    )
 
 
 @login_required

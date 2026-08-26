@@ -11,6 +11,10 @@ const statusElement = document.getElementById("model-viewer-status");
 const resetButton = document.getElementById("model-viewer-reset");
 const wireframeButton = document.getElementById("model-viewer-wireframe");
 const downloadLink = document.getElementById("model-viewer-download");
+const annotateButton = document.getElementById("model-viewer-annotate");
+const annotationForm = document.getElementById("model-viewer-annotation-form");
+const annotationText = document.getElementById("model-viewer-annotation-text");
+const annotationCancel = document.getElementById("model-viewer-annotation-cancel");
 
 let renderer;
 let scene;
@@ -21,6 +25,11 @@ let animationFrame;
 let wireframe = false;
 let activeLoadId = 0;
 let canvasResizeObserver;
+let annotationsUrl = "";
+let annotationMode = false;
+let pendingAnchor = null;
+let pendingCamera = null;
+let annotationMarkers;
 
 class ViewerHttpError extends Error {
   constructor(message, status) {
@@ -59,6 +68,10 @@ function ensureScene() {
   const axes = new THREE.AxesHelper(60);
   axes.name = "viewer-axes";
   scene.add(axes);
+
+  annotationMarkers = new THREE.Group();
+  annotationMarkers.name = "viewer-annotations";
+  scene.add(annotationMarkers);
 
   window.addEventListener("resize", resizeRenderer);
   if (window.ResizeObserver) {
@@ -102,6 +115,17 @@ function clearModel() {
     }
   });
   currentObject = null;
+  clearAnnotationMarkers();
+}
+
+function clearAnnotationMarkers() {
+  if (!annotationMarkers) return;
+  while (annotationMarkers.children.length) {
+    const marker = annotationMarkers.children[0];
+    annotationMarkers.remove(marker);
+    marker.geometry?.dispose();
+    marker.material?.dispose();
+  }
 }
 
 function setWireframe(enabled) {
@@ -182,20 +206,23 @@ function csrfToken() {
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
+    ...options,
     credentials: "same-origin",
     headers: {
       "X-Requested-With": "XMLHttpRequest",
       ...(options.method === "POST" ? { "X-CSRFToken": csrfToken() } : {}),
       ...(options.headers || {}),
     },
-    ...options,
   });
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json")
     ? await response.json()
     : { message: await response.text() };
   if (!response.ok) {
-    throw new ViewerHttpError(payload.message || `Anfrage fehlgeschlagen (${response.status}).`, response.status);
+    throw new ViewerHttpError(
+      payload.error || payload.message || `Anfrage fehlgeschlagen (${response.status}).`,
+      response.status,
+    );
   }
   return payload;
 }
@@ -230,6 +257,9 @@ async function openViewer(trigger) {
   titleElement.textContent = trigger.dataset.modelViewerTitle || "3D-Modell";
   formatElement.textContent = format.toUpperCase();
   downloadLink.href = trigger.dataset.modelViewerDownload || sourceUrl;
+  annotationsUrl = trigger.dataset.modelViewerAnnotations || "";
+  annotateButton.hidden = trigger.dataset.modelViewerCanAnnotate !== "1" || !annotationsUrl;
+  cancelAnnotation();
 
   try {
     const buffer = await loadModelBuffer(trigger, sourceUrl, loadId);
@@ -238,12 +268,138 @@ async function openViewer(trigger) {
     scene.add(currentObject);
     setWireframe(wireframe);
     fitCamera(currentObject);
+    await loadViewerAnnotations();
     setStatus("", false);
     if (!animationFrame) animate();
   } catch (error) {
     setStatus(error.message || "3D-Modell konnte nicht angezeigt werden.");
   }
 }
+
+function markerRadius() {
+  if (!currentObject) return 1;
+  const size = new THREE.Box3()
+    .setFromObject(currentObject)
+    .getSize(new THREE.Vector3());
+  return Math.max(size.length() / 120, 0.5);
+}
+
+function addAnnotationMarker(annotation) {
+  const anchor = annotation.viewer_anchor || {};
+  if (![anchor.x, anchor.y, anchor.z].every(Number.isFinite)) return;
+  const geometry = new THREE.SphereGeometry(markerRadius(), 20, 12);
+  const material = new THREE.MeshStandardMaterial({
+    color: annotation.status === "resolved" ? 0x10b981 : 0xf59e0b,
+    emissive: annotation.status === "resolved" ? 0x064e3b : 0x78350f,
+  });
+  const marker = new THREE.Mesh(geometry, material);
+  marker.position.set(anchor.x, anchor.y, anchor.z);
+  marker.userData.annotation = annotation;
+  annotationMarkers.add(marker);
+}
+
+async function loadViewerAnnotations() {
+  clearAnnotationMarkers();
+  if (!annotationsUrl) return;
+  try {
+    const payload = await fetchJson(annotationsUrl);
+    (payload.annotations || []).forEach(addAnnotationMarker);
+  } catch (error) {
+    setStatus(error.message || "3D-Anmerkungen konnten nicht geladen werden.");
+  }
+}
+
+function vectorPayload(vector) {
+  return { x: vector.x, y: vector.y, z: vector.z };
+}
+
+function cancelAnnotation() {
+  annotationMode = false;
+  pendingAnchor = null;
+  pendingCamera = null;
+  annotateButton?.classList.remove("btn-primary");
+  if (annotationForm) annotationForm.hidden = true;
+  if (annotationText) annotationText.value = "";
+}
+
+annotateButton?.addEventListener("click", () => {
+  annotationMode = !annotationMode;
+  pendingAnchor = null;
+  pendingCamera = null;
+  annotationForm.hidden = true;
+  annotateButton.classList.toggle("btn-primary", annotationMode);
+  setStatus(
+    annotationMode ? "Punkt am Modell anklicken." : "",
+    annotationMode,
+  );
+});
+
+rendererCanvasClickSetup();
+
+function rendererCanvasClickSetup() {
+  canvasHost.addEventListener("click", (event) => {
+    if (!renderer || !currentObject) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const pointer = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, camera);
+
+    if (!annotationMode) {
+      const markerHit = raycaster.intersectObjects(
+        annotationMarkers.children,
+        true,
+      )[0];
+      const annotation = markerHit?.object?.userData?.annotation;
+      if (annotation) {
+        setStatus(
+          `${annotation.status === "resolved" ? "Erledigt" : "Offen"}: ${annotation.text}`,
+        );
+      }
+      return;
+    }
+
+    const hit = raycaster.intersectObject(currentObject, true)[0];
+    if (!hit) {
+      setStatus("Kein Modellpunkt getroffen. Bitte erneut klicken.");
+      return;
+    }
+    pendingAnchor = vectorPayload(hit.point);
+    pendingCamera = {
+      position: vectorPayload(camera.position),
+      target: vectorPayload(controls.target),
+    };
+    annotationForm.hidden = false;
+    annotationText.focus();
+    setStatus("Punkt gewählt. Anmerkung eingeben.");
+  });
+}
+
+annotationCancel?.addEventListener("click", cancelAnnotation);
+
+annotationForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const text = annotationText.value.trim();
+  if (!text || !pendingAnchor || !annotationsUrl) return;
+  try {
+    const payload = await fetchJson(annotationsUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        viewer_anchor: pendingAnchor,
+        viewer_camera: pendingCamera,
+      }),
+    });
+    addAnnotationMarker(payload.annotation);
+    cancelAnnotation();
+    setStatus("3D-Anmerkung gespeichert.");
+  } catch (error) {
+    setStatus(error.message || "3D-Anmerkung konnte nicht gespeichert werden.");
+  }
+});
 
 async function loadModelBuffer(trigger, sourceUrl, loadId) {
   try {

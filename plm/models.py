@@ -581,6 +581,8 @@ class Annotation(TimeStampedModel):
     )
     object_name = models.CharField(max_length=200, blank=True)
     subelement = models.CharField(max_length=200, blank=True)
+    viewer_anchor = models.JSONField(default=dict, blank=True)
+    viewer_camera = models.JSONField(default=dict, blank=True)
     text = models.TextField()
     status = models.CharField(
         max_length=20,
