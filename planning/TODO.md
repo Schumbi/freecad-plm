@@ -12,7 +12,10 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - PNG-Ansichten, 3D-Preview und Revisionsvergleich auf der laufenden Instanz mit echtem Worker pruefen.
 - Slicer-Projekt-Synchronisation auf einem zweiten Rechner prüfen, inklusive
   Konfliktfall bei paralleler Änderung.
-- Docker-Compose-Stack und Backup-Strategie fuer `storage/` und PostgreSQL auf dem Zielserver festhalten.
+- Update-, Backup- und Restore-Ablauf aus
+  `planning/PRODUCTION_CHECKLIST.md` auf dem Zielserver durchführen und
+  protokollieren; die Strategie selbst ist festgehalten und auf der lokalen
+  Testinstanz erfolgreich erprobt.
 - Die UX-Änderungen aus `planning/UX_UI_REVIEW.md` im echten FreeCAD und im
   Browser manuell abnehmen, insbesondere Baum, Drag-and-drop, 3D-Hotspots und
   den Betriebssystem-Handler für `freecad-plm://`.

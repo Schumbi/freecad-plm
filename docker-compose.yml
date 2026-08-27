@@ -50,6 +50,18 @@ services:
       - static-data:/app/staticfiles
     ports:
       - "${PLM_HTTP_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 8000), 5).close()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
     depends_on:
       db:
         condition: service_healthy
@@ -103,6 +115,8 @@ services:
       - media-data:/app/storage
     depends_on:
       db:
+        condition: service_healthy
+      web:
         condition: service_healthy
 
 volumes:

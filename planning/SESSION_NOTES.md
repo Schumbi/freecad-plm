@@ -760,3 +760,36 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Migration `0018_annotation_viewer_position` ergänzt die dazu nötigen
   JSON-Felder.
 - Automatisierte Abnahme: 241 Server- und 163 Add-on-Tests erfolgreich.
+
+# 2026-08-27
+
+## Technische V1-Vorabnahme auf der lokalen Testinstanz
+
+- Server, Add-on und Wiki wurden gegen ihre Remotes abgeglichen; alle drei
+  Arbeitsbäume waren sauber und `main` lag jeweils exakt auf `origin/main`.
+- Aktueller automatisierter Stand: 245 Servertests und 168 Add-on-Tests
+  erfolgreich; `manage.py check` und `makemigrations --check --dry-run` sauber.
+- Die aktuellen Web- und Worker-Images wurden in
+  `/home/ralf/freecad-plm-testing` gezogen. Drei zentrale Dateien im laufenden
+  Webimage waren per SHA-256 identisch zum Server-Commit `db1523c`.
+- Der erste Start zeigte eine Race Condition: Der Worker griff vor Abschluss
+  der Web-Migrationen auf `Revision.file_format` zu. Beide Compose-Dateien
+  besitzen deshalb jetzt einen Web-Healthcheck; der Worker hängt zusätzlich von
+  `web: service_healthy` ab.
+- Die korrigierte Image-Compose-Datei wurde in die Testumgebung übernommen.
+  Beim erneuten Start wartete Compose nach der gesunden Datenbank auf den
+  gesunden Webdienst und startete erst danach den Worker; der Start blieb ohne
+  Traceback.
+- Der vollständige HTTP-Abruf von `/` folgte dem Redirect nach `/login/?next=/`
+  und lud die FreeCAD-PLM-Anmeldeseite mit HTTP 200.
+- FreeCADCmd 1.1.1 Revision 20260414 wurde im Worker bestätigt. Ein echter
+  FCStd-Analysejob sowie frische STEP-, STL-, 3MF- und PNG-Ableitungsjobs liefen
+  erfolgreich. Alle erzeugten Dateien wurden gegen gespeicherte Größe,
+  SHA-256 und ihr internes Dateiformat geprüft.
+- PostgreSQL und `storage/` wurden nach dem Ablauf aus
+  `planning/PRODUCTION_CHECKLIST.md` gesichert. Der Datenbank-Dump ließ sich in
+  eine temporäre Prüfdatenbank restaurieren; Projekt-, Teil-, Revisions-,
+  Artefakt- und Jobzahlen waren identisch. Die Prüfdatenbank wurde danach
+  entfernt, die Backup-Dateien blieben unter `/tmp` erhalten.
+- Die allgemeine Rollen-/Browser-Abnahme, die neuen UX-Prüfungen im echten
+  FreeCAD und der Zwei-Rechner-Slicer-Konflikt bleiben bewusst offen.

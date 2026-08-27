@@ -100,6 +100,10 @@ docker compose -f docker-compose.image.yml up -d
 
 `storage/` liegt neben der Compose-Datei und enthaelt hochgeladene Modelle, Revisionen und erzeugte Artefakte. `staticfiles/` enthaelt nur neu generierbare Django-Static-Dateien.
 
+Die verbindliche Reihenfolge fuer Update, Zustandspruefung, konsistentes Backup
+und Restore-Test steht in
+[`planning/PRODUCTION_CHECKLIST.md`](planning/PRODUCTION_CHECKLIST.md).
+
 Nach dem ersten Start:
 
 ```bash

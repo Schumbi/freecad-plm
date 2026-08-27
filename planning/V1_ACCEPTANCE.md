@@ -4,7 +4,7 @@
 
 Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierbare manuelle Abnahme. Sie dient als Nachweis, dass V1 im Alltag nutzbar ist — nicht nur in Tests und auf dem Papier.
 
-**Stand der Implementierung:** 2026-08-07 — die V1-Kriterien einschließlich primärer STEP/STL-Revisionen, vereinfachter Addon-Teilanlage und automatischer Slicer-Projekt-Synchronisation sind im Code umgesetzt. Der Slicer-Workflow ist auf einem Rechner manuell abgenommen; die allgemeine V1-Browser-Abnahme und der Zwei-Rechner-Slicer-Test bleiben getrennt nachvollziehbar offen.
+**Stand der Implementierung:** 2026-08-27 — die V1-Kriterien einschließlich primärer STEP/STL-Revisionen, vereinfachter Addon-Teilanlage, automatischer Slicer-Projekt-Synchronisation und der priorisierten UX-Verbesserungen sind im Code umgesetzt. Der Slicer-Workflow ist auf einem Rechner manuell abgenommen; die allgemeine V1-Browser-Abnahme und der Zwei-Rechner-Slicer-Test bleiben getrennt nachvollziehbar offen.
 
 ## Vorbereitung
 
@@ -68,6 +68,25 @@ Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierb
 | 3 | Haengengebliebene Jobs werden als fehlgeschlagen recovered | |
 | 4 | `docker compose pull && up -d` nach Image-Update | |
 | 5 | Logs ueber `docker compose logs web worker` auswertbar | |
+
+## Automatisierter Vorabcheck Testinstanz 2026-08-27
+
+Dieser Abschnitt ersetzt weder die Browser-Abnahme noch die Betriebsabnahme auf
+dem Zielserver. Er hält fest, welche technische Verarbeitungskette bereits mit
+den aktuellen Images in `/home/ralf/freecad-plm-testing` nachgewiesen wurde.
+
+| Prüfpunkt | Ergebnis |
+|-----------|----------|
+| Aktuelle Images gezogen; Webdateien per SHA-256 identisch zu Server-Commit `db1523c` | OK |
+| PostgreSQL 16.15 gesund; alle Migrationen bis `plm.0018` angewendet | OK |
+| Vollständiger HTTP-Abruf bis zur Login-Seite, HTTP 200 nach Redirect | OK |
+| Web-Healthcheck verhindert Worker-Start vor abgeschlossenen Migrationen | OK |
+| FreeCADCmd 1.1.1 Revision 20260414 im gehärteten Worker | OK |
+| Echter FCStd-Analysejob `65` | erfolgreich |
+| Frische STEP-/STL-/3MF-/PNG-Jobs `66` bis `69` | erfolgreich |
+| Artefakte gegen Größe, SHA-256 und internes Dateiformat geprüft | OK |
+| PostgreSQL-Custom-Dump und Storage-Archiv erstellt | OK |
+| Dump in temporäre Prüfdatenbank restauriert; Kernobjektzahlen identisch | OK |
 
 ## Addon-Slicer-Abnahme
 
