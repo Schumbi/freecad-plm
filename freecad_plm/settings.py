@@ -213,6 +213,7 @@ BAMBUDDY_URL = os.environ.get('BAMBUDDY_URL', '').strip().rstrip('/')
 BAMBUDDY_API_KEY = os.environ.get('BAMBUDDY_API_KEY', '').strip()
 BAMBUDDY_TIMEOUT_SECONDS = env_int('BAMBUDDY_TIMEOUT_SECONDS', 10)
 BAMBUDDY_SOURCE_SYNC_ENABLED = env_bool('BAMBUDDY_SOURCE_SYNC_ENABLED', False)
+PLM_PUBLIC_URL = os.environ.get('PLM_PUBLIC_URL', '').strip().rstrip('/')
 try:
     BAMBUDDY_SOURCE_SYNC_PRINTER_IDS = tuple(
         int(value.strip())

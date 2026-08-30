@@ -41,6 +41,7 @@ def integration_settings(request):
         "plm/integration_settings.html",
         {
             "bambuddy_url": settings.BAMBUDDY_URL,
+            "plm_public_url": settings.PLM_PUBLIC_URL,
             "bambuddy_api_key_configured": bool(settings.BAMBUDDY_API_KEY),
             "bambuddy_timeout_seconds": settings.BAMBUDDY_TIMEOUT_SECONDS,
             "bambuddy_source_sync_enabled": settings.BAMBUDDY_SOURCE_SYNC_ENABLED,

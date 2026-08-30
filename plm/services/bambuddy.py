@@ -1,6 +1,8 @@
 from dataclasses import asdict, dataclass
+from urllib.parse import urljoin, urlsplit
 
 from django.conf import settings
+from django.urls import reverse
 from django.utils import timezone
 
 from ..integrations.bambuddy import BambuddyClient, BambuddyProtocolError
@@ -13,7 +15,9 @@ class BambuddySourceSyncResult:
     eligible: int = 0
     matched: int = 0
     uploaded: int = 0
+    linked: int = 0
     already_attached: int = 0
+    already_linked: int = 0
     skipped_status: int = 0
     skipped_printer: int = 0
     unmatched: int = 0
@@ -26,6 +30,25 @@ class BambuddySourceSyncResult:
 def bambuddy_print_name(manufacturing_file):
     revision = manufacturing_file.revision
     return f"{revision.part.number}_{revision.revision_code}"
+
+
+def plm_revision_url(revision):
+    base_url = str(getattr(settings, "PLM_PUBLIC_URL", "") or "").strip()
+    parsed = urlsplit(base_url)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise BambuddyProtocolError(
+            "PLM_PUBLIC_URL muss als vollständige HTTP- oder HTTPS-URL "
+            "ohne Zugangsdaten, Query-String oder Fragment konfiguriert sein."
+        )
+    part_path = reverse("plm:part_detail", args=[revision.part_id]).lstrip("/")
+    return f"{urljoin(f'{base_url.rstrip('/')}/', part_path)}#revision-{revision.id}"
 
 
 def slicer_projects_by_print_name():
@@ -66,10 +89,8 @@ def sync_bambuddy_source_projects(
     result = BambuddySourceSyncResult(inspected=len(archives))
 
     for archive in archives:
-        if archive.get("source_3mf_path"):
-            result.already_attached += 1
-            continue
-        if str(archive.get("status") or "").lower() != "printing":
+        status = str(archive.get("status") or "").lower()
+        if status not in {"printing", "completed"}:
             result.skipped_status += 1
             continue
         try:
@@ -81,6 +102,17 @@ def sync_bambuddy_source_projects(
             ) from exc
         if printer_id not in printer_ids:
             result.skipped_printer += 1
+            continue
+
+        source_attached = bool(archive.get("source_3mf_path"))
+        revision_linked = bool(str(archive.get("external_url") or "").strip())
+        if source_attached:
+            result.already_attached += 1
+        if revision_linked:
+            result.already_linked += 1
+        needs_source = status == "printing" and not source_attached
+        needs_link = not revision_linked
+        if not needs_source and not needs_link:
             continue
 
         result.eligible += 1
@@ -98,53 +130,95 @@ def sync_bambuddy_source_projects(
         if dry_run:
             continue
 
-        # Bambuddys Upload-Endpunkt ersetzt eine vorhandene Source-Datei. Daher
-        # direkt vor dem Upload noch einmal das konkrete Archiv prüfen, um das
+        # Bambuddys Schreib-Endpunkte ersetzen vorhandene Werte. Daher direkt
+        # vor dem Schreiben noch einmal das konkrete Archiv prüfen, um das
         # Zeitfenster zwischen Listenabfrage und Schreibzugriff klein zu halten.
         current_archive = client.get_archive(archive_id)
-        if current_archive.get("source_3mf_path"):
-            result.already_attached += 1
-            continue
-        if str(current_archive.get("status") or "").lower() != "printing":
+        current_status = str(current_archive.get("status") or "").lower()
+        if current_status not in {"printing", "completed"}:
             result.skipped_status += 1
             continue
 
-        with project.file.open("rb") as source_file:
-            response = client.upload_source_3mf(
-                archive_id,
-                source_file,
-                project.original_filename,
+        current_external_url = str(current_archive.get("external_url") or "").strip()
+        if current_external_url:
+            if not revision_linked:
+                result.already_linked += 1
+        else:
+            revision_url = plm_revision_url(project.revision)
+            client.update_archive_external_url(archive_id, revision_url)
+            link_history = list(
+                (project.metadata or {}).get("bambuddy_revision_links", [])
             )
+            link_history.append(
+                {
+                    "archive_id": archive_id,
+                    "printer_id": printer_id,
+                    "print_name": print_name,
+                    "revision_url": revision_url,
+                    "linked_at": timezone.now().isoformat(),
+                }
+            )
+            project.metadata = {
+                **(project.metadata or {}),
+                "bambuddy_revision_links": link_history[-100:],
+            }
+            project.save(update_fields=["metadata", "updated_at"])
+            AuditEvent.objects.create(
+                actor=project.uploaded_by,
+                action=AuditEvent.Action.BAMBUDDY_REVISION_LINKED,
+                object_repr=str(project),
+                metadata={
+                    "manufacturing_file_id": project.id,
+                    "revision_id": project.revision_id,
+                    "bambuddy_archive_id": archive_id,
+                    "bambuddy_printer_id": printer_id,
+                    "print_name": print_name,
+                    "revision_url": revision_url,
+                },
+            )
+            result.linked += 1
 
-        history = list(project.metadata.get("bambuddy_source_archives", []))
-        history.append(
-            {
+        current_source_path = current_archive.get("source_3mf_path")
+        if current_source_path:
+            if not source_attached:
+                result.already_attached += 1
+        elif current_status == "printing":
+            with project.file.open("rb") as source_file:
+                response = client.upload_source_3mf(
+                    archive_id,
+                    source_file,
+                    project.original_filename,
+                )
+
+            history = list(
+                (project.metadata or {}).get("bambuddy_source_archives", [])
+            )
+            history.append({
                 "archive_id": archive_id,
                 "printer_id": printer_id,
                 "print_name": print_name,
                 "source_sha256": project.sha256,
                 "attached_at": timezone.now().isoformat(),
+            })
+            project.metadata = {
+                **(project.metadata or {}),
+                "bambuddy_source_archives": history[-100:],
             }
-        )
-        project.metadata = {
-            **project.metadata,
-            "bambuddy_source_archives": history[-100:],
-        }
-        project.save(update_fields=["metadata", "updated_at"])
-        AuditEvent.objects.create(
-            actor=project.uploaded_by,
-            action=AuditEvent.Action.BAMBUDDY_SOURCE_ATTACHED,
-            object_repr=str(project),
-            metadata={
-                "manufacturing_file_id": project.id,
-                "revision_id": project.revision_id,
-                "bambuddy_archive_id": archive_id,
-                "bambuddy_printer_id": printer_id,
-                "print_name": print_name,
-                "sha256": project.sha256,
-                "source_3mf_path": response.get("source_3mf_path", ""),
-            },
-        )
-        result.uploaded += 1
+            project.save(update_fields=["metadata", "updated_at"])
+            AuditEvent.objects.create(
+                actor=project.uploaded_by,
+                action=AuditEvent.Action.BAMBUDDY_SOURCE_ATTACHED,
+                object_repr=str(project),
+                metadata={
+                    "manufacturing_file_id": project.id,
+                    "revision_id": project.revision_id,
+                    "bambuddy_archive_id": archive_id,
+                    "bambuddy_printer_id": printer_id,
+                    "print_name": print_name,
+                    "sha256": project.sha256,
+                    "source_3mf_path": response.get("source_3mf_path", ""),
+                },
+            )
+            result.uploaded += 1
 
     return result

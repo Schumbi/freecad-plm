@@ -6,7 +6,7 @@ from plm.services.bambuddy import sync_bambuddy_source_projects
 
 
 class Command(BaseCommand):
-    help = "Hängt PLM-Slicerprojekte an laufende Bambuddy-Druckarchive an."
+    help = "Verknüpft Bambuddy-Druckarchive mit PLM-Revision und Source-3MF."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -18,7 +18,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Zuordnungen prüfen, ohne Dateien hochzuladen.",
+            help="Zuordnungen prüfen, ohne Bambuddy oder PLM-Metadaten zu ändern.",
         )
 
     def handle(self, *args, **options):
@@ -38,6 +38,7 @@ class Command(BaseCommand):
                 f"Bambuddy-{mode}: {result.inspected} geprüft, "
                 f"{result.matched} eindeutig zugeordnet, "
                 f"{result.uploaded} hochgeladen, "
+                f"{result.linked} verlinkt, "
                 f"{result.unmatched} ohne PLM-Treffer, "
                 f"{result.ambiguous} mehrdeutig."
             )

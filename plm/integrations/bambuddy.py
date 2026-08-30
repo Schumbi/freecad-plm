@@ -187,6 +187,33 @@ class BambuddyClient:
             )
         return set(permissions)
 
+    def update_archive_external_url(self, archive_id, external_url):
+        external_url = str(external_url or "").strip()
+        parsed = urlsplit(external_url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+            or len(external_url) > 2048
+        ):
+            raise BambuddyProtocolError(
+                "Der externe PLM-Link ist keine gültige HTTP- oder HTTPS-URL."
+            )
+
+        payload = self.request_json(
+            f"archives/{int(archive_id)}",
+            method="PATCH",
+            data=json.dumps({"external_url": external_url}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            required_permission="„Read Status“ und „Manage Archives“",
+        )
+        if not isinstance(payload, dict) or payload.get("external_url") != external_url:
+            raise BambuddyProtocolError(
+                "Bambuddy bestätigte den externen PLM-Link nicht."
+            )
+        return payload
+
     def upload_source_3mf(self, archive_id, source_file, filename):
         safe_filename = PurePath(str(filename or "")).name
         if not safe_filename.lower().endswith(".3mf"):

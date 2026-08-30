@@ -24,7 +24,7 @@
     <div class="section-header">
       <div>
         <h2>Bambuddy</h2>
-        <p class="muted">Druckarchive übernehmen und PLM-Slicerprojekte automatisch als Source-3MF anhängen.</p>
+        <p class="muted">PLM-Slicerprojekte automatisch als Source-3MF anhängen und Druckarchive mit der konkreten PLM-Revision verlinken.</p>
       </div>
       {% if bambuddy_configured %}
         <span class="status-badge status-released">Konfiguriert</span>
@@ -35,6 +35,7 @@
 
     <dl class="manufacturing-detail-grid">
       <div><dt>Server-URL</dt><dd>{{ bambuddy_url|default:"–" }}</dd></div>
+      <div><dt>Öffentliche PLM-URL</dt><dd>{{ plm_public_url|default:"–" }}</dd></div>
       <div><dt>API-Key</dt><dd>{% if bambuddy_api_key_configured %}Gesetzt (Wert verborgen){% else %}Nicht gesetzt{% endif %}</dd></div>
       <div><dt>Zeitlimit</dt><dd>{{ bambuddy_timeout_seconds }} Sekunden</dd></div>
       <div><dt>Source-Sync</dt><dd>{% if bambuddy_source_sync_enabled %}Aktiv{% else %}Inaktiv{% endif %}</dd></div>
@@ -49,7 +50,8 @@
 BAMBUDDY_API_KEY=bb_...
 BAMBUDDY_TIMEOUT_SECONDS=10
 BAMBUDDY_SOURCE_SYNC_ENABLED=1
-BAMBUDDY_SOURCE_SYNC_PRINTER_IDS=1</code></pre>
+BAMBUDDY_SOURCE_SYNC_PRINTER_IDS=1
+PLM_PUBLIC_URL=https://plm.example.local</code></pre>
       <p class="muted">Nach einer Änderung müssen Web- und Worker-Container neu erstellt werden.</p>
     </div>
 
@@ -57,7 +59,7 @@ BAMBUDDY_SOURCE_SYNC_PRINTER_IDS=1</code></pre>
       <div class="message mt-4"><span>{{ connection_result }}</span></div>
     {% endif %}
     {% if source_write_authorized is True %}
-      <div class="message mt-4"><span>Source-3MF-Upload ist berechtigt.</span></div>
+      <div class="message mt-4"><span>Source-3MF-Upload und Revisionslink sind berechtigt.</span></div>
     {% elif source_write_authorized is False %}
       <div class="form-errors mt-4">Dem API-Key fehlt „Manage Archives“ (<code>archives:update_all</code>).</div>
     {% endif %}

@@ -22,8 +22,6 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Als Naechstes
 
-- Produktiven Bambuddy-Key um `Manage Archives` ergänzen, den Source-3MF-Sync
-  für Drucker-ID 1 aktivieren und am A1-Druckarchiv verifizieren.
 - Danach Phase B aus `planning/BAMBUDDY_INTEGRATION_PLAN.md` als lesenden
   Archiveingang ohne automatische Zuordnung umsetzen.
 - Nach erfolgreicher Abnahme: Git-Tag `v1.0.0` und kurze Release-Notiz.
@@ -38,6 +36,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 - Bambuddy-Verbindung mit produktivem Read-only-Key geprüft und sicheren,
   exakten Source-3MF-Upload an laufende Druckarchive implementiert.
+- Bambuddy-Druckarchive erhalten bei eindeutiger Zuordnung einen externen Link
+  auf die konkrete PLM-Revision; vorhandene Links bleiben erhalten.
 
 - Add-on auf einen lazy geladenen Projekt-/Teile-/Revisionsbaum mit direkten
   Checkout-Markierungen und kontextabhängiger Arbeitsleiste umgestellt.

@@ -45,6 +45,7 @@ In `.env` mindestens setzen:
 DJANGO_SECRET_KEY=replace-with-a-long-random-secret
 DJANGO_ALLOWED_HOSTS=plm.example.local,localhost,127.0.0.1
 DJANGO_CSRF_TRUSTED_ORIGINS=https://plm.example.local
+PLM_PUBLIC_URL=https://plm.example.local
 DJANGO_SECURE_SSL_REDIRECT=0
 DJANGO_SECURE_HSTS_SECONDS=0
 DJANGO_SESSION_COOKIE_SECURE=1
@@ -79,10 +80,15 @@ Das Runtime-Image enthaelt den User `plm` mit UID/GID `1000:1000`. `PLM_USER` so
 Die `PLM_MAX_*`-Werte begrenzen FCStd-, STEP-/STL-, Projekt-ZIP- und 3MF-Uploads gegen sehr große Dateien und ZIP-Bomben. Die Defaults sind für ein LAN-Team konservativ und können bei Bedarf höher gesetzt werden.
 
 Für lesende Bambuddy-Abfragen genügt ein eigener API-Key mit `Read Status`.
-Der automatische Source-3MF-Sync benötigt zusätzlich `Manage Archives` sowie
+Der automatische Source-3MF- und Revisionslink-Sync benötigt zusätzlich
+`Manage Archives` sowie
 eine explizite Drucker-ID, beispielsweise
 `BAMBUDDY_SOURCE_SYNC_PRINTER_IDS=1`. Der Key bleibt in der Laufzeitumgebung
 und wird weder in der Datenbank noch im Browser ausgegeben.
+`PLM_PUBLIC_URL` ist die von Bambuddy aus erreichbare Browser-Basisadresse des
+PLM. Der Worker setzt daraus bei laufenden und abgeschlossenen Drucken einen
+Link direkt auf die eindeutig erkannte Revision; bereits vorhandene externe
+Links werden nicht überschrieben.
 `BAMBUDDY_TIMEOUT_SECONDS` darf zwischen 1 und 60 Sekunden liegen. Unter
 `Verwaltung -> Integrationen` zeigt der Verbindungstest auch, ob der Key den
 Source-Upload ausführen darf.

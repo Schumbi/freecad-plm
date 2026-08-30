@@ -9,8 +9,8 @@ keine automatische, möglicherweise falsche Verknüpfung erzeugen.
 
 ## Verifizierter API-Vertrag
 
-Bambuddy stellt eine HTTP-API unter `/api/v1` bereit. Für den ersten Ausbau
-werden nur lesende Aufrufe benötigt:
+Bambuddy stellt eine HTTP-API unter `/api/v1` bereit. Der aktuelle Ausbau
+verwendet diese Aufrufe:
 
 - `GET /api/v1/archives/` listet Archive. Bambuddy-Versionen liefern dabei
   entweder eine direkte JSON-Liste oder ein Objekt mit `archives` und `total`;
@@ -21,9 +21,12 @@ werden nur lesende Aufrufe benötigt:
 - `POST /api/v1/archives/{id}/source` hängt die ursprüngliche Slicer-3MF als
   Source-Datei an ein konkretes Archiv. Dieser Weg vermeidet die unscharfe
   Namenssuche von `/api/v1/archives/upload-source`.
+- `PATCH /api/v1/archives/{id}` setzt unter anderem `external_url`. Der
+  PLM-Worker verwendet diesen Endpunkt für einen Link auf die konkrete
+  Revisionskarte.
 - Die Authentifizierung erfolgt über den Header `X-API-Key`.
-- Für lesende Aufrufe genügt `Read Status`; der Source-Upload benötigt
-  zusätzlich `Manage Archives` und effektiv `archives:update_all`.
+- Für lesende Aufrufe genügt `Read Status`; Source-Upload und Revisionslink
+  benötigen zusätzlich `Manage Archives` und effektiv `archives:update_all`.
 
 ## Sicherheit und Konfiguration
 
@@ -44,6 +47,7 @@ BAMBUDDY_API_KEY=bb_...
 BAMBUDDY_TIMEOUT_SECONDS=10
 BAMBUDDY_SOURCE_SYNC_ENABLED=1
 BAMBUDDY_SOURCE_SYNC_PRINTER_IDS=1
+PLM_PUBLIC_URL=https://plm.example.local
 ```
 
 Unter `Verwaltung -> Integrationen` kann ein Admin die wirksame Konfiguration
@@ -59,7 +63,7 @@ angezeigt.
 - [x] Admin-Seite mit Konfigurationsstatus und Verbindungstest.
 - [x] Client und View automatisiert testen.
 
-### Phase A2: PLM-Slicerprojekt an laufenden Druck hängen
+### Phase A2: PLM-Slicerprojekt und Revision mit Druckarchiv verknüpfen
 
 - [x] Laufende Bambuddy-Archive des explizit konfigurierten Druckers lesen.
 - [x] Ausschließlich den exakten Namen `<Teilnummer>_<Revisionscode>`
@@ -67,8 +71,11 @@ angezeigt.
 - [x] Die aktuelle `slicer_project_3mf` per konkreter Archiv-ID als Source-3MF
   hochladen; vorhandene Source-Dateien niemals automatisch überschreiben.
 - [x] Upload in PLM-Metadaten und Audit-Trail protokollieren.
+- [x] Laufende und abgeschlossene Archive direkt mit der konkreten
+  PLM-Revision verlinken; vorhandene externe Links nicht überschreiben.
+- [x] Revisionslink in PLM-Metadaten und Audit-Trail protokollieren.
 - [x] Worker-Kommando mit Dry-Run und standardmäßig deaktivierter Automatik.
-- [ ] Produktiven API-Key um `Manage Archives` ergänzen, Sync für Drucker-ID 1
+- [x] Produktiven API-Key um `Manage Archives` ergänzen, Sync für Drucker-ID 1
   aktivieren und den laufenden A1-Druck verifizieren.
 
 ### Phase B: Archiveingang
@@ -107,6 +114,6 @@ angezeigt.
 
 ## Nächster Schritt
 
-Nach der produktiven Abnahme des Source-Syncs folgt Phase B zunächst als
+Nach der produktiven Abnahme des Source- und Link-Syncs folgt Phase B zunächst als
 Metadatenimport. Die eingehende Zuordnung bleibt unabhängig vom sicheren,
 exakten Source-Upload und darf weiterhin keine unscharfen Treffer übernehmen.

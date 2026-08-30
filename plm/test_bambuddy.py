@@ -20,7 +20,7 @@ from .integrations.bambuddy import (
 )
 from .models import AuditEvent, ManufacturingFile, Part, Project, Revision
 from .permissions import ROLE_ADMIN, ROLE_READER
-from .services.bambuddy import sync_bambuddy_source_projects
+from .services.bambuddy import plm_revision_url, sync_bambuddy_source_projects
 
 
 class FakeResponse:
@@ -221,7 +221,54 @@ class BambuddyClientTests(SimpleTestCase):
         self.assertIn(b"PK\x03\x04source-3mf", request.data)
         self.assertEqual(kwargs["timeout"], 9)
 
+    def test_updates_archive_external_url_with_patch(self):
+        requests = []
+        external_url = "https://plm.example/parts/3/#revision-9"
 
+        def opener(request, **kwargs):
+            requests.append((request, kwargs))
+            return FakeResponse(
+                json.dumps({"id": 24, "external_url": external_url}).encode()
+            )
+
+        client = BambuddyClient(
+            "https://bambuddy.example",
+            "bb_secret",
+            timeout_seconds=9,
+            opener=opener,
+        )
+
+        result = client.update_archive_external_url(24, external_url)
+
+        self.assertEqual(result["external_url"], external_url)
+        request, kwargs = requests[0]
+        self.assertEqual(
+            request.full_url,
+            "https://bambuddy.example/api/v1/archives/24",
+        )
+        self.assertEqual(request.method, "PATCH")
+        self.assertEqual(request.get_header("Content-type"), "application/json")
+        self.assertEqual(
+            json.loads(request.data),
+            {"external_url": external_url},
+        )
+        self.assertEqual(kwargs["timeout"], 9)
+
+    def test_rejects_invalid_external_url_before_request(self):
+        opener = Mock()
+        client = BambuddyClient(
+            "https://bambuddy.example",
+            "bb_secret",
+            opener=opener,
+        )
+
+        with self.assertRaises(BambuddyProtocolError):
+            client.update_archive_external_url(24, "javascript:alert(1)")
+
+        opener.assert_not_called()
+
+
+@override_settings(PLM_PUBLIC_URL="https://plm.example")
 class BambuddySourceSyncTests(TestCase):
     def setUp(self):
         self.media_root = tempfile.TemporaryDirectory()
@@ -259,12 +306,20 @@ class BambuddySourceSyncTests(TestCase):
             uploaded_by=self.user,
         )
 
+    @override_settings(PLM_PUBLIC_URL="")
+    def test_revision_link_requires_public_plm_url(self):
+        slicer_project = self.make_slicer_project()
+
+        with self.assertRaisesMessage(BambuddyProtocolError, "PLM_PUBLIC_URL"):
+            plm_revision_url(slicer_project.revision)
+
     def test_uploads_exact_matching_source_to_running_archive(self):
         slicer_project = self.make_slicer_project()
 
         class FakeClient:
             def __init__(self):
                 self.uploads = []
+                self.links = []
 
             def list_archives(self, limit):
                 self.limit = limit
@@ -275,8 +330,13 @@ class BambuddySourceSyncTests(TestCase):
                         "print_name": "A-001_R0007",
                         "status": "printing",
                         "source_3mf_path": None,
+                        "external_url": None,
                     }
                 ]
+
+            def update_archive_external_url(self, archive_id, external_url):
+                self.links.append((archive_id, external_url))
+                return {"id": archive_id, "external_url": external_url}
 
             def upload_source_3mf(self, archive_id, source_file, filename):
                 self.uploads.append((archive_id, source_file.read(), filename))
@@ -290,6 +350,7 @@ class BambuddySourceSyncTests(TestCase):
                     "id": archive_id,
                     "status": "printing",
                     "source_3mf_path": None,
+                    "external_url": None,
                 }
 
         client = FakeClient()
@@ -302,11 +363,17 @@ class BambuddySourceSyncTests(TestCase):
         self.assertEqual(result.inspected, 1)
         self.assertEqual(result.matched, 1)
         self.assertEqual(result.uploaded, 1)
+        self.assertEqual(result.linked, 1)
         self.assertEqual(client.limit, 7)
         self.assertEqual(
             client.uploads,
             [(24, b"PK\x03\x04source", "A-001_R0007.3mf")],
         )
+        expected_url = (
+            f"https://plm.example/parts/{slicer_project.revision.part_id}/"
+            f"#revision-{slicer_project.revision_id}"
+        )
+        self.assertEqual(client.links, [(24, expected_url)])
         slicer_project.refresh_from_db()
         history = slicer_project.metadata["bambuddy_source_archives"]
         self.assertEqual(history[0]["archive_id"], 24)
@@ -315,6 +382,10 @@ class BambuddySourceSyncTests(TestCase):
             action=AuditEvent.Action.BAMBUDDY_SOURCE_ATTACHED
         )
         self.assertEqual(event.metadata["bambuddy_archive_id"], 24)
+        link_event = AuditEvent.objects.get(
+            action=AuditEvent.Action.BAMBUDDY_REVISION_LINKED
+        )
+        self.assertEqual(link_event.metadata["revision_url"], expected_url)
 
     def test_dry_run_does_not_upload_or_change_metadata(self):
         slicer_project = self.make_slicer_project()
@@ -326,6 +397,7 @@ class BambuddySourceSyncTests(TestCase):
                 "print_name": "A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
+                "external_url": None,
             }
         ]
 
@@ -337,7 +409,9 @@ class BambuddySourceSyncTests(TestCase):
 
         self.assertEqual(result.matched, 1)
         self.assertEqual(result.uploaded, 0)
+        self.assertEqual(result.linked, 0)
         client.upload_source_3mf.assert_not_called()
+        client.update_archive_external_url.assert_not_called()
         slicer_project.refresh_from_db()
         self.assertNotIn("bambuddy_source_archives", slicer_project.metadata)
 
@@ -351,12 +425,14 @@ class BambuddySourceSyncTests(TestCase):
                 "print_name": "A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
+                "external_url": None,
             }
         ]
         client.get_archive.return_value = {
             "id": 24,
             "status": "printing",
             "source_3mf_path": "archive/24/source/manual.3mf",
+            "external_url": "https://example.invalid/manual-link",
         }
 
         result = sync_bambuddy_source_projects(client=client, printer_ids=[1])
@@ -365,6 +441,63 @@ class BambuddySourceSyncTests(TestCase):
         self.assertEqual(result.already_attached, 1)
         self.assertEqual(result.uploaded, 0)
         client.upload_source_3mf.assert_not_called()
+
+    def test_links_completed_archive_with_existing_source(self):
+        slicer_project = self.make_slicer_project()
+        client = Mock()
+        client.list_archives.return_value = [
+            {
+                "id": 24,
+                "printer_id": 1,
+                "print_name": "A-001_R0007",
+                "status": "completed",
+                "source_3mf_path": "archive/24/source/A-001_R0007.3mf",
+                "external_url": None,
+            }
+        ]
+        client.get_archive.return_value = client.list_archives.return_value[0]
+
+        result = sync_bambuddy_source_projects(client=client, printer_ids=[1])
+
+        expected_url = (
+            f"https://plm.example/parts/{slicer_project.revision.part_id}/"
+            f"#revision-{slicer_project.revision_id}"
+        )
+        self.assertEqual(result.linked, 1)
+        self.assertEqual(result.uploaded, 0)
+        client.update_archive_external_url.assert_called_once_with(24, expected_url)
+        client.upload_source_3mf.assert_not_called()
+        slicer_project.refresh_from_db()
+        self.assertEqual(
+            slicer_project.metadata["bambuddy_revision_links"][0]["revision_url"],
+            expected_url,
+        )
+
+    def test_preserves_existing_external_url_while_uploading_source(self):
+        self.make_slicer_project()
+        existing_url = "https://example.invalid/manually-curated"
+        client = Mock()
+        archive = {
+            "id": 24,
+            "printer_id": 1,
+            "print_name": "A-001_R0007",
+            "status": "printing",
+            "source_3mf_path": None,
+            "external_url": existing_url,
+        }
+        client.list_archives.return_value = [archive]
+        client.get_archive.return_value = archive
+        client.upload_source_3mf.return_value = {
+            "status": "uploaded",
+            "source_3mf_path": "archive/24/source/A-001_R0007.3mf",
+        }
+
+        result = sync_bambuddy_source_projects(client=client, printer_ids=[1])
+
+        self.assertEqual(result.already_linked, 1)
+        self.assertEqual(result.linked, 0)
+        self.assertEqual(result.uploaded, 1)
+        client.update_archive_external_url.assert_not_called()
 
     def test_ambiguous_part_and_revision_name_is_not_uploaded(self):
         self.make_slicer_project(project_code="P7")
@@ -377,6 +510,7 @@ class BambuddySourceSyncTests(TestCase):
                 "print_name": "A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
+                "external_url": None,
             }
         ]
 
@@ -386,7 +520,7 @@ class BambuddySourceSyncTests(TestCase):
         self.assertEqual(result.uploaded, 0)
         client.upload_source_3mf.assert_not_called()
 
-    def test_skips_other_printers_non_running_and_attached_archives(self):
+    def test_skips_other_printers_and_already_synchronized_archives(self):
         self.make_slicer_project()
         client = Mock()
         client.list_archives.return_value = [
@@ -396,6 +530,7 @@ class BambuddySourceSyncTests(TestCase):
                 "print_name": "A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
+                "external_url": None,
             },
             {
                 "id": 2,
@@ -403,6 +538,7 @@ class BambuddySourceSyncTests(TestCase):
                 "print_name": "A-001_R0007",
                 "status": "completed",
                 "source_3mf_path": None,
+                "external_url": "https://plm.example/parts/1/#revision-1",
             },
             {
                 "id": 3,
@@ -410,15 +546,18 @@ class BambuddySourceSyncTests(TestCase):
                 "print_name": "A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": "archive/3/source/project.3mf",
+                "external_url": "https://plm.example/parts/1/#revision-1",
             },
         ]
 
         result = sync_bambuddy_source_projects(client=client, printer_ids=[1])
 
         self.assertEqual(result.skipped_printer, 1)
-        self.assertEqual(result.skipped_status, 1)
+        self.assertEqual(result.skipped_status, 0)
         self.assertEqual(result.already_attached, 1)
+        self.assertEqual(result.already_linked, 2)
         client.upload_source_3mf.assert_not_called()
+        client.update_archive_external_url.assert_not_called()
 
 
 class BambuddyIntegrationViewTests(TestCase):
@@ -440,6 +579,7 @@ class BambuddyIntegrationViewTests(TestCase):
         BAMBUDDY_URL="http://bambuddy.example:8000",
         BAMBUDDY_API_KEY="bb_hidden_secret",
         BAMBUDDY_TIMEOUT_SECONDS=10,
+        PLM_PUBLIC_URL="https://plm.example",
     )
     def test_admin_sees_configuration_without_api_key_value(self):
         self.client.force_login(self.admin)
@@ -448,6 +588,7 @@ class BambuddyIntegrationViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "http://bambuddy.example:8000")
+        self.assertContains(response, "https://plm.example")
         self.assertContains(response, "Gesetzt (Wert verborgen)")
         self.assertNotContains(response, "bb_hidden_secret")
 
@@ -479,7 +620,7 @@ class BambuddyIntegrationViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Verbindung erfolgreich")
         self.assertContains(response, "23 Archiv(e)")
-        self.assertContains(response, "Source-3MF-Upload ist berechtigt")
+        self.assertContains(response, "Source-3MF-Upload und Revisionslink sind berechtigt")
 
     @override_settings(
         BAMBUDDY_URL="http://bambuddy.example:8000",
