@@ -793,3 +793,20 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
   entfernt, die Backup-Dateien blieben unter `/tmp` erhalten.
 - Die allgemeine Rollen-/Browser-Abnahme, die neuen UX-Prüfungen im echten
   FreeCAD und der Zwei-Rechner-Slicer-Konflikt bleiben bewusst offen.
+
+# 2026-08-30
+
+## Leere Slicer-Projekte bei Baugruppen verhindert
+
+- Beim erstmaligen Öffnen einer Baugruppenrevision im Slicer hatte das Add-on
+  nur die Root-FCStd heruntergeladen. Externe FCStd-Abhängigkeiten fehlten;
+  FreeCAD erzeugte dadurch eine syntaktisch gültige, aber geometrisch leere
+  3MF-Datei.
+- Der Export lädt nun das vollständige, revisionsgenaue Manifest mit Root-Datei
+  und allen Abhängigkeiten in derselben Verzeichnisstruktur.
+- Add-on und Server prüfen 3MF-Slicer-Projekte auf mindestens ein
+  Geometriedreieck. Bereits synchronisierte leere Projekte werden beim Öffnen
+  erkannt, aus dem CAD-Manifest neu aufgebaut und anschließend aktualisiert.
+- Ein echter Test mit FreeCAD 1.1.3 exportierte eine Root-Baugruppe mit externer
+  FCStd-Abhängigkeit erfolgreich als 3MF mit 12 Dreiecken.
+- Automatisierte Abnahme: 246 Server- und 170 Add-on-Tests erfolgreich.

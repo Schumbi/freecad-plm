@@ -178,9 +178,27 @@ class UploadWithoutReportedSize(BytesIO):
         self.seek(0)
 
 
+MINIMAL_3MF_MODEL = """<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" unit="millimeter">
+  <resources>
+    <object id="1" type="model">
+      <mesh>
+        <vertices>
+          <vertex x="0" y="0" z="0" />
+          <vertex x="1" y="0" z="0" />
+          <vertex x="0" y="1" z="0" />
+        </vertices>
+        <triangles><triangle v1="0" v2="1" v3="2" /></triangles>
+      </mesh>
+    </object>
+  </resources>
+  <build><item objectid="1" /></build>
+</model>"""
+
+
 def make_3mf_upload(name="plate.3mf", members=None):
     members = members or {
-        "3D/3dmodel.model": "<model unit=\"millimeter\"></model>",
+        "3D/3dmodel.model": MINIMAL_3MF_MODEL,
         "Metadata/project_settings.config": """
             printer_model = Bambu Lab X1C
             print_settings_id = 0.20mm Standard @BBL X1C
@@ -4148,7 +4166,9 @@ class AddonApiWorkflowTests(TestCase):
         second_upload = make_3mf_upload(
             "Part_R0001.3mf",
             members={
-                "3D/3dmodel.model": "<model unit=\"millimeter\"><resources /></model>",
+                "3D/3dmodel.model": MINIMAL_3MF_MODEL.replace(
+                    'vertex x="1"', 'vertex x="2"'
+                ),
                 "Metadata/project_settings.config": "layer_height = 0.12",
             },
         )
@@ -4182,7 +4202,9 @@ class AddonApiWorkflowTests(TestCase):
             b"".join(download.streaming_content), make_3mf_upload(
                 "Part_R0001.3mf",
                 members={
-                    "3D/3dmodel.model": "<model unit=\"millimeter\"><resources /></model>",
+                    "3D/3dmodel.model": MINIMAL_3MF_MODEL.replace(
+                        'vertex x="1"', 'vertex x="2"'
+                    ),
                     "Metadata/project_settings.config": "layer_height = 0.12",
                 },
             ).read(),
@@ -4203,7 +4225,11 @@ class AddonApiWorkflowTests(TestCase):
             reverse("plm:api_revision_slicer_project", args=[revision.id]),
             {
                 "file": make_3mf_upload(
-                    members={"3D/3dmodel.model": "<model><resources /></model>"}
+                    members={
+                        "3D/3dmodel.model": MINIMAL_3MF_MODEL.replace(
+                            'vertex x="1"', 'vertex x="3"'
+                        )
+                    }
                 ),
                 "base_sha256": "0" * 64,
             },
@@ -4212,6 +4238,30 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 409)
         project.refresh_from_db()
         self.assertNotEqual(project.sha256, "0" * 64)
+
+    def test_api_rejects_geometryless_slicer_project(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.WRITE])
+        revision = create_revision_from_upload(
+            self.part, make_zip_upload("Part.FCStd"), self.user
+        )
+
+        response = self.client.post(
+            reverse("plm:api_revision_slicer_project", args=[revision.id]),
+            {
+                "file": make_3mf_upload(
+                    members={
+                        "3D/3dmodel.model": (
+                            '<model xmlns="http://schemas.microsoft.com/'
+                            '3dmanufacturing/core/2015/02"><resources /></model>'
+                        )
+                    }
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Geometriedreieck", response.json()["error"])
+        self.assertFalse(revision.manufacturing_files.exists())
 
     def test_api_slicer_project_requires_write_scope_and_editor_role(self):
         revision = create_revision_from_upload(

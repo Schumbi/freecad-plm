@@ -302,6 +302,40 @@ def select_3mf_thumbnail_name(names):
     return sorted(candidates, key=thumbnail_candidate_score)[0]
 
 
+def inspect_3mf_geometry(archive, names):
+    counts = {
+        "model_files": 0,
+        "objects": 0,
+        "vertices": 0,
+        "triangles": 0,
+        "components": 0,
+        "build_items": 0,
+    }
+    for name in names:
+        if PurePosixPath(name).suffix.lower() != ".model":
+            continue
+        counts["model_files"] += 1
+        try:
+            root = ElementTree.fromstring(archive.read(name))
+        except ElementTree.ParseError as exc:
+            raise ValidationError(
+                f"Die 3MF-Modelldatei ist ungültig: {name}."
+            ) from exc
+        for node in root.iter():
+            local_name = str(node.tag).rsplit("}", 1)[-1]
+            if local_name == "object":
+                counts["objects"] += 1
+            elif local_name == "vertex":
+                counts["vertices"] += 1
+            elif local_name == "triangle":
+                counts["triangles"] += 1
+            elif local_name == "component":
+                counts["components"] += 1
+            elif local_name == "item":
+                counts["build_items"] += 1
+    return counts
+
+
 def inspect_manufacturing_upload(uploaded_file):
     original_filename = PurePosixPath(uploaded_file.name).name
     suffix = PurePosixPath(original_filename).suffix.lower()
@@ -355,6 +389,7 @@ def inspect_manufacturing_upload(uploaded_file):
                     {"name": name, "size": archive.getinfo(name).file_size}
                     for name in names[:200]
                 ]
+                metadata["geometry"] = inspect_3mf_geometry(archive, names)
                 metadata["has_thumbnail"] = any(
                     "thumbnail" in name.lower() for name in names
                 )
@@ -522,6 +557,10 @@ def sync_slicer_project_from_upload(
     info = inspect_manufacturing_upload(uploaded_file)
     if PurePosixPath(info["original_filename"]).suffix.lower() != ".3mf":
         raise ValidationError("Ein Slicer-Projekt muss eine 3MF-Datei sein.")
+    if info["metadata"].get("geometry", {}).get("triangles", 0) < 1:
+        raise ValidationError(
+            "Ein Slicer-Projekt muss mindestens ein Geometriedreieck enthalten."
+        )
 
     existing = (
         ManufacturingFile.objects.select_for_update()
