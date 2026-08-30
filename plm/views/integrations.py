@@ -16,10 +16,14 @@ def integration_settings(request):
 
     connection_result = None
     connection_error = ""
+    source_write_authorized = None
     configured = bool(settings.BAMBUDDY_URL and settings.BAMBUDDY_API_KEY)
     if request.method == "POST":
         try:
-            info = BambuddyClient.from_settings().test_connection()
+            client = BambuddyClient.from_settings()
+            info = client.test_connection()
+            permissions = client.get_effective_permissions()
+            source_write_authorized = "archives:update_all" in permissions
             archive_count = (
                 str(info.total_archives)
                 if info.total_archives is not None
@@ -39,9 +43,14 @@ def integration_settings(request):
             "bambuddy_url": settings.BAMBUDDY_URL,
             "bambuddy_api_key_configured": bool(settings.BAMBUDDY_API_KEY),
             "bambuddy_timeout_seconds": settings.BAMBUDDY_TIMEOUT_SECONDS,
+            "bambuddy_source_sync_enabled": settings.BAMBUDDY_SOURCE_SYNC_ENABLED,
+            "bambuddy_source_sync_printer_ids": ", ".join(
+                str(value) for value in settings.BAMBUDDY_SOURCE_SYNC_PRINTER_IDS
+            ),
             "bambuddy_configured": configured,
             "connection_result": connection_result,
             "connection_error": connection_error,
+            "source_write_authorized": source_write_authorized,
         },
         status=502 if connection_error else 200,
     )

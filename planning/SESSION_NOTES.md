@@ -810,3 +810,20 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Ein echter Test mit FreeCAD 1.1.3 exportierte eine Root-Baugruppe mit externer
   FCStd-Abhängigkeit erfolgreich als 3MF mit 12 Dreiecken.
 - Automatisierte Abnahme: 246 Server- und 170 Add-on-Tests erfolgreich.
+
+## Source-3MF für laufende Bambuddy-Drucke
+
+- Bambuddy 1.2.5.5 stellt mit `POST /api/v1/archives/{id}/source` bereits einen
+  passenden Endpunkt bereit. Der PLM-Worker verwendet bewusst die konkrete
+  Archiv-ID statt der ebenfalls angebotenen unscharfen Namenssuche.
+- Automatisch berücksichtigt werden nur laufende Drucke explizit
+  konfigurierter Drucker. Der Druckname muss exakt
+  `<Teilnummer>_<Revisionscode>` entsprechen und im PLM eindeutig sein.
+- Eine bereits vorhandene Source-3MF wird nicht überschrieben. Dadurch bleibt
+  der Stand erhalten, mit dem der jeweilige Druck begonnen wurde.
+- Der produktive A1-Druck `A-001_R0007` wurde als Bambuddy-Archiv 24 erkannt;
+  die Source-Datei ist dort vor der Aktivierung noch leer.
+- Für den produktiven Upload muss der vorhandene API-Key zusätzlich zu
+  `Read Status` die Bambuddy-Berechtigung `Manage Archives` erhalten.
+- Automatisierte Abnahme: 255 Server- und 170 Add-on-Tests erfolgreich; beide
+  Compose-Varianten sind syntaktisch gültig.

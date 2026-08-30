@@ -708,6 +708,7 @@ class AuditEvent(models.Model):
         MANUFACTURING_FILE_DOWNLOADED = "manufacturing_file_downloaded", "Fertigungsdatei heruntergeladen"
         MANUFACTURING_FILE_UPDATED = "manufacturing_file_updated", "Fertigungsdatei geaendert"
         MANUFACTURING_FILE_STATUS_CHANGED = "manufacturing_file_status_changed", "Fertigungsdatei-Status geaendert"
+        BAMBUDDY_SOURCE_ATTACHED = "bambuddy_source_attached", "3MF an Bambuddy-Druck angehängt"
         MANUFACTURING_RUN_CREATED = "manufacturing_run_created", "Fertigungslauf angelegt"
         MANUFACTURING_RUN_ATTACHMENT_ADDED = "manufacturing_run_attachment_added", "Fertigungslauf-Anhang angelegt"
         CHECKOUT_CREATED = "checkout_created", "Checkout angelegt"

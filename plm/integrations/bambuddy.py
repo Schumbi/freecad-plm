@@ -1,14 +1,17 @@
 import json
 import ssl
 from dataclasses import dataclass
+from pathlib import PurePath
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 from django.conf import settings
 
 
 MAX_JSON_RESPONSE_BYTES = 1024 * 1024
+MAX_SOURCE_3MF_BYTES = 200 * 1024 * 1024
 
 
 class BambuddyError(Exception):
@@ -94,15 +97,26 @@ class BambuddyClient:
             url = f"{url}?{urlencode(query)}"
         return url
 
-    def get_json(self, path, query=None):
+    def request_json(
+        self,
+        path,
+        query=None,
+        *,
+        method="GET",
+        data=None,
+        headers=None,
+        required_permission="„Read Status“",
+    ):
         request = Request(
             self.api_url(path, query),
             headers={
                 "Accept": "application/json",
                 "User-Agent": "FreeCAD-PLM Bambuddy integration",
                 "X-API-Key": self.api_key,
+                **(headers or {}),
             },
-            method="GET",
+            data=data,
+            method=method,
         )
         try:
             with self.opener(
@@ -114,7 +128,8 @@ class BambuddyClient:
         except HTTPError as exc:
             if exc.code in {401, 403}:
                 raise BambuddyAuthenticationError(
-                    "Bambuddy hat den API-Key abgelehnt. Benötigt wird mindestens „Read Status“."
+                    "Bambuddy hat den API-Key abgelehnt. Benötigt wird "
+                    f"mindestens {required_permission}."
                 ) from exc
             raise BambuddyConnectionError(
                 f"Bambuddy antwortete mit HTTP {exc.code}."
@@ -131,6 +146,87 @@ class BambuddyClient:
             raise BambuddyProtocolError(
                 "Bambuddy lieferte keine gültige JSON-Antwort."
             ) from exc
+
+    def get_json(self, path, query=None):
+        return self.request_json(path, query)
+
+    def list_archives(self, limit=50):
+        payload = self.get_json("archives/", {"limit": int(limit), "offset": 0})
+        if isinstance(payload, list):
+            archives = payload
+        elif isinstance(payload, dict) and isinstance(
+            payload.get("archives"), list
+        ):
+            archives = payload["archives"]
+        else:
+            raise BambuddyProtocolError(
+                "Die Bambuddy-Archivantwort hat ein unbekanntes Format."
+            )
+        if not all(isinstance(item, dict) for item in archives):
+            raise BambuddyProtocolError(
+                "Die Bambuddy-Archivliste enthält ungültige Einträge."
+            )
+        return archives
+
+    def get_archive(self, archive_id):
+        payload = self.get_json(f"archives/{int(archive_id)}")
+        if not isinstance(payload, dict):
+            raise BambuddyProtocolError(
+                "Die Bambuddy-Archivdetails haben ein unbekanntes Format."
+            )
+        return payload
+
+    def get_effective_permissions(self):
+        payload = self.get_json("auth/me")
+        permissions = payload.get("permissions") if isinstance(payload, dict) else None
+        if not isinstance(permissions, list) or not all(
+            isinstance(item, str) for item in permissions
+        ):
+            raise BambuddyProtocolError(
+                "Bambuddy lieferte keine gültige Berechtigungsliste."
+            )
+        return set(permissions)
+
+    def upload_source_3mf(self, archive_id, source_file, filename):
+        safe_filename = PurePath(str(filename or "")).name
+        if not safe_filename.lower().endswith(".3mf"):
+            raise BambuddyProtocolError("Die Bambuddy-Quelldatei muss eine 3MF sein.")
+
+        source_file.seek(0)
+        content = source_file.read(MAX_SOURCE_3MF_BYTES + 1)
+        if len(content) > MAX_SOURCE_3MF_BYTES:
+            raise BambuddyProtocolError(
+                "Die Bambuddy-Quell-3MF überschreitet das Größenlimit."
+            )
+        boundary = f"freecad-plm-{uuid4().hex}"
+        quoted_filename = safe_filename.replace("\\", "_").replace('"', "_")
+        body = b"".join(
+            (
+                f"--{boundary}\r\n".encode("ascii"),
+                (
+                    'Content-Disposition: form-data; name="file"; '
+                    f'filename="{quoted_filename}"\r\n'
+                ).encode("utf-8"),
+                b"Content-Type: application/vnd.ms-package.3dmanufacturing-3dmodel+xml\r\n\r\n",
+                content,
+                f"\r\n--{boundary}--\r\n".encode("ascii"),
+            )
+        )
+        payload = self.request_json(
+            f"archives/{int(archive_id)}/source",
+            method="POST",
+            data=body,
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(len(body)),
+            },
+            required_permission="„Read Status“ und „Manage Archives“",
+        )
+        if not isinstance(payload, dict) or payload.get("status") != "uploaded":
+            raise BambuddyProtocolError(
+                "Bambuddy bestätigte den Source-3MF-Upload nicht."
+            )
+        return payload
 
     def test_connection(self):
         payload = self.get_json("archives/", {"limit": 1, "offset": 0})

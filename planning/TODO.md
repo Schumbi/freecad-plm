@@ -22,8 +22,8 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 
 ## Als Naechstes
 
-- Nur lesenden Bambuddy-Test-Key konfigurieren und die Verbindung zur echten
-  Instanz unter `Verwaltung -> Integrationen` testen.
+- Produktiven Bambuddy-Key um `Manage Archives` ergänzen, den Source-3MF-Sync
+  für Drucker-ID 1 aktivieren und am A1-Druckarchiv verifizieren.
 - Danach Phase B aus `planning/BAMBUDDY_INTEGRATION_PLAN.md` als lesenden
   Archiveingang ohne automatische Zuordnung umsetzen.
 - Nach erfolgreicher Abnahme: Git-Tag `v1.0.0` und kurze Release-Notiz.
@@ -35,6 +35,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Bulk-ZIP-Import aus `planning/BULK_IMPORT_PLAN.md` umsetzen.
 
 ## Erledigt
+
+- Bambuddy-Verbindung mit produktivem Read-only-Key geprüft und sicheren,
+  exakten Source-3MF-Upload an laufende Druckarchive implementiert.
 
 - Add-on auf einen lazy geladenen Projekt-/Teile-/Revisionsbaum mit direkten
   Checkout-Markierungen und kontextabhängiger Arbeitsleiste umgestellt.

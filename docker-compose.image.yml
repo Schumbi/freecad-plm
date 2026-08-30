@@ -43,6 +43,8 @@ services:
       BAMBUDDY_URL: ${BAMBUDDY_URL:-}
       BAMBUDDY_API_KEY: ${BAMBUDDY_API_KEY:-}
       BAMBUDDY_TIMEOUT_SECONDS: ${BAMBUDDY_TIMEOUT_SECONDS:-10}
+      BAMBUDDY_SOURCE_SYNC_ENABLED: ${BAMBUDDY_SOURCE_SYNC_ENABLED:-0}
+      BAMBUDDY_SOURCE_SYNC_PRINTER_IDS: ${BAMBUDDY_SOURCE_SYNC_PRINTER_IDS:-}
     volumes:
       - ./storage:/app/storage
       - ./staticfiles:/app/staticfiles
@@ -82,6 +84,7 @@ services:
     command: >
       sh -c "while true; do
              python manage.py process_export_jobs --limit 1;
+             python manage.py sync_bambuddy_sources --limit 20;
              sleep 10;
              done"
     environment:
@@ -103,6 +106,8 @@ services:
       BAMBUDDY_URL: ${BAMBUDDY_URL:-}
       BAMBUDDY_API_KEY: ${BAMBUDDY_API_KEY:-}
       BAMBUDDY_TIMEOUT_SECONDS: ${BAMBUDDY_TIMEOUT_SECONDS:-10}
+      BAMBUDDY_SOURCE_SYNC_ENABLED: ${BAMBUDDY_SOURCE_SYNC_ENABLED:-0}
+      BAMBUDDY_SOURCE_SYNC_PRINTER_IDS: ${BAMBUDDY_SOURCE_SYNC_PRINTER_IDS:-}
       TMPDIR: /tmp
       # FreeCAD 1.0 braucht ein beschreibbares HOME (read-only Root-FS + tmpfs /tmp)
       HOME: /tmp
