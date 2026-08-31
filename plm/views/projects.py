@@ -7,9 +7,10 @@ from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ProjectForm, ProjectSnapshotUploadForm
-from ..models import AuditEvent, Part, PrintProject, Project, ProjectSnapshot, Revision
+from ..models import AuditEvent, Part, PrintProject, PrintProjectPlate, PrintProjectSource, Project, ProjectSnapshot, Revision
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
+from ..services.manufacturing import inspect_manufacturing_upload
 
 
 @login_required
@@ -196,7 +197,7 @@ def project_detail(request, project_id):
         .prefetch_related("entries__revision__part")
         .order_by("-created_at")
     )
-    print_projects = project.print_projects.select_related("primary_revision__part").prefetch_related("sources", "snapshots")
+    print_projects = project.print_projects.select_related("primary_revision__part").prefetch_related("sources", "plates", "snapshots")
     return render(
         request,
         "plm/project_detail.html",
@@ -210,6 +211,45 @@ def project_detail(request, project_id):
             "can_edit_project": is_plm_admin(request.user),
         },
     )
+
+
+@login_required
+def upload_print_project_source(request, print_project_id):
+    print_project = get_object_or_404(PrintProject, id=print_project_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Hinzufügen von STL-Quellen.")
+    if request.method != "POST":
+        return redirect("plm:project_detail", project_id=print_project.project_id)
+
+    uploaded = request.FILES.get("file")
+    if uploaded is None or not uploaded.name.lower().endswith(".stl"):
+        messages.error(request, "Bitte eine STL-Datei auswählen.")
+        return redirect("plm:project_detail", project_id=print_project.project_id)
+    try:
+        info = inspect_manufacturing_upload(uploaded)
+    except ValidationError as exc:
+        messages.error(request, str(exc))
+        return redirect("plm:project_detail", project_id=print_project.project_id)
+    source = PrintProjectSource.objects.create(
+        print_project=print_project,
+        source_type=PrintProjectSource.SourceType.EXTERNAL_STL,
+        file=uploaded,
+        original_filename=info["original_filename"],
+        sha256=info["sha256"],
+        size_bytes=info["size_bytes"],
+        label=request.POST.get("label", "").strip(),
+        uploaded_by=request.user,
+    )
+    messages.success(request, f"STL-Quelle „{source}“ wurde hinzugefügt.")
+    return redirect("plm:project_detail", project_id=print_project.project_id)
+
+
+@login_required
+def print_project_plate_preview(request, plate_id):
+    plate = get_object_or_404(PrintProjectPlate, id=plate_id)
+    if not plate.preview:
+        return HttpResponseForbidden("Keine Vorschau für diese Druckplatte.")
+    return FileResponse(plate.preview.open("rb"), as_attachment=False, filename=plate.preview.name.rsplit("/", 1)[-1])
 
 
 @login_required

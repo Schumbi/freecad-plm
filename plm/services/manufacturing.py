@@ -50,6 +50,55 @@ THREEMF_THUMBNAIL_PREFERRED_NAMES = (
 )
 
 
+def extract_3mf_plate_previews(uploaded_file):
+    """Return Bambu plate names and preview images from a validated 3MF upload."""
+    data = read_uploaded_file(uploaded_file)
+    with ZipFile(BytesIO(data)) as archive:
+        names = set(archive.namelist())
+        plates = []
+        for name in sorted(names):
+            path = PurePosixPath(name)
+            if path.parent.name != "Metadata" or not path.name.startswith("plate_"):
+                continue
+            if path.suffix.lower() != ".json":
+                continue
+            suffix = path.stem.removeprefix("plate_")
+            if not suffix.isdigit():
+                continue
+            plate_number = int(suffix)
+            try:
+                config = json.loads(decode_config_bytes(archive.read(name)))
+            except json.JSONDecodeError:
+                config = {}
+            name_value = ""
+            if isinstance(config, dict):
+                for key in ("plate_name", "name", "title"):
+                    value = config.get(key)
+                    if isinstance(value, str) and value.strip():
+                        name_value = value.strip()
+                        break
+            preview_name = next(
+                (
+                    candidate
+                    for candidate in (
+                        f"Metadata/plate_{plate_number}_small.png",
+                        f"Metadata/plate_{plate_number}.png",
+                    )
+                    if candidate in names
+                ),
+                "",
+            )
+            plates.append(
+                {
+                    "plate_number": plate_number,
+                    "name": name_value or f"Platte {plate_number}",
+                    "preview_name": PurePosixPath(preview_name).name if preview_name else "",
+                    "preview_content": archive.read(preview_name) if preview_name else None,
+                }
+            )
+    return plates
+
+
 def infer_manufacturing_file_type(filename):
     suffix = PurePosixPath(filename).suffix.lower()
     return MANUFACTURING_FILE_EXTENSIONS.get(suffix)

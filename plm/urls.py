@@ -52,6 +52,8 @@ urlpatterns = [
     ),
     path("projects/new/", views.create_project, name="create_project"),
     path("projects/<int:project_id>/", views.project_detail, name="project_detail"),
+    path("print-projects/<int:print_project_id>/sources/upload/", views.upload_print_project_source, name="upload_print_project_source"),
+    path("print-project-plates/<int:plate_id>/preview/", views.print_project_plate_preview, name="print_project_plate_preview"),
     path(
         "projects/<int:project_id>/properties/",
         views.project_properties,

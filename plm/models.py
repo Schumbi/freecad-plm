@@ -139,6 +139,13 @@ def print_project_snapshot_upload_path(instance, filename):
     )
 
 
+def print_project_plate_preview_upload_path(instance, filename):
+    return (
+        f"projects/{instance.print_project.project_id}/print-projects/"
+        f"{instance.print_project.storage_key}/plates/{instance.plate_number}/{filename}"
+    )
+
+
 class Revision(TimeStampedModel):
     class FileFormat(models.TextChoices):
         FCSTD = "fcstd", "FreeCAD"
@@ -509,6 +516,33 @@ class PrintProjectSource(TimeStampedModel):
 
     def __str__(self):
         return self.label or self.original_filename or str(self.revision)
+
+
+class PrintProjectPlate(TimeStampedModel):
+    """Derived plate information from the current 3MF slicer project."""
+
+    print_project = models.ForeignKey(
+        PrintProject, on_delete=models.CASCADE, related_name="plates"
+    )
+    plate_number = models.PositiveIntegerField()
+    name = models.CharField(max_length=255)
+    preview = models.FileField(
+        upload_to=print_project_plate_preview_upload_path,
+        max_length=500,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["plate_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["print_project", "plate_number"],
+                name="unique_print_project_plate_number",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.print_project} – {self.name}"
 
 
 class PrintProjectSnapshot(TimeStampedModel):

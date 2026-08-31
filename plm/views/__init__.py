@@ -53,6 +53,8 @@ from .projects import (
     project_detail,
     project_list,
     project_properties,
+    print_project_plate_preview,
+    upload_print_project_source,
     upload_project_snapshot,
 )
 from .parts import (

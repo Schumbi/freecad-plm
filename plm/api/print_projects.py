@@ -5,8 +5,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from ..auth import api_auth_required
-from ..models import ApiToken, PrintProject, PrintProjectSource, Revision
-from ..services.manufacturing import inspect_manufacturing_upload
+from django.core.files.base import ContentFile
+from django.db import transaction
+
+from ..models import ApiToken, PrintProject, PrintProjectPlate, PrintProjectSource, Revision
+from ..services.manufacturing import extract_3mf_plate_previews, inspect_manufacturing_upload
 from .common import json_body, user_can_mutate_models
 
 
@@ -24,6 +27,10 @@ def payload(item, request=None):
              "label": source.label, "original_filename": source.original_filename,
              "sha256": source.sha256, "size_bytes": source.size_bytes}
             for source in item.sources.select_related("revision").order_by("id")
+        ],
+        "plates": [
+            {"number": plate.plate_number, "name": plate.name, "has_preview": bool(plate.preview)}
+            for plate in item.plates.all()
         ],
         "snapshots": [
             {"id": snapshot.id, "sha256": snapshot.sha256, "original_filename": snapshot.original_filename,
@@ -43,7 +50,7 @@ def payload(item, request=None):
 @require_http_methods(["GET", "POST"])
 def print_projects_api(request):
     if request.method == "GET":
-        projects = PrintProject.objects.select_related("project", "primary_revision").prefetch_related("sources", "snapshots")
+        projects = PrintProject.objects.select_related("project", "primary_revision").prefetch_related("sources", "plates", "snapshots")
         return JsonResponse({"print_projects": [payload(item, request) for item in projects]})
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung für Druckprojekte."}, status=403)
@@ -70,7 +77,7 @@ def print_projects_api(request):
 @api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.WRITE)
 @require_http_methods(["GET", "POST"])
 def print_project_slicer_api(request, print_project_id):
-    item = get_object_or_404(PrintProject.objects.prefetch_related("sources", "snapshots"), id=print_project_id)
+    item = get_object_or_404(PrintProject.objects.prefetch_related("sources", "plates", "snapshots"), id=print_project_id)
     if request.method == "GET":
         return JsonResponse({"print_project": payload(item, request)})
     if not user_can_mutate_models(request.user):
@@ -84,13 +91,31 @@ def print_project_slicer_api(request, print_project_id):
         return JsonResponse({"error": str(exc)}, status=400)
     if not info["original_filename"].lower().endswith(".3mf"):
         return JsonResponse({"error": "Ein Druckprojekt benötigt eine 3MF-Datei."}, status=400)
-    item.slicer_file = uploaded
-    item.slicer_original_filename = info["original_filename"]
-    item.slicer_sha256 = info["sha256"]
-    item.slicer_size_bytes = info["size_bytes"]
-    item.slicer_metadata = info["metadata"]
-    item.slicer_updated_by = request.user
-    item.save()
+    plates = extract_3mf_plate_previews(uploaded)
+    with transaction.atomic():
+        for plate in item.plates.exclude(preview=""):
+            plate.preview.delete(save=False)
+        item.plates.all().delete()
+        item.slicer_file = uploaded
+        item.slicer_original_filename = info["original_filename"]
+        item.slicer_sha256 = info["sha256"]
+        item.slicer_size_bytes = info["size_bytes"]
+        item.slicer_metadata = info["metadata"]
+        item.slicer_updated_by = request.user
+        item.save()
+        for plate_data in plates:
+            plate = PrintProjectPlate(
+                print_project=item,
+                plate_number=plate_data["plate_number"],
+                name=plate_data["name"],
+            )
+            if plate_data["preview_content"]:
+                plate.preview.save(
+                    plate_data["preview_name"] or f"plate_{plate.plate_number}.png",
+                    ContentFile(plate_data["preview_content"]),
+                    save=False,
+                )
+            plate.save()
     return JsonResponse({"print_project": payload(item, request)})
 
 
