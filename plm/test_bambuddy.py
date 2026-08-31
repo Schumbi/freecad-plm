@@ -567,7 +567,7 @@ class BambuddySourceSyncTests(TestCase):
                 "printer_id": 1,
                 "print_name": "P7_A-001_R0007",
                 "status": "completed",
-                "source_3mf_path": None,
+                "source_3mf_path": "archive/2/source/project.3mf",
                 "external_url": "https://plm.example/parts/1/#revision-1",
             },
             {
@@ -584,7 +584,7 @@ class BambuddySourceSyncTests(TestCase):
 
         self.assertEqual(result.skipped_printer, 1)
         self.assertEqual(result.skipped_status, 0)
-        self.assertEqual(result.already_attached, 1)
+        self.assertEqual(result.already_attached, 2)
         self.assertEqual(result.already_linked, 2)
         client.upload_source_3mf.assert_not_called()
         client.update_archive_external_url.assert_not_called()
