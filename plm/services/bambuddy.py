@@ -29,7 +29,10 @@ class BambuddySourceSyncResult:
 
 def bambuddy_print_name(manufacturing_file):
     revision = manufacturing_file.revision
-    return f"{revision.part.number}_{revision.revision_code}"
+    return (
+        f"{revision.part.project.code}_{revision.part.number}_"
+        f"{revision.revision_code}"
+    )
 
 
 def plm_revision_url(revision):
@@ -57,7 +60,7 @@ def slicer_projects_by_print_name():
             file_type=ManufacturingFile.FileType.SLICER_PROJECT_3MF,
         )
         .exclude(status=ManufacturingFile.Status.OBSOLETE)
-        .select_related("revision__part", "uploaded_by")
+        .select_related("revision__part__project", "uploaded_by")
         .order_by("id")
     )
     matches = {}
@@ -110,7 +113,9 @@ def sync_bambuddy_source_projects(
             result.already_attached += 1
         if revision_linked:
             result.already_linked += 1
-        needs_source = status == "printing" and not source_attached
+        # A quick print may already be completed before the next worker cycle.
+        # The source archive is still useful and Bambuddy accepts it then too.
+        needs_source = not source_attached
         needs_link = not revision_linked
         if not needs_source and not needs_link:
             continue
@@ -182,7 +187,7 @@ def sync_bambuddy_source_projects(
         if current_source_path:
             if not source_attached:
                 result.already_attached += 1
-        elif current_status == "printing":
+        elif current_status in {"printing", "completed"}:
             with project.file.open("rb") as source_file:
                 response = client.upload_source_3mf(
                     archive_id,

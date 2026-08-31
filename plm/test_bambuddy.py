@@ -327,7 +327,7 @@ class BambuddySourceSyncTests(TestCase):
                     {
                         "id": 24,
                         "printer_id": 1,
-                        "print_name": "A-001_R0007",
+                        "print_name": "P7_A-001_R0007",
                         "status": "printing",
                         "source_3mf_path": None,
                         "external_url": None,
@@ -342,7 +342,7 @@ class BambuddySourceSyncTests(TestCase):
                 self.uploads.append((archive_id, source_file.read(), filename))
                 return {
                     "status": "uploaded",
-                    "source_3mf_path": "archive/24/source/A-001_R0007.3mf",
+                    "source_3mf_path": "archive/24/source/P7_A-001_R0007.3mf",
                 }
 
             def get_archive(self, archive_id):
@@ -394,7 +394,7 @@ class BambuddySourceSyncTests(TestCase):
             {
                 "id": 24,
                 "printer_id": 1,
-                "print_name": "A-001_R0007",
+                "print_name": "P7_A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
                 "external_url": None,
@@ -422,7 +422,7 @@ class BambuddySourceSyncTests(TestCase):
             {
                 "id": 24,
                 "printer_id": 1,
-                "print_name": "A-001_R0007",
+                "print_name": "P7_A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
                 "external_url": None,
@@ -449,7 +449,7 @@ class BambuddySourceSyncTests(TestCase):
             {
                 "id": 24,
                 "printer_id": 1,
-                "print_name": "A-001_R0007",
+                "print_name": "P7_A-001_R0007",
                 "status": "completed",
                 "source_3mf_path": "archive/24/source/A-001_R0007.3mf",
                 "external_url": None,
@@ -473,15 +473,15 @@ class BambuddySourceSyncTests(TestCase):
             expected_url,
         )
 
-    def test_preserves_existing_external_url_while_uploading_source(self):
+    def test_uploads_source_for_completed_archive(self):
         self.make_slicer_project()
         existing_url = "https://example.invalid/manually-curated"
         client = Mock()
         archive = {
             "id": 24,
             "printer_id": 1,
-            "print_name": "A-001_R0007",
-            "status": "printing",
+            "print_name": "P7_A-001_R0007",
+            "status": "completed",
             "source_3mf_path": None,
             "external_url": existing_url,
         }
@@ -520,6 +520,35 @@ class BambuddySourceSyncTests(TestCase):
         self.assertEqual(result.uploaded, 0)
         client.upload_source_3mf.assert_not_called()
 
+    def test_project_prefix_selects_matching_duplicate_part_number(self):
+        first = self.make_slicer_project(project_code="P7")
+        self.make_slicer_project(project_code="P8")
+        client = Mock()
+        client.list_archives.return_value = [
+            {
+                "id": 24,
+                "printer_id": 1,
+                "print_name": "P7_A-001_R0007",
+                "status": "printing",
+                "source_3mf_path": None,
+                "external_url": "https://example.invalid/linked",
+            }
+        ]
+        client.get_archive.return_value = client.list_archives.return_value[0]
+        client.upload_source_3mf.return_value = {
+            "status": "uploaded",
+            "source_3mf_path": "archive/24/source/P7_A-001_R0007.3mf",
+        }
+
+        result = sync_bambuddy_source_projects(client=client, printer_ids=[1])
+
+        self.assertEqual(result.matched, 1)
+        self.assertEqual(result.uploaded, 1)
+        client.upload_source_3mf.assert_called_once()
+        uploaded_file = client.upload_source_3mf.call_args.args[1]
+        self.assertEqual(uploaded_file.read(), b"PK\x03\x04source")
+        self.assertEqual(first.revision.part.project.code, "P7")
+
     def test_skips_other_printers_and_already_synchronized_archives(self):
         self.make_slicer_project()
         client = Mock()
@@ -527,7 +556,7 @@ class BambuddySourceSyncTests(TestCase):
             {
                 "id": 1,
                 "printer_id": 2,
-                "print_name": "A-001_R0007",
+                "print_name": "P7_A-001_R0007",
                 "status": "printing",
                 "source_3mf_path": None,
                 "external_url": None,
@@ -535,7 +564,7 @@ class BambuddySourceSyncTests(TestCase):
             {
                 "id": 2,
                 "printer_id": 1,
-                "print_name": "A-001_R0007",
+                "print_name": "P7_A-001_R0007",
                 "status": "completed",
                 "source_3mf_path": None,
                 "external_url": "https://plm.example/parts/1/#revision-1",
