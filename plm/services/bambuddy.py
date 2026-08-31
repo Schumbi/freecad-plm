@@ -2,11 +2,12 @@ from dataclasses import asdict, dataclass
 from urllib.parse import urljoin, urlsplit
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
 
 from ..integrations.bambuddy import BambuddyClient, BambuddyProtocolError
-from ..models import AuditEvent, ManufacturingFile
+from ..models import AuditEvent, ManufacturingFile, PrintProject, PrintProjectSnapshot
 
 
 @dataclass
@@ -76,6 +77,64 @@ def slicer_projects_by_print_name():
         # deliberately ambiguous and are never picked implicitly.
         matches.setdefault(legacy_bambuddy_print_name(project), []).append(project)
     return matches
+
+
+def print_projects_by_print_name():
+    matches = {}
+    for project in PrintProject.objects.filter(slicer_file__isnull=False).select_related("project", "slicer_updated_by"):
+        if project.slicer_file:
+            matches.setdefault(f"{project.project.code}_{project.code}", []).append(project)
+    return matches
+
+
+def sync_bambuddy_print_projects(*, client=None, printer_ids=None, limit=20, dry_run=False):
+    """Attach a frozen multi-source 3MF snapshot to matching Bambuddy jobs."""
+    client = client or BambuddyClient.from_settings()
+    printer_ids = set(settings.BAMBUDDY_SOURCE_SYNC_PRINTER_IDS if printer_ids is None else printer_ids)
+    archives = client.list_archives(limit=limit)
+    matches = print_projects_by_print_name()
+    result = BambuddySourceSyncResult(inspected=len(archives))
+    for archive in archives:
+        if str(archive.get("status") or "").lower() not in {"printing", "completed"}:
+            continue
+        if int(archive.get("printer_id") or 0) not in printer_ids:
+            continue
+        archive_id = int(archive["id"])
+        if archive.get("source_3mf_path"):
+            result.already_attached += 1
+            continue
+        candidates = matches.get(str(archive.get("print_name") or "").strip(), [])
+        if not candidates:
+            result.unmatched += 1
+            continue
+        if len(candidates) != 1:
+            result.ambiguous += 1
+            continue
+        result.matched += 1
+        if dry_run:
+            continue
+        project = candidates[0]
+        current = client.get_archive(archive_id)
+        if current.get("source_3mf_path"):
+            result.already_attached += 1
+            continue
+        snapshot, _created = PrintProjectSnapshot.objects.get_or_create(
+            bambuddy_archive_id=archive_id,
+            defaults={
+                "print_project": project,
+                "original_filename": project.slicer_original_filename,
+                "sha256": project.slicer_sha256,
+                "size_bytes": project.slicer_size_bytes,
+                "created_by": project.slicer_updated_by,
+            },
+        )
+        if not snapshot.file:
+            with project.slicer_file.open("rb") as source:
+                snapshot.file.save(project.slicer_original_filename, ContentFile(source.read()), save=True)
+        with snapshot.file.open("rb") as source:
+            client.upload_source_3mf(archive_id, source, snapshot.original_filename)
+        result.uploaded += 1
+    return result
 
 
 def sync_bambuddy_source_projects(

@@ -120,6 +120,25 @@ def manufacturing_run_attachment_upload_path(instance, filename):
     )
 
 
+def print_project_upload_path(instance, filename):
+    project = instance
+    return f"projects/{project.project_id}/print-projects/{project.storage_key}/{filename}"
+
+
+def print_project_source_upload_path(instance, filename):
+    return (
+        f"projects/{instance.print_project.project_id}/print-projects/"
+        f"{instance.print_project.storage_key}/sources/{instance.storage_key}/{filename}"
+    )
+
+
+def print_project_snapshot_upload_path(instance, filename):
+    return (
+        f"projects/{instance.print_project.project_id}/print-projects/"
+        f"{instance.print_project.storage_key}/snapshots/{instance.storage_key}/{filename}"
+    )
+
+
 class Revision(TimeStampedModel):
     class FileFormat(models.TextChoices):
         FCSTD = "fcstd", "FreeCAD"
@@ -430,6 +449,80 @@ class ManufacturingRun(TimeStampedModel):
 
     def __str__(self):
         return f"{self.manufacturing_file} {self.get_status_display()}"
+
+
+class PrintProject(TimeStampedModel):
+    """A multi-source, editable slicer project owned by a PLM project."""
+
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="print_projects")
+    primary_revision = models.ForeignKey(
+        Revision, on_delete=models.PROTECT, related_name="primary_print_projects"
+    )
+    code = models.CharField(max_length=40)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    storage_key = models.UUIDField(default=uuid4, editable=False, unique=True)
+    slicer_file = models.FileField(upload_to=print_project_upload_path, max_length=500, blank=True)
+    slicer_original_filename = models.CharField(max_length=255, blank=True)
+    slicer_sha256 = models.CharField(max_length=64, blank=True)
+    slicer_size_bytes = models.PositiveBigIntegerField(default=0)
+    slicer_metadata = models.JSONField(default=dict, blank=True)
+    slicer_updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="updated_print_projects",
+    )
+
+    class Meta:
+        ordering = ["project__code", "code"]
+        constraints = [
+            models.UniqueConstraint(fields=["project", "code"], name="unique_print_project_code"),
+        ]
+
+    def __str__(self):
+        return f"{self.project.code} {self.code} - {self.name}"
+
+
+class PrintProjectSource(TimeStampedModel):
+    class SourceType(models.TextChoices):
+        REVISION = "revision", "PLM-Revision"
+        EXTERNAL_STL = "external_stl", "Externe STL"
+
+    print_project = models.ForeignKey(PrintProject, on_delete=models.CASCADE, related_name="sources")
+    source_type = models.CharField(max_length=20, choices=SourceType.choices)
+    revision = models.ForeignKey(Revision, on_delete=models.PROTECT, null=True, blank=True)
+    storage_key = models.UUIDField(default=uuid4, editable=False, unique=True)
+    file = models.FileField(upload_to=print_project_source_upload_path, max_length=500, blank=True)
+    original_filename = models.CharField(max_length=255, blank=True)
+    sha256 = models.CharField(max_length=64, blank=True)
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    label = models.CharField(max_length=160, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["print_project", "revision"],
+                condition=models.Q(source_type="revision"),
+                name="unique_print_project_revision_source",
+            ),
+        ]
+
+    def __str__(self):
+        return self.label or self.original_filename or str(self.revision)
+
+
+class PrintProjectSnapshot(TimeStampedModel):
+    print_project = models.ForeignKey(PrintProject, on_delete=models.CASCADE, related_name="snapshots")
+    storage_key = models.UUIDField(default=uuid4, editable=False, unique=True)
+    file = models.FileField(upload_to=print_project_snapshot_upload_path, max_length=500)
+    original_filename = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    size_bytes = models.PositiveBigIntegerField()
+    bambuddy_archive_id = models.PositiveIntegerField(null=True, blank=True, unique=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
+    class Meta:
+        ordering = ["-created_at"]
 
 
 class ManufacturingRunAttachment(TimeStampedModel):

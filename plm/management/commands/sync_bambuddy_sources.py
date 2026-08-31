@@ -2,7 +2,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from plm.integrations.bambuddy import BambuddyError
-from plm.services.bambuddy import sync_bambuddy_source_projects
+from plm.services.bambuddy import sync_bambuddy_print_projects, sync_bambuddy_source_projects
 
 
 class Command(BaseCommand):
@@ -29,6 +29,9 @@ class Command(BaseCommand):
                 limit=options["limit"],
                 dry_run=options["dry_run"],
             )
+            print_result = sync_bambuddy_print_projects(
+                limit=options["limit"], dry_run=options["dry_run"]
+            )
         except BambuddyError as exc:
             raise CommandError(str(exc)) from exc
 
@@ -41,5 +44,12 @@ class Command(BaseCommand):
                 f"{result.linked} verlinkt, "
                 f"{result.unmatched} ohne PLM-Treffer, "
                 f"{result.ambiguous} mehrdeutig."
+            )
+        )
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Druckprojekt-{mode}: {print_result.inspected} geprüft, "
+                f"{print_result.matched} eindeutig zugeordnet, "
+                f"{print_result.uploaded} hochgeladen."
             )
         )
