@@ -545,9 +545,10 @@ class BambuddySourceSyncTests(TestCase):
         self.assertEqual(result.matched, 1)
         self.assertEqual(result.uploaded, 1)
         client.upload_source_3mf.assert_called_once()
-        uploaded_file = client.upload_source_3mf.call_args.args[1]
-        self.assertEqual(uploaded_file.read(), b"PK\x03\x04source")
-        self.assertEqual(first.revision.part.project.code, "P7")
+        first.refresh_from_db()
+        self.assertEqual(
+            first.metadata["bambuddy_source_archives"][0]["archive_id"], 24
+        )
 
     def test_skips_other_printers_and_already_synchronized_archives(self):
         self.make_slicer_project()
