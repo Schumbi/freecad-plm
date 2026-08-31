@@ -2431,6 +2431,20 @@ class RolePermissionTests(TestCase):
 
         self.assertContains(response, "Verwaltung")
         self.assertContains(response, reverse("plm:user_management"))
+        self.assertContains(
+            response,
+            "https://git.home.schumbi.de/ralf/freecad-plm/wiki/Verwendung",
+        )
+
+    def test_reader_sees_documentation_navigation(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("plm:project_list"))
+
+        self.assertContains(
+            response,
+            "https://git.home.schumbi.de/ralf/freecad-plm/wiki/Verwendung",
+        )
 
     def test_reader_cannot_access_user_management(self):
         self.client.force_login(self.reader)
