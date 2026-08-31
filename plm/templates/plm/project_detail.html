@@ -48,6 +48,39 @@
       </div>
 
       <div class="section-header">
+        <h2>Druckprojekte</h2>
+      </div>
+      {% if print_projects %}
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Code</th><th>Name</th><th>Quellen</th><th>3MF / Platten</th><th>Druck-Snapshots</th></tr></thead>
+            <tbody>
+              {% for print_project in print_projects %}
+                <tr>
+                  <td>{{ print_project.code }}</td>
+                  <td>{{ print_project.name }}</td>
+                  <td>
+                    {% for source in print_project.sources.all %}
+                      {{ source.get_source_type_display }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </td>
+                  <td>
+                    {% if print_project.slicer_file %}
+                      {{ print_project.slicer_original_filename }}
+                      {% with geometry=print_project.slicer_metadata.geometry %}{% if geometry.build_items %} · {{ geometry.build_items }} Modelle{% endif %}{% endwith %}
+                    {% else %}Noch kein Slicer-Projekt{% endif %}
+                  </td>
+                  <td>{{ print_project.snapshots.all|length }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">Noch keine Druckprojekte. Sie werden über „Druckprojekt öffnen/erstellen“ in FreeCAD angelegt.</p>
+      {% endif %}
+
+      <div class="section-header">
         <h2>Teile und Baugruppen</h2>
         <div class="section-header-actions">
           <input

@@ -7,7 +7,7 @@ from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ProjectForm, ProjectSnapshotUploadForm
-from ..models import AuditEvent, Part, Project, ProjectSnapshot, Revision
+from ..models import AuditEvent, Part, PrintProject, Project, ProjectSnapshot, Revision
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
 
@@ -196,6 +196,7 @@ def project_detail(request, project_id):
         .prefetch_related("entries__revision__part")
         .order_by("-created_at")
     )
+    print_projects = project.print_projects.select_related("primary_revision__part").prefetch_related("sources", "snapshots")
     return render(
         request,
         "plm/project_detail.html",
@@ -203,6 +204,7 @@ def project_detail(request, project_id):
             "project": project,
             "parts": parts,
             "snapshots": snapshots,
+            "print_projects": print_projects,
             "snapshot_form": ProjectSnapshotUploadForm(),
             "can_create_part": can_upload_revision(request.user),
             "can_edit_project": is_plm_admin(request.user),
