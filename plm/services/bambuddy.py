@@ -35,6 +35,11 @@ def bambuddy_print_name(manufacturing_file):
     )
 
 
+def legacy_bambuddy_print_name(manufacturing_file):
+    revision = manufacturing_file.revision
+    return f"{revision.part.number}_{revision.revision_code}"
+
+
 def plm_revision_url(revision):
     base_url = str(getattr(settings, "PLM_PUBLIC_URL", "") or "").strip()
     parsed = urlsplit(base_url)
@@ -66,6 +71,10 @@ def slicer_projects_by_print_name():
     matches = {}
     for project in projects:
         matches.setdefault(bambuddy_print_name(project), []).append(project)
+        # Slicer projects created before project prefixes were introduced keep
+        # working when their old name is unambiguous.  Duplicate names remain
+        # deliberately ambiguous and are never picked implicitly.
+        matches.setdefault(legacy_bambuddy_print_name(project), []).append(project)
     return matches
 
 
