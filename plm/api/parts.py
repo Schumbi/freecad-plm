@@ -125,6 +125,15 @@ def create_fcstd_part_api(request, project_id):
                 status=409,
             )
 
+    upload_source = request.POST.get("source", "addon_blank_fcstd").strip()
+    if upload_source not in {"addon_blank_fcstd", "addon_local_fcstd"}:
+        upload_source = "addon_blank_fcstd"
+    revision_notes = (
+        "Vorhandene lokale FreeCAD-Datei im Addon hinzugefügt."
+        if upload_source == "addon_local_fcstd"
+        else "Leeres FreeCAD-Modell im Addon angelegt."
+    )
+
     try:
         with transaction.atomic():
             part = Part.objects.create(
@@ -142,7 +151,7 @@ def create_fcstd_part_api(request, project_id):
                     "part_id": part.id,
                     "part_number": part.number,
                     "category": part.category,
-                    "source": "addon_blank_fcstd",
+                    "source": upload_source,
                 },
             )
             revision = create_revision_from_upload(
@@ -150,7 +159,7 @@ def create_fcstd_part_api(request, project_id):
                 uploaded_file=uploaded_file,
                 created_by=request.user,
                 normalize_plm_revision=True,
-                notes="Leeres FreeCAD-Modell im Addon angelegt.",
+                notes=revision_notes,
             )
 
             if target_checkout is not None:

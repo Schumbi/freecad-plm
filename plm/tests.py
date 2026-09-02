@@ -3957,6 +3957,7 @@ class AddonApiWorkflowTests(TestCase):
                 "name": "Deckel",
                 "category": Part.Category.PART,
                 "checkout_id": checkout.id,
+                "source": "addon_local_fcstd",
                 "file": make_zip_upload(
                     "Deckel.FCStd",
                     members={"Document.xml": "<Document />"},
@@ -3974,6 +3975,15 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(payload["checkout"]["id"], checkout.id)
         self.assertEqual(payload["added_file"]["revision_id"], revision.id)
         self.assertIn("Deckel.FCStd", [item["path"] for item in payload["manifest"]["files"]])
+        self.assertEqual(
+            revision.notes,
+            "Vorhandene lokale FreeCAD-Datei im Addon hinzugefügt.",
+        )
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                object_repr=str(part), metadata__source="addon_local_fcstd"
+            ).exists()
+        )
 
     def test_api_fcstd_part_creation_requires_checkout_scope(self):
         self.authorize_token([ApiToken.Scope.WRITE])

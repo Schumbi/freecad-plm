@@ -82,3 +82,56 @@ class PrintProjectViewTests(TestCase):
         self.assertContains(response, "Mount und Figur")
         self.assertContains(response, "STL hinzufügen")
         self.assertContains(response, "Figur")
+
+    def test_plm_revision_can_be_added_as_print_project_source(self):
+        print_project_id = self.create_print_project()
+        second_part = Part.objects.create(
+            project=self.project, number="A-002", name="Scheibe"
+        )
+        second_revision = Revision.objects.create(
+            part=second_part,
+            revision_code="R0001",
+            file=SimpleUploadedFile("Scheibe.FCStd", b"fcstd"),
+            original_filename="Scheibe.FCStd",
+            sha256="b" * 64,
+            size_bytes=5,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("plm:api_print_project_source", args=[print_project_id]),
+            data=json.dumps(
+                {"revision_id": second_revision.id, "label": "Scheibe R0001"}
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["source"]["revision_id"], second_revision.id)
+        self.assertEqual(response.json()["source"]["label"], "Scheibe R0001")
+        print_project = PrintProject.objects.get(id=print_project_id)
+        self.assertTrue(print_project.sources.filter(revision=second_revision).exists())
+
+    def test_revision_from_another_project_is_rejected_as_print_source(self):
+        print_project_id = self.create_print_project()
+        other_project = Project.objects.create(code="OTHER", name="Anderes Projekt")
+        other_part = Part.objects.create(
+            project=other_project, number="X-001", name="Fremdteil"
+        )
+        other_revision = Revision.objects.create(
+            part=other_part,
+            revision_code="R0001",
+            file=SimpleUploadedFile("Fremd.FCStd", b"fcstd"),
+            original_filename="Fremd.FCStd",
+            sha256="c" * 64,
+            size_bytes=5,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("plm:api_print_project_source", args=[print_project_id]),
+            data=json.dumps({"revision_id": other_revision.id}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)

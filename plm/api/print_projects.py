@@ -126,10 +126,53 @@ def print_project_source_api(request, print_project_id):
     item = get_object_or_404(PrintProject, id=print_project_id)
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung für Druckprojekte."}, status=403)
+
+    source_data = json_body(request) if request.content_type == "application/json" else {}
+    revision_id = str(
+        request.POST.get("revision_id", "") or source_data.get("revision_id", "")
+    ).strip()
+    if revision_id:
+        revision = get_object_or_404(
+            Revision.objects.select_related("part__project"), id=revision_id
+        )
+        if revision.part.project_id != item.project_id:
+            return JsonResponse(
+                {"error": "Die Revision gehört zu einem anderen Projekt."},
+                status=409,
+            )
+        source, created = PrintProjectSource.objects.get_or_create(
+            print_project=item,
+            source_type=PrintProjectSource.SourceType.REVISION,
+            revision=revision,
+            defaults={
+                "label": str(
+                    request.POST.get("label", "") or source_data.get("label", "")
+                ).strip()
+                or f"{revision.part.number} {revision.revision_code}",
+                "uploaded_by": request.user,
+            },
+        )
+        return JsonResponse(
+            {
+                "source_id": source.id,
+                "source": {
+                    "id": source.id,
+                    "type": source.source_type,
+                    "revision_id": source.revision_id,
+                    "label": source.label,
+                },
+                "created": created,
+            },
+            status=201 if created else 200,
+        )
+
     uploaded = request.FILES.get("file")
     if uploaded is None or not uploaded.name.lower().endswith(".stl"):
         return JsonResponse({"error": "Eine STL-Datei ist erforderlich."}, status=400)
-    info = inspect_manufacturing_upload(uploaded)
+    try:
+        info = inspect_manufacturing_upload(uploaded)
+    except ValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     source = PrintProjectSource.objects.create(
         print_project=item, source_type=PrintProjectSource.SourceType.EXTERNAL_STL,
         file=uploaded, original_filename=info["original_filename"], sha256=info["sha256"],
