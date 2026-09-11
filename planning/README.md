@@ -48,6 +48,7 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 14. `planning/PRODUCTION_CHECKLIST.md`
 15. `planning/BAMBUDDY_INTEGRATION_PLAN.md`
 16. `planning/UX_UI_REVIEW.md`
+17. `planning/SLICER_SOURCE_PROVENANCE.md`
 
 ## Arbeitsregel
 
