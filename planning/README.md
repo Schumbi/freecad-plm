@@ -26,13 +26,12 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 - Die aktuelle Serverversion ist `0.2.0`. Der V1-Funktionsumfang ist im Code
   weitgehend vollständig (Stand 2026-09-16). Die Testabdeckung umfasst
   301 Servertests, 226 Addon-Tests und 8 separate HTTP-Vertragstests.
-  Unter SQLite: 6 erwartete Server-Fehlschläge, 4 erwartete Addon-Fehlschläge
+  Unter SQLite: 4 erwartete Server-Fehlschläge, 3 erwartete Addon-Fehlschläge
   für offene Review-Befunde; ein PostgreSQL-Paralleltest wird übersprungen.
   Diese Markierungen bedeuten noch keine Behebung der Fehler.
 - Offen fuer V1.0: allgemeine Browser-Abnahme gemaess
-  `planning/V1_ACCEPTANCE.md`, abschließende Betriebsabnahme sowie eine
-  serverseitige Versionssperre für PrintProject-Uploads mit anschließendem
-  Zwei-Rechner-Test. Der Einzelrechner-Addon-E2E mit
+  `planning/V1_ACCEPTANCE.md`, abschließende Betriebsabnahme sowie der
+  Zwei-Rechner-Test der implementierten PrintProject-Versionssperre. Der Einzelrechner-Addon-E2E mit
   echtem FreeCAD und Bambu Studio ist am 2026-08-07 erfolgreich abgeschlossen.
 
 ## Lesereihenfolge

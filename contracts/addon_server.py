@@ -66,6 +66,21 @@ class AddonServerContracts(PrintProjectFixture, LiveServerTestCase):
         self.assertEqual(state["server_sha256"], sha256_file(self.mesh))
         self.assertEqual(state["sync_status"], "synchronized")
 
+
+    def test_stale_print_project_upload_maps_to_conflict(self):
+        first = self.api.sync_print_project(self.item.pk, self.mesh)
+        base = first["slicer_project"]["sha256"]
+        newer = self.local / "newer.3mf"
+        newer.write_bytes(mesh_upload(marker="newer").read())
+        current = self.api.sync_print_project(self.item.pk, newer, base_sha256=base)
+        with self.assertRaises(ConflictError) as raised:
+            self.api.sync_print_project(self.item.pk, self.mesh, base_sha256=base)
+        self.assertEqual(raised.exception.status, 409)
+        self.assertEqual(
+            self.api.get_print_project(self.item.pk)["slicer_project"]["sha256"],
+            current["slicer_project"]["sha256"],
+        )
+
     def test_sources_use_real_json_and_multipart_contracts(self):
         other = self.make_revision(self.project, "A-002")
         first = self.api.add_print_project_revision_source(self.item.pk, other.pk, "Deckel ä")

@@ -4,7 +4,7 @@
 
 Diese Checkliste ergaenzt `planning/ACCEPTANCE_CRITERIA.md` um eine dokumentierbare manuelle Abnahme. Sie dient als Nachweis, dass V1 im Alltag nutzbar ist — nicht nur in Tests und auf dem Papier.
 
-**Stand der Implementierung:** 2026-09-16 — der aktuelle Addon-Workflow synchronisiert projektbezogene Druckprojekte mit einer primären CAD-Revision und weiteren Quellen. Der Einzelrechner-Workflow ist manuell abgenommen. Vor dem Zwei-Rechner-Test fehlt am PrintProject-Endpunkt noch eine serverseitige Versionssperre; ohne sie kann ein späterer Upload einen zwischenzeitlich gespeicherten Stand ersetzen.
+**Stand der Implementierung:** 2026-09-16 — der aktuelle Addon-Workflow synchronisiert projektbezogene Druckprojekte mit einer primären CAD-Revision und weiteren Quellen. Der Einzelrechner-Workflow ist manuell abgenommen. Der PrintProject-Endpunkt besitzt eine serverseitige Versionssperre; der echte Zwei-Rechner-Test steht noch aus.
 
 ## Vorbereitung
 
@@ -104,8 +104,8 @@ Manuell bestätigt am 2026-08-07 mit FreeCAD Flatpak und Bambu Studio Flatpak:
 | 8 | Primäre STL-Revision schreibgeschützt über den Mesh-Importer öffnen | x |
 | 9 | PrintProject-Upload weist veralteten Basis-Hash ab; zweiter Rechner erkennt Paralleländerung | offen |
 
-Ergebnis: Der Einzelrechner-Workflow ist fachlich abgenommen. Offen sind die
-serverseitige Versionssperre des PrintProject-Endpunkts und danach die manuelle
+Ergebnis: Der Einzelrechner-Workflow ist fachlich abgenommen und die
+serverseitige Versionssperre ist automatisiert geprüft. Offen ist die manuelle
 Abnahme des echten Mehrrechnerfalls.
 
 ## Ergebnis
@@ -116,9 +116,8 @@ Abnahme des echten Mehrrechnerfalls.
 
 ### Offene Punkte / Abweichungen
 
-- 2026-09-16: Der Zwei-Rechner-Test bleibt offen. Zuvor muss der aktuelle
-  PrintProject-Endpunkt eine serverseitige Versionssperre erhalten; die ältere
-  revisionsgebundene Slicer-API besitzt diese Prüfung bereits.
+- 2026-09-16: Die PrintProject-Versionssperre ist implementiert und durch
+  sequenzielle Konflikttests abgesichert. Der echte Zwei-Rechner-Test bleibt offen.
 
 ### Freigabe V1.0
 

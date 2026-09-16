@@ -120,7 +120,6 @@ class PrintProjectWriteTests(PrintProjectFixture, TestCase):
         self.assertEqual(response.json()["print_project"]["slicer_project"]["sha256"],
                          self.item.slicer_sha256)
 
-    @expectedFailure  # Review 4: two clients read A, first writes B, second must not overwrite B.
     def test_stale_writer_receives_conflict_and_preserves_current_file(self):
         base = self.initial_upload()
         self.assertEqual(self.upload(marker="second", base_sha256=base).status_code, 200)
@@ -136,7 +135,6 @@ class PrintProjectWriteTests(PrintProjectFixture, TestCase):
         self.assertEqual(current_path.read_bytes(), current)
         self.assertEqual(self.item.plates.get().name, "second")
 
-    @expectedFailure  # Review 4: omitted base must not silently overwrite an existing file.
     def test_missing_base_cannot_overwrite_existing_project(self):
         base = self.initial_upload()
         response = self.upload(marker="no-base")
@@ -242,7 +240,6 @@ class PrintProjectStorageTests(PrintProjectFixture, TestCase):
 
 @skipUnless(connection.vendor == "postgresql", "Concurrent writes require the production PostgreSQL backend")
 class PrintProjectConcurrencyTests(PrintProjectFixture, TransactionTestCase):
-    @expectedFailure  # Review 4: run again on PostgreSQL when optimistic locking lands.
     def test_only_one_of_two_simultaneous_writers_can_update_the_same_base(self):
         base = self.initial_upload()
         start = Barrier(2, timeout=10)

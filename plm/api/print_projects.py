@@ -92,7 +92,22 @@ def print_project_slicer_api(request, print_project_id):
     if not info["original_filename"].lower().endswith(".3mf"):
         return JsonResponse({"error": "Ein Druckprojekt benötigt eine 3MF-Datei."}, status=400)
     plates = extract_3mf_plate_previews(uploaded)
+    base_sha256 = request.POST.get("base_sha256", "").strip().lower()
     with transaction.atomic():
+        item = (
+            PrintProject.objects.select_for_update()
+            .prefetch_related("sources", "plates", "snapshots")
+            .get(pk=item.pk)
+        )
+        current_sha256 = item.slicer_sha256 if item.slicer_file else ""
+        if current_sha256 != base_sha256:
+            return JsonResponse(
+                {
+                    "error": "Das Druckprojekt wurde seit dem Öffnen geändert.",
+                    "current_sha256": current_sha256,
+                },
+                status=409,
+            )
         for plate in item.plates.exclude(preview=""):
             plate.preview.delete(save=False)
         item.plates.all().delete()
