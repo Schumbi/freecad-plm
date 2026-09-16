@@ -57,6 +57,11 @@ urlpatterns = [
         views.download_print_project_slicer,
         name="download_print_project_slicer",
     ),
+    path(
+        "print-projects/<int:print_project_id>/delete/",
+        views.delete_print_project_view,
+        name="delete_print_project",
+    ),
     path("print-projects/<int:print_project_id>/sources/upload/", views.upload_print_project_source, name="upload_print_project_source"),
     path("print-project-plates/<int:plate_id>/preview/", views.print_project_plate_preview, name="print_project_plate_preview"),
     path(

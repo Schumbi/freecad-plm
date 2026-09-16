@@ -1,6 +1,7 @@
 import json
 import tempfile
 from io import BytesIO
+from pathlib import Path
 from urllib.error import HTTPError
 from unittest.mock import Mock, patch
 
@@ -16,11 +17,24 @@ from .integrations.bambuddy import (
     BambuddyConfigurationError,
     BambuddyConnectionError,
     BambuddyConnectionInfo,
+    BambuddyNotFoundError,
     BambuddyProtocolError,
 )
-from .models import AuditEvent, ManufacturingFile, Part, Project, Revision
+from .models import (
+    AuditEvent,
+    ManufacturingFile,
+    Part,
+    PrintProject,
+    PrintProjectSnapshot,
+    Project,
+    Revision,
+)
 from .permissions import ROLE_ADMIN, ROLE_READER
-from .services.bambuddy import plm_revision_url, sync_bambuddy_source_projects
+from .services.bambuddy import (
+    plm_revision_url,
+    prune_deleted_bambuddy_snapshots,
+    sync_bambuddy_source_projects,
+)
 
 
 class FakeResponse:
@@ -122,6 +136,25 @@ class BambuddyClientTests(SimpleTestCase):
             client.test_connection()
 
         self.assertNotIn("bb_secret", str(raised.exception))
+
+    def test_missing_archive_has_distinct_error(self):
+        def opener(request, **_kwargs):
+            raise HTTPError(
+                request.full_url,
+                404,
+                "Not found",
+                hdrs=None,
+                fp=None,
+            )
+
+        client = BambuddyClient(
+            "http://bambuddy.example",
+            "bb_secret",
+            opener=opener,
+        )
+
+        with self.assertRaises(BambuddyNotFoundError):
+            client.get_archive(24)
 
     def test_rejects_invalid_archive_payload(self):
         client = BambuddyClient(
@@ -694,3 +727,79 @@ class BambuddyIntegrationViewTests(TestCase):
             status_code=502,
         )
         self.assertNotContains(response, "bb_hidden_secret", status_code=502)
+
+
+class BambuddySnapshotPruneTests(TestCase):
+    def setUp(self):
+        self.media_root = tempfile.TemporaryDirectory()
+        self.addCleanup(self.media_root.cleanup)
+        media_override = self.settings(MEDIA_ROOT=self.media_root.name)
+        media_override.enable()
+        self.addCleanup(media_override.disable)
+        self.user = get_user_model().objects.create_user(username="snapshot-prune")
+        project = Project.objects.create(code="SYNC", name="Sync")
+        part = Part.objects.create(project=project, number="A-001", name="Teil")
+        revision = Revision.objects.create(
+            part=part,
+            revision_code="R0001",
+            file=SimpleUploadedFile("part.FCStd", b"fcstd"),
+            original_filename="part.FCStd",
+            sha256="a" * 64,
+            size_bytes=5,
+            created_by=self.user,
+        )
+        self.print_project = PrintProject.objects.create(
+            project=project,
+            primary_revision=revision,
+            code="DP-1",
+            name="Druck",
+        )
+        self.snapshot = PrintProjectSnapshot.objects.create(
+            print_project=self.print_project,
+            file=SimpleUploadedFile("snapshot.3mf", b"snapshot"),
+            original_filename="snapshot.3mf",
+            sha256="b" * 64,
+            size_bytes=8,
+            bambuddy_archive_id=24,
+            created_by=self.user,
+        )
+
+    def test_missing_bambuddy_archive_removes_snapshot_file_and_audits(self):
+        snapshot_id = self.snapshot.id
+        snapshot_path = Path(self.snapshot.file.path)
+        client = Mock()
+        client.get_archive.side_effect = BambuddyNotFoundError("fehlt")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            deleted = prune_deleted_bambuddy_snapshots(client=client)
+
+        self.assertEqual(deleted, 1)
+        self.assertFalse(PrintProjectSnapshot.objects.filter(id=snapshot_id).exists())
+        self.assertFalse(snapshot_path.exists())
+        event = AuditEvent.objects.get(
+            action=AuditEvent.Action.BAMBUDDY_ARCHIVE_DELETED
+        )
+        self.assertEqual(event.metadata["bambuddy_archive_id"], 24)
+        self.assertEqual(event.metadata["print_project_id"], self.print_project.id)
+
+    def test_existing_bambuddy_archive_keeps_snapshot(self):
+        client = Mock()
+        client.get_archive.return_value = {"id": 24}
+
+        deleted = prune_deleted_bambuddy_snapshots(client=client)
+
+        self.assertEqual(deleted, 0)
+        self.assertTrue(
+            PrintProjectSnapshot.objects.filter(id=self.snapshot.id).exists()
+        )
+
+    def test_dry_run_reports_missing_archive_without_deleting(self):
+        client = Mock()
+        client.get_archive.side_effect = BambuddyNotFoundError("fehlt")
+
+        deleted = prune_deleted_bambuddy_snapshots(client=client, dry_run=True)
+
+        self.assertEqual(deleted, 1)
+        self.assertTrue(
+            PrintProjectSnapshot.objects.filter(id=self.snapshot.id).exists()
+        )

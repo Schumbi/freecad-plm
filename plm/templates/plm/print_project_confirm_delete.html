@@ -1,0 +1,61 @@
+{% extends "plm/base.html" %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></li>
+      <li><span aria-current="page">Druckprojekt löschen</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">Druckprojekt löschen</span>
+      <h1>{{ print_project.code }} · {{ print_project.name }}</h1>
+      <p class="lead-text">
+        Hauptrevision {{ print_project.primary_revision.part.number }} ·
+        {{ print_project.primary_revision.revision_code }}
+      </p>
+    </div>
+  </div>
+
+  <div class="data-card danger-card form-shell">
+    {% if snapshot_count %}
+      <div class="danger-banner">
+        Dieses Druckprojekt besitzt
+        {% if snapshot_count == 1 %}einen gespeicherten Druck-Snapshot{% else %}{{ snapshot_count }} gespeicherte Druck-Snapshots{% endif %}
+        und kann deshalb nicht gelöscht werden.
+      </div>
+      <p>
+        Mit Bambuddy verknüpfte Snapshots werden automatisch entfernt, sobald
+        das zugehörige Archiv dort gelöscht wurde. Danach ist das Druckprojekt
+        löschbar.
+      </p>
+      <div class="form-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Zurück zum Projekt</a>
+      </div>
+    {% else %}
+      <div class="danger-banner">
+        Diese Aktion kann nicht rückgängig gemacht werden. Die aktuelle 3MF,
+        externe Quellen, Plattenvorschauen und Metadaten werden dauerhaft entfernt.
+      </div>
+      <dl class="properties-list">
+        <div><dt>Code</dt><dd>{{ print_project.code }}</dd></div>
+        <div><dt>Name</dt><dd>{{ print_project.name }}</dd></div>
+        <div><dt>3MF</dt><dd>{{ print_project.slicer_original_filename|default:"–" }}</dd></div>
+        <div><dt>Quellen</dt><dd>{{ print_project.sources.count }}</dd></div>
+        <div><dt>Druckplatten</dt><dd>{{ print_project.plates.count }}</dd></div>
+      </dl>
+      <form class="form-card" method="post">
+        {% csrf_token %}
+        <div class="form-actions">
+          <button class="btn btn-danger" type="submit">Druckprojekt dauerhaft löschen</button>
+          <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Abbrechen</a>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+{% endblock %}

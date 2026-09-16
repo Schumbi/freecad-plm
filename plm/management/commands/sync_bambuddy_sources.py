@@ -50,6 +50,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"Druckprojekt-{mode}: {print_result.inspected} geprüft, "
                 f"{print_result.matched} eindeutig zugeordnet, "
-                f"{print_result.uploaded} hochgeladen."
+                f"{print_result.uploaded} hochgeladen, "
+                f"{print_result.deleted} in Bambuddy gelöschte Snapshots entfernt."
             )
         )

@@ -130,6 +130,7 @@ def part_detail(request, part_id):
             "manufacturing_form": ManufacturingFileUploadForm(),
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
+            "can_delete_print_projects": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),
         },
     )

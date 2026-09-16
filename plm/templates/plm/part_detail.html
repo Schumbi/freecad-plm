@@ -293,7 +293,7 @@
                   {% with print_projects=revision.primary_print_projects.all %}
                     {% if print_projects %}
                       <h5>Druckprojekte</h5>
-                      {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_upload show_primary_revision=False %}
+                      {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_upload can_delete_print_projects=can_delete_print_projects show_primary_revision=False %}
                     {% endif %}
                   {% endwith %}
 

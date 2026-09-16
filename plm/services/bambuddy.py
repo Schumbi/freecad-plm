@@ -6,8 +6,13 @@ from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
 
-from ..integrations.bambuddy import BambuddyClient, BambuddyProtocolError
+from ..integrations.bambuddy import (
+    BambuddyClient,
+    BambuddyNotFoundError,
+    BambuddyProtocolError,
+)
 from ..models import AuditEvent, ManufacturingFile, PrintProject, PrintProjectSnapshot
+from .print_projects import delete_bambuddy_snapshot
 
 
 @dataclass
@@ -23,6 +28,7 @@ class BambuddySourceSyncResult:
     skipped_printer: int = 0
     unmatched: int = 0
     ambiguous: int = 0
+    deleted: int = 0
 
     def as_dict(self):
         return asdict(self)
@@ -88,6 +94,21 @@ def print_projects_by_print_name():
     return matches
 
 
+def prune_deleted_bambuddy_snapshots(*, client, dry_run=False):
+    deleted = 0
+    snapshots = PrintProjectSnapshot.objects.exclude(
+        bambuddy_archive_id__isnull=True
+    ).select_related("print_project")
+    for snapshot in snapshots:
+        try:
+            client.get_archive(snapshot.bambuddy_archive_id)
+        except BambuddyNotFoundError:
+            deleted += 1
+            if not dry_run:
+                delete_bambuddy_snapshot(snapshot)
+    return deleted
+
+
 def sync_bambuddy_print_projects(*, client=None, printer_ids=None, limit=20, dry_run=False):
     """Attach a frozen multi-source 3MF snapshot to matching Bambuddy jobs."""
     client = client or BambuddyClient.from_settings()
@@ -95,6 +116,10 @@ def sync_bambuddy_print_projects(*, client=None, printer_ids=None, limit=20, dry
     archives = client.list_archives(limit=limit)
     matches = print_projects_by_print_name()
     result = BambuddySourceSyncResult(inspected=len(archives))
+    result.deleted = prune_deleted_bambuddy_snapshots(
+        client=client,
+        dry_run=dry_run,
+    )
     for archive in archives:
         if str(archive.get("status") or "").lower() not in {"printing", "completed"}:
             continue

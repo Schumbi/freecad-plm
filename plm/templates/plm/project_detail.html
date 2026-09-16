@@ -66,7 +66,7 @@
               <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
             </div>
             <div class="plm-dialog-body">
-              {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_create_part show_primary_revision=True %}
+              {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_create_part can_delete_print_projects=can_delete_print_projects show_primary_revision=True %}
             </div>
           </div>
         </div>

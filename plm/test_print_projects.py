@@ -1,6 +1,7 @@
 import json
 import tempfile
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
@@ -10,7 +11,15 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .auth import create_api_token
-from .models import ApiToken, Part, PrintProject, Project, Revision
+from .models import (
+    ApiToken,
+    AuditEvent,
+    Part,
+    PrintProject,
+    PrintProjectSnapshot,
+    Project,
+    Revision,
+)
 from .permissions import ROLE_EDITOR
 
 
@@ -185,3 +194,90 @@ class PrintProjectViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 409)
+
+
+    def test_admin_can_delete_print_project_and_stored_files(self):
+        print_project_id = self.create_print_project()
+        response = self.client.post(
+            reverse("plm:api_print_project_slicer", args=[print_project_id]),
+            {"file": bambu_project_upload()},
+        )
+        self.assertEqual(response.status_code, 200)
+        print_project = PrintProject.objects.get(id=print_project_id)
+        source = print_project.sources.create(
+            source_type="external_stl",
+            file=SimpleUploadedFile("figure.stl", b"solid figure\nendsolid\n"),
+            original_filename="figure.stl",
+            sha256="d" * 64,
+            size_bytes=23,
+            uploaded_by=self.user,
+        )
+        stored_paths = [
+            print_project.slicer_file.path,
+            source.file.path,
+            print_project.plates.get(plate_number=1).preview.path,
+        ]
+        self.client.defaults.pop("HTTP_AUTHORIZATION")
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.client.force_login(self.user)
+
+        project_page = self.client.get(
+            reverse("plm:project_detail", args=[self.project.id])
+        )
+        delete_url = reverse("plm:delete_print_project", args=[print_project_id])
+        self.assertContains(project_page, delete_url)
+        confirmation = self.client.get(delete_url)
+        self.assertContains(confirmation, "Druckprojekt dauerhaft löschen")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(delete_url)
+
+        self.assertRedirects(
+            response,
+            reverse("plm:project_detail", args=[self.project.id]),
+        )
+        self.assertFalse(PrintProject.objects.filter(id=print_project_id).exists())
+        self.assertTrue(all(not Path(path).exists() for path in stored_paths))
+        event = AuditEvent.objects.get(action=AuditEvent.Action.PRINT_PROJECT_DELETED)
+        self.assertEqual(event.metadata["code"], "DP-1")
+        self.assertEqual(event.metadata["source_count"], 2)
+
+    def test_print_project_with_snapshot_cannot_be_deleted(self):
+        print_project_id = self.create_print_project()
+        print_project = PrintProject.objects.get(id=print_project_id)
+        PrintProjectSnapshot.objects.create(
+            print_project=print_project,
+            file=SimpleUploadedFile("snapshot.3mf", b"snapshot"),
+            original_filename="snapshot.3mf",
+            sha256="e" * 64,
+            size_bytes=8,
+            bambuddy_archive_id=24,
+            created_by=self.user,
+        )
+        self.client.defaults.pop("HTTP_AUTHORIZATION")
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.client.force_login(self.user)
+        delete_url = reverse("plm:delete_print_project", args=[print_project_id])
+
+        confirmation = self.client.get(delete_url)
+        self.assertContains(confirmation, "kann deshalb nicht gelöscht werden")
+        self.assertNotContains(confirmation, "Druckprojekt dauerhaft löschen")
+        response = self.client.post(delete_url, follow=True)
+
+        self.assertContains(response, "gespeicherte Druck-Snapshots")
+        self.assertTrue(PrintProject.objects.filter(id=print_project_id).exists())
+
+    def test_editor_cannot_delete_print_project(self):
+        print_project_id = self.create_print_project()
+        self.client.defaults.pop("HTTP_AUTHORIZATION")
+        self.client.force_login(self.user)
+        delete_url = reverse("plm:delete_print_project", args=[print_project_id])
+
+        page = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+        self.assertNotContains(page, delete_url)
+        response = self.client.post(delete_url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(PrintProject.objects.filter(id=print_project_id).exists())

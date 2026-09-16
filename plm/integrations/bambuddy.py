@@ -34,6 +34,10 @@ class BambuddyProtocolError(BambuddyError):
     pass
 
 
+class BambuddyNotFoundError(BambuddyError):
+    pass
+
+
 @dataclass(frozen=True)
 class BambuddyConnectionInfo:
     total_archives: int | None
@@ -130,6 +134,10 @@ class BambuddyClient:
                 raise BambuddyAuthenticationError(
                     "Bambuddy hat den API-Key abgelehnt. Benötigt wird "
                     f"mindestens {required_permission}."
+                ) from exc
+            if exc.code == 404:
+                raise BambuddyNotFoundError(
+                    "Das Bambuddy-Archiv wurde nicht gefunden."
                 ) from exc
             raise BambuddyConnectionError(
                 f"Bambuddy antwortete mit HTTP {exc.code}."

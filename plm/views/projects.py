@@ -11,6 +11,7 @@ from ..models import AuditEvent, Part, PrintProject, PrintProjectPlate, PrintPro
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
 from ..services.manufacturing import inspect_manufacturing_upload
+from ..services.print_projects import delete_print_project
 
 
 @login_required
@@ -209,6 +210,45 @@ def project_detail(request, project_id):
             "snapshot_form": ProjectSnapshotUploadForm(),
             "can_create_part": can_upload_revision(request.user),
             "can_edit_project": is_plm_admin(request.user),
+            "can_delete_print_projects": is_plm_admin(request.user),
+        },
+    )
+
+
+@login_required
+def delete_print_project_view(request, print_project_id):
+    print_project = get_object_or_404(
+        PrintProject.objects.select_related(
+            "project", "primary_revision", "primary_revision__part"
+        ).prefetch_related("sources", "plates", "snapshots"),
+        id=print_project_id,
+    )
+    if not is_plm_admin(request.user):
+        return HttpResponseForbidden(
+            "Keine Berechtigung zum Loeschen von Druckprojekten."
+        )
+
+    project_id = print_project.project_id
+    if request.method == "POST":
+        code = print_project.code
+        try:
+            delete_print_project(print_project, request.user)
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+        else:
+            messages.success(
+                request,
+                f"Druckprojekt {code} wurde dauerhaft gelöscht.",
+            )
+        return redirect("plm:project_detail", project_id=project_id)
+
+    return render(
+        request,
+        "plm/print_project_confirm_delete.html",
+        {
+            "print_project": print_project,
+            "project": print_project.project,
+            "snapshot_count": print_project.snapshots.count(),
         },
     )
 
