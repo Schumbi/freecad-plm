@@ -44,6 +44,11 @@
             {% if print_project.slicer_file %}
               <div>{{ print_project.slicer_original_filename }}</div>
               <div class="print-project-actions">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                  data-model-viewer-source="{% url 'plm:download_print_project_slicer' print_project.id %}"
+                  data-model-viewer-download="{% url 'plm:download_print_project_slicer' print_project.id %}"
+                  data-model-viewer-format="3mf" data-model-viewer-view="bottom"
+                  data-model-viewer-title="{{ print_project.code }} – {{ print_project.slicer_original_filename }}">Unterseite in 3D</button>
                 <a class="btn btn-outline-secondary btn-sm" href="{% url 'plm:download_print_project_slicer' print_project.id %}">3MF herunterladen</a>
               </div>
               {% if print_project.plates.all %}

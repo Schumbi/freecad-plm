@@ -155,6 +155,10 @@ class PrintProjectViewTests(TestCase):
         )
         self.assertContains(project_response, download_url)
         self.assertContains(project_response, "3MF herunterladen")
+        self.assertContains(project_response, "Unterseite in 3D")
+        self.assertContains(project_response, f'data-model-viewer-source="{download_url}"')
+        self.assertContains(project_response, 'data-model-viewer-view="bottom"')
+        self.assertContains(project_response, 'id="model-viewer-bottom"')
 
         part_response = self.client.get(
             reverse("plm:part_detail", args=[self.revision.part_id])
@@ -162,6 +166,7 @@ class PrintProjectViewTests(TestCase):
         self.assertContains(part_response, "Druckprojekt DP-1")
         self.assertContains(part_response, "Druckprojekte")
         self.assertContains(part_response, download_url)
+        self.assertContains(part_response, "Unterseite in 3D")
 
         response = self.client.get(download_url)
         self.assertEqual(response.status_code, 200)

@@ -4,7 +4,9 @@
   function closeDialog(dialog) {
     if (!dialog) return;
     dialog.hidden = true;
-    document.body.classList.remove("modal-open");
+    if (!document.querySelector(".plm-dialog:not([hidden])")) {
+      document.body.classList.remove("modal-open");
+    }
   }
 
   function openDialog(dialog) {
@@ -38,7 +40,8 @@
 
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
-        closeDialog(document.querySelector(".plm-dialog:not([hidden])"));
+        var openDialogs = document.querySelectorAll(".plm-dialog:not([hidden])");
+        closeDialog(openDialogs[openDialogs.length - 1]);
       }
     });
   }

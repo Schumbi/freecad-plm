@@ -9,6 +9,8 @@ const formatElement = document.getElementById("model-viewer-format");
 const canvasHost = document.getElementById("model-viewer-canvas");
 const statusElement = document.getElementById("model-viewer-status");
 const resetButton = document.getElementById("model-viewer-reset");
+const topButton = document.getElementById("model-viewer-top");
+const bottomButton = document.getElementById("model-viewer-bottom");
 const wireframeButton = document.getElementById("model-viewer-wireframe");
 const downloadLink = document.getElementById("model-viewer-download");
 const annotateButton = document.getElementById("model-viewer-annotate");
@@ -30,6 +32,7 @@ let annotationMode = false;
 let pendingAnchor = null;
 let pendingCamera = null;
 let annotationMarkers;
+let initialView = "default";
 
 class ViewerHttpError extends Error {
   constructor(message, status) {
@@ -64,6 +67,9 @@ function ensureScene() {
   const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
   keyLight.position.set(80, 120, 90);
   scene.add(keyLight);
+  const undersideLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  undersideLight.position.set(50, -100, 80);
+  scene.add(undersideLight);
 
   const axes = new THREE.AxesHelper(60);
   axes.name = "viewer-axes";
@@ -167,6 +173,18 @@ function fitCamera(object, viewDirection = new THREE.Vector3(1, 0.75, 1).normali
   controls.update();
 }
 
+function showView(view) {
+  if (!currentObject) return;
+  if (view === "top" || view === "bottom") {
+    // 3MF models are rotated from Z-up to Y-up when loaded.
+    camera.up.set(0, 0, -1);
+    fitCamera(currentObject, new THREE.Vector3(0, view === "top" ? 1 : -1, 0));
+  } else {
+    camera.up.set(0, 1, 0);
+    fitCamera(currentObject);
+  }
+}
+
 function materialForGeometry(geometry) {
   if (geometry.hasAttribute("color")) {
     return new THREE.MeshStandardMaterial({
@@ -254,6 +272,7 @@ async function openViewer(trigger) {
 
   const sourceUrl = trigger.dataset.modelViewerSource;
   const format = trigger.dataset.modelViewerFormat || "stl";
+  initialView = trigger.dataset.modelViewerView === "bottom" ? "bottom" : "default";
   titleElement.textContent = trigger.dataset.modelViewerTitle || "3D-Modell";
   formatElement.textContent = format.toUpperCase();
   downloadLink.href = trigger.dataset.modelViewerDownload || sourceUrl;
@@ -267,7 +286,7 @@ async function openViewer(trigger) {
     currentObject = parseModel(buffer, format);
     scene.add(currentObject);
     setWireframe(wireframe);
-    fitCamera(currentObject);
+    showView(initialView);
     await loadViewerAnnotations();
     setStatus("", false);
     if (!animationFrame) animate();
@@ -448,8 +467,11 @@ document.addEventListener("click", (event) => {
 });
 
 resetButton?.addEventListener("click", () => {
-  if (currentObject) fitCamera(currentObject);
+  showView(initialView);
 });
+
+topButton?.addEventListener("click", () => showView("top"));
+bottomButton?.addEventListener("click", () => showView("bottom"));
 
 wireframeButton?.addEventListener("click", () => {
   setWireframe(!wireframe);
