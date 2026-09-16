@@ -9,6 +9,7 @@ from defusedxml import ElementTree
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 
 from ..fcstd import (
     DEFAULT_PLM_MAX_PROJECT_ZIP_BYTES,
@@ -22,6 +23,56 @@ from ..fcstd import (
 )
 from ..models import AuditEvent, ManufacturingFile
 from .common import upload_file_digest
+
+
+@transaction.atomic
+def delete_manufacturing_file(manufacturing_file, actor):
+    manufacturing_file = (
+        ManufacturingFile.objects.select_for_update()
+        .select_related("revision", "revision__part", "revision__part__project")
+        .get(pk=manufacturing_file.pk)
+    )
+    if manufacturing_file.runs.exists():
+        raise ValidationError(
+            "Diese Fertigungsdatei wird bereits von einem Fertigungslauf verwendet "
+            "und kann nur als obsolet markiert werden."
+        )
+
+    stored_files = [
+        (field_file.storage, field_file.name)
+        for field_file in (manufacturing_file.file, manufacturing_file.thumbnail)
+        if field_file and field_file.name
+    ]
+    metadata = {
+        "manufacturing_file_id": manufacturing_file.id,
+        "revision_id": manufacturing_file.revision_id,
+        "part_id": manufacturing_file.revision.part_id,
+        "project_id": manufacturing_file.revision.part.project_id,
+        "original_filename": manufacturing_file.original_filename,
+        "sha256": manufacturing_file.sha256,
+        "file_type": manufacturing_file.file_type,
+        "status": manufacturing_file.status,
+    }
+    AuditEvent.objects.create(
+        actor=actor,
+        action=AuditEvent.Action.MANUFACTURING_FILE_DELETED,
+        object_repr=str(manufacturing_file),
+        metadata=metadata,
+    )
+    try:
+        manufacturing_file.delete()
+    except ProtectedError as exc:
+        raise ValidationError(
+            "Diese Fertigungsdatei wird bereits verwendet und kann nur als "
+            "obsolet markiert werden."
+        ) from exc
+
+    def delete_stored_files():
+        for storage, name in stored_files:
+            storage.delete(name)
+
+    transaction.on_commit(delete_stored_files)
+    return metadata
 
 
 MANUFACTURING_FILE_EXTENSIONS = {

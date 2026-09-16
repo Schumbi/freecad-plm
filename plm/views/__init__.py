@@ -84,6 +84,7 @@ from .revisions import (
     upload_revision,
 )
 from .manufacturing import (
+    delete_manufacturing_file_view,
     download_manufacturing_file,
     manufacturing_file_thumbnail,
     manufacturing_file_viewer_source,

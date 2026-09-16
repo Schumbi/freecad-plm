@@ -184,6 +184,11 @@ urlpatterns = [
         name="obsolete_manufacturing_file",
     ),
     path(
+        "manufacturing-files/<int:manufacturing_file_id>/delete/",
+        views.delete_manufacturing_file_view,
+        name="delete_manufacturing_file",
+    ),
+    path(
         "parts/<int:part_id>/compare/",
         views.revision_compare,
         name="revision_compare",

@@ -10,8 +10,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - V0-Browser-Abnahme aus `planning/ACCEPTANCE_CRITERIA.md` mitlaufen lassen, falls noch nicht erledigt.
 - Echten Analyse-/Exportlauf fuer STEP/STL/3MF mit FreeCADCmd auf dem Zielserver abhaken.
 - PNG-Ansichten, 3D-Preview und Revisionsvergleich auf der laufenden Instanz mit echtem Worker pruefen.
-- Slicer-Projekt-Synchronisation auf einem zweiten Rechner prüfen, inklusive
-  Konfliktfall bei paralleler Änderung.
+- PrintProject-Uploads um eine serverseitige Versionssperre mit Basis-Hash und
+  HTTP `409` bei veraltetem Stand ergänzen. Danach die Druckprojekt-Synchronisation
+  auf einem zweiten Rechner einschließlich Paralleländerung prüfen.
 - Update-, Backup- und Restore-Ablauf aus
   `planning/PRODUCTION_CHECKLIST.md` auf dem Zielserver durchführen und
   protokollieren; die Strategie selbst ist festgehalten und auf der lokalen
@@ -117,8 +118,9 @@ Diese Datei ist die operative Aufgabenliste. Sie soll kurz bleiben und den naech
 - Schwebenden 3D-Viewer fuer Revisionen, Artefakte und Fertigungsdateien angelegt; STL/3MF werden direkt angezeigt, FCStd/STEP nutzen ein gespeichertes STL-Preview-Artefakt.
 - Slicer-Projekt-Synchronisation im Addon auf einem Rechner manuell abgenommen:
   Start aus FreeCAD Flatpak, 3MF-Erzeugung, automatischer Upload, erneutes
-  Öffnen, Metadatenanzeige sowie schreibgeschütztes STL-/STEP-Öffnen; nur der
-  Zwei-Rechner-Konflikttest bleibt offen.
+  Öffnen, Metadatenanzeige sowie schreibgeschütztes STL-/STEP-Öffnen. Für den
+  Zwei-Rechner-Konflikttest fehlt am aktuellen PrintProject-Endpunkt noch die
+  serverseitige Versionssperre.
 - Upload-/ZIP-Budgets fuer FCStd, Projekt-ZIP und 3MF eingefuehrt; grobe DoS-/Zip-Bomb-Grenzen liegen jetzt als konfigurierbare `PLM_MAX_*`-Werte in den Settings.
 - Worker-Container im Compose gehärtet: keine Linux-Caps, `no-new-privileges`, read-only Root-FS, `tmpfs` fuer `/tmp` und `/var/tmp`, sowie einfache CPU-/RAM-/PID-Limits.
 - Snapshot-Projektprüfung im Checkout-API-Pfad umgesetzt; fremde `snapshot_id`-Werte liefern jetzt `404`.

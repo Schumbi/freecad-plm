@@ -17,7 +17,15 @@ from .permissions import ROLE_EDITOR
 def bambu_project_upload():
     buffer = BytesIO()
     with ZipFile(buffer, "w") as archive:
-        archive.writestr("3D/3dmodel.model", "<model><resources/><build/></model>")
+        archive.writestr(
+            "3D/3dmodel.model",
+            '<model xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">'
+            '<resources><object id="1" type="model"><mesh><vertices>'
+            '<vertex x="0" y="0" z="0"/><vertex x="10" y="0" z="0"/>'
+            '<vertex x="0" y="10" z="0"/></vertices><triangles>'
+            '<triangle v1="0" v2="1" v3="2"/></triangles></mesh></object></resources>'
+            '<build><item objectid="1"/></build></model>',
+        )
         archive.writestr("Metadata/plate_1.json", json.dumps({"name": "Mount und Figur"}))
         archive.writestr("Metadata/plate_1.png", b"plate-one")
         archive.writestr("Metadata/plate_2.json", json.dumps({"plate_name": "Reserve"}))

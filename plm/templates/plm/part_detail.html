@@ -429,6 +429,9 @@
                                   <button type="submit">Als obsolet markieren</button>
                                 </form>
                               {% endif %}
+                              {% if can_release %}
+                                <a class="btn btn-danger btn-sm" href="{% url 'plm:delete_manufacturing_file' manufacturing_file.id %}">Löschen</a>
+                              {% endif %}
                             </td>
                           </tr>
                         {% endfor %}

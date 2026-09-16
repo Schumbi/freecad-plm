@@ -6,7 +6,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from ..forms import ManufacturingFileUploadForm, RevisionUploadForm
 from ..models import AuditEvent, ManufacturingFile, Revision
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
-from ..services import create_manufacturing_file_from_upload
+from ..services import (
+    create_manufacturing_file_from_upload,
+    delete_manufacturing_file,
+)
 
 from .common import (
     VIEWER_SUPPORTED_MANUFACTURING_TYPES,
@@ -170,3 +173,42 @@ def obsolete_manufacturing_file(request, manufacturing_file_id):
     )
     messages.success(request, "Fertigungsdatei wurde als obsolet markiert.")
     return redirect("plm:part_detail", part_id=manufacturing_file.revision.part_id)
+
+
+@login_required
+def delete_manufacturing_file_view(request, manufacturing_file_id):
+    manufacturing_file = get_object_or_404(
+        ManufacturingFile.objects.select_related(
+            "revision", "revision__part", "revision__part__project"
+        ),
+        id=manufacturing_file_id,
+    )
+    if not can_release_revision(request.user):
+        return HttpResponseForbidden(
+            "Keine Berechtigung zum Loeschen von Fertigungsdateien."
+        )
+
+    part_id = manufacturing_file.revision.part_id
+    if request.method == "POST":
+        filename = manufacturing_file.original_filename
+        try:
+            delete_manufacturing_file(manufacturing_file, request.user)
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+        else:
+            messages.success(
+                request,
+                f"Fertigungsdatei {filename} wurde dauerhaft gelöscht.",
+            )
+        return redirect("plm:part_detail", part_id=part_id)
+
+    return render(
+        request,
+        "plm/manufacturing_file_confirm_delete.html",
+        {
+            "manufacturing_file": manufacturing_file,
+            "part": manufacturing_file.revision.part,
+            "project": manufacturing_file.revision.part.project,
+            "run_count": manufacturing_file.runs.count(),
+        },
+    )

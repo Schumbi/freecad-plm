@@ -23,11 +23,16 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 - Das vorhandene nanoPLM wurde grob analysiert.
 - Der alte nanoPLM-Code wurde nach `old/` verschoben.
 - Django ist die technische Basis; Docker Compose mit PostgreSQL, Media-Volume und FreeCADCmd-Worker ist umgesetzt.
-- V1-Funktionsumfang ist im Code weitgehend vollständig (Stand 2026-08-30,
-  255 Server- und 170 Add-on-Tests).
+- Die aktuelle Serverversion ist `0.2.0`. Der V1-Funktionsumfang ist im Code
+  weitgehend vollständig (Stand 2026-09-16). Die Testabdeckung umfasst
+  301 Servertests, 226 Addon-Tests und 8 separate HTTP-Vertragstests.
+  Unter SQLite: 13 erwartete Server-Fehlschläge, 10 erwartete Addon-Fehlschläge
+  für offene Review-Befunde; ein PostgreSQL-Paralleltest wird übersprungen.
+  Diese Markierungen bedeuten noch keine Behebung der Fehler.
 - Offen fuer V1.0: allgemeine Browser-Abnahme gemaess
-  `planning/V1_ACCEPTANCE.md`, abschließende Betriebsabnahme und der manuelle
-  Zwei-Rechner-Test der Slicer-Synchronisation. Der Einzelrechner-Addon-E2E mit
+  `planning/V1_ACCEPTANCE.md`, abschließende Betriebsabnahme sowie eine
+  serverseitige Versionssperre für PrintProject-Uploads mit anschließendem
+  Zwei-Rechner-Test. Der Einzelrechner-Addon-E2E mit
   echtem FreeCAD und Bambu Studio ist am 2026-08-07 erfolgreich abgeschlossen.
 
 ## Lesereihenfolge

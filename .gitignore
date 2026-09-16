@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 db.sqlite3
+default_*.sqlite3
 storage/
 staticfiles/
 .pytest_cache/

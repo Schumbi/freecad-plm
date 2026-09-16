@@ -12,6 +12,7 @@ from .common import (
 from .manufacturing import (
     MANUFACTURING_FILE_EXTENSIONS,
     create_manufacturing_file_from_upload,
+    delete_manufacturing_file,
     decimal_config_value,
     decode_config_bytes,
     extract_slicer_fields,

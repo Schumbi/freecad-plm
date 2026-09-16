@@ -57,7 +57,8 @@ def plm_revision_url(revision):
             "ohne Zugangsdaten, Query-String oder Fragment konfiguriert sein."
         )
     part_path = reverse("plm:part_detail", args=[revision.part_id]).lstrip("/")
-    return f"{urljoin(f'{base_url.rstrip('/')}/', part_path)}#revision-{revision.id}"
+    detail_url = urljoin(base_url.rstrip("/") + "/", part_path)
+    return f"{detail_url}#revision-{revision.id}"
 
 
 def slicer_projects_by_print_name():

@@ -17,6 +17,47 @@ Die PLM-Oberflaeche startet unter <http://127.0.0.1:8000/> und nutzt
 <http://127.0.0.1:8000/login/> fuer die normale Anmeldung. Die technische
 Django-Admin-Oberflaeche liegt weiterhin unter <http://127.0.0.1:8000/admin/>.
 
+## Tests unter Windows und Linux
+
+Der gemeinsame Teststarter erzeugt beziehungsweise aktualisiert `.venv`,
+installiert die Abhängigkeiten aus `requirements.txt` und führt Django-Systemchecks
+sowie die vollständige Test-Suite aus:
+
+Windows 11:
+
+```powershell
+python scripts/run_tests.py
+```
+
+Linux Mint:
+
+```bash
+python3 scripts/run_tests.py
+```
+
+Abhängigkeiten werden erneut installiert, wenn sich `requirements.txt`
+geändert hat.
+
+Die zusätzlichen HTTP-Vertragstests benötigen auch das Addon-Repository
+(standardmäßig neben dem Server-Repository). Sie starten einen temporären
+Django-Testserver, verwenden die Testdatenbank und sprechen ihn mit dem echten
+Addon-Client an. FreeCAD, Slicer und ein laufender Produktivserver sind nicht nötig:
+
+```powershell
+python scripts/run_contract_tests.py
+```
+
+Unter Linux Mint: `python3 scripts/run_contract_tests.py`. Für eine andere
+Verzeichnisstruktur: `--addon /pfad/zu/freecad-plm-addon`.
+Ein fehlendes Addon führt zu einem Fehler, nicht zu übersprungenen Vertragstests.
+
+`plm/test_review_regressions.py` enthält Sollverhalten für die offenen
+Review-Befunde. `expectedFailure` kennzeichnet bekannte Fehler; beim Beheben
+muss der jeweilige Dekorator entfernt werden, sonst meldet die Suite einen
+unerwarteten Erfolg und schlägt fehl. Der Parallel-Schreibtest benötigt
+PostgreSQL und wird unter SQLite ausdrücklich übersprungen. Die HTTP-Vertragstests
+sind ein separater Pflichtlauf bei Änderungen an der Server/Addon-Schnittstelle.
+
 ## Serverbetrieb Mit Docker Compose
 
 Der empfohlene Serverpfad nutzt Docker Compose mit PostgreSQL, lokalen Datenverzeichnissen und einem separaten Worker. Web und Worker werden aus getrennten Docker-Targets gebaut. Beide enthalten die PLM-Anwendung; nur das Worker-Image enthält FreeCAD/FreeCADCmd.
@@ -324,11 +365,13 @@ Facetten funktionieren auch ohne Suchtext. Auf Listen-Seiten gibt es weiterhin
 einen lokalen Filter in der jeweiligen Toolbar.
 
 Die Teilseite verbindet Revisionen, Freigaben, synchronisierte
-3MF-Slicer-Stände, Fertigungsdateien und Fertigungsläufe in einem gemeinsamen
+3MF-Druckprojektstände, Fertigungsdateien und Fertigungsläufe in einem gemeinsamen
 Lebenszyklus. Baugruppen zeigen außerdem einen aufklappbaren Referenzbaum aus
 dem historischen Projektstand. CAD-Revisionen und Fertigungsdateien können per
-Drag-and-drop hochgeladen werden. Im 3D-Viewer lassen sich PLM-Anmerkungen an
-einem Modellpunkt verankern.
+Drag-and-drop hochgeladen werden. Admins können unbenutzte, temporäre
+Fertigungsdateien nach einer Bestätigung dauerhaft löschen; mit einem
+Fertigungslauf verknüpfte Dateien bleiben geschützt. Im 3D-Viewer lassen sich
+PLM-Anmerkungen an einem Modellpunkt verankern.
 
 ## Projektstaende
 
@@ -374,7 +417,11 @@ Token-Scopes:
 - `POST /api/revisions/<id>/notes/`
 - `GET /api/revisions/<id>/file/`
 - `GET /api/revisions/<id>/manifest/`
-- `GET/POST /api/revisions/<id>/slicer-project/`
+- `GET/POST /api/revisions/<id>/slicer-project/` (Kompatibilität für ältere Addon-Stände)
+- `GET/POST /api/print-projects/`
+- `GET/POST /api/print-projects/<id>/slicer-project/`
+- `GET /api/print-projects/<id>/slicer-project/file/`
+- `POST /api/print-projects/<id>/sources/`
 - `GET /api/manufacturing-files/<id>/file/`
 - `POST /api/revisions/<id>/checkout/`
 - `GET /api/checkouts/active/`
@@ -406,12 +453,21 @@ ein eigener Checkout für das neue Teil. Schlägt die serverseitige Teilanlage
 oder Aufnahme in den Checkout fehl, werden Teil, Revision und Audit-Einträge
 nicht als unvollständiger Datenbankstand gespeichert.
 
-Mit `GET/POST /api/revisions/<id>/slicer-project/` verwaltet das Addon genau
-einen bearbeitbaren 3MF-Slicer-Arbeitsstand je CAD-Revision. Ein Update sendet
-den zuletzt gelesenen Server-Hash als `base_sha256`; ein veralteter Stand wird
-mit HTTP `409` abgelehnt und niemals still überschrieben. Normale hochgeladene
-Slicer-/Fertigungsdateien bleiben davon getrennt und unveränderlich. Der
-Arbeitsstand wird im WebUI als `Slicer-Projekt (Arbeitsstand)` angezeigt.
+Das aktuelle Addon arbeitet mit projektbezogenen `PrintProject`-Objekten. Beim
+Anlegen wird eine CAD-Revision als primäre Quelle festgelegt; weitere
+Revisionen desselben PLM-Projekts und externe STL-Dateien können als Quellen
+hinzukommen. Das Druckprojekt besitzt genau eine veränderliche 3MF mit ihren
+Druckplatten und Vorschaubildern. Der Download erfolgt über den eigenen
+`.../slicer-project/file/`-Endpunkt. Normale hochgeladene Fertigungsdateien
+bleiben davon getrennt und unveränderlich.
+
+`GET/POST /api/revisions/<id>/slicer-project/` bleibt für ältere Addon-Stände
+verfügbar. Dieser ältere Endpunkt verwaltet einen Arbeitsstand unmittelbar an
+der CAD-Revision und prüft beim Update `base_sha256`. Der aktuelle
+PrintProject-Endpunkt nimmt beim Upload noch keinen Basis-Hash entgegen. Ein
+Client muss deshalb vor dem Upload den Serverstand abgleichen; zwei gleichzeitig
+geöffnete Druckprojekte sind noch nicht durch eine serverseitige
+Versionssperre geschützt.
 
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 

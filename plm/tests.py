@@ -1536,10 +1536,12 @@ class RevisionUploadViewTests(TestCase):
 
         status = self.client.get(reverse("plm:revision_viewer_status", args=[revision.id]))
         source = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
-
-        self.assertEqual(status.json()["status"], "ready")
-        self.assertEqual(source.status_code, 200)
-        self.assertEqual(source["Content-Type"], "model/stl")
+        try:
+            self.assertEqual(status.json()["status"], "ready")
+            self.assertEqual(source.status_code, 200)
+            self.assertEqual(source["Content-Type"], "model/stl")
+        finally:
+            source.close()
 
     def test_duplicate_upload_shows_error_and_creates_no_new_revision(self):
         self.client.force_login(self.user)
@@ -3151,6 +3153,96 @@ class ManufacturingFileTests(TestCase):
             'inline; filename="thumbnail.png"',
         )
         thumbnail.close()
+
+    def test_admin_can_delete_temporary_manufacturing_file_and_storage(self):
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+            label="Temporärer Testdruck",
+        )
+        manufacturing_id = manufacturing_file.id
+        file_path = Path(manufacturing_file.file.path)
+        thumbnail_path = Path(manufacturing_file.thumbnail.path)
+        self.client.force_login(self.admin)
+
+        confirm = self.client.get(
+            reverse("plm:delete_manufacturing_file", args=[manufacturing_id])
+        )
+        self.assertEqual(confirm.status_code, 200)
+        self.assertContains(confirm, "Temporärer Testdruck")
+        self.assertContains(confirm, "Fertigungsdatei dauerhaft löschen")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("plm:delete_manufacturing_file", args=[manufacturing_id])
+            )
+
+        self.assertRedirects(response, reverse("plm:part_detail", args=[self.part.id]))
+        self.assertFalse(ManufacturingFile.objects.filter(id=manufacturing_id).exists())
+        self.assertFalse(file_path.exists())
+        self.assertFalse(thumbnail_path.exists())
+        event = AuditEvent.objects.get(
+            action=AuditEvent.Action.MANUFACTURING_FILE_DELETED
+        )
+        self.assertEqual(event.metadata["manufacturing_file_id"], manufacturing_id)
+        self.assertEqual(event.metadata["original_filename"], "plate.3mf")
+        self.assertEqual(event.metadata["revision_id"], self.revision.id)
+
+    def test_editor_cannot_delete_manufacturing_file(self):
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+        )
+        self.client.force_login(self.editor)
+
+        detail = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+        self.assertNotContains(
+            detail,
+            reverse("plm:delete_manufacturing_file", args=[manufacturing_file.id]),
+        )
+        response = self.client.post(
+            reverse("plm:delete_manufacturing_file", args=[manufacturing_file.id])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ManufacturingFile.objects.filter(id=manufacturing_file.id).exists())
+
+    def test_manufacturing_file_with_run_cannot_be_deleted(self):
+        machine = ManufacturingMachine.objects.create(name="Bambu X1C")
+        manufacturing_file = create_manufacturing_file_from_upload(
+            revision=self.revision,
+            uploaded_file=make_3mf_upload(),
+            uploaded_by=self.editor,
+            machine=machine,
+        )
+        ManufacturingRun.objects.create(
+            manufacturing_file=manufacturing_file,
+            machine=machine,
+            operator=self.admin,
+        )
+        file_path = Path(manufacturing_file.file.path)
+        self.client.force_login(self.admin)
+
+        confirm = self.client.get(
+            reverse("plm:delete_manufacturing_file", args=[manufacturing_file.id])
+        )
+        self.assertContains(confirm, "kann deshalb nicht gelöscht werden")
+        self.assertNotContains(confirm, "Fertigungsdatei dauerhaft löschen")
+        response = self.client.post(
+            reverse("plm:delete_manufacturing_file", args=[manufacturing_file.id]),
+            follow=True,
+        )
+
+        self.assertContains(response, "kann nur als obsolet markiert werden")
+        self.assertTrue(ManufacturingFile.objects.filter(id=manufacturing_file.id).exists())
+        self.assertTrue(file_path.exists())
+        self.assertFalse(
+            AuditEvent.objects.filter(
+                action=AuditEvent.Action.MANUFACTURING_FILE_DELETED
+            ).exists()
+        )
 
     def test_admin_can_mark_manufacturing_file_obsolete(self):
         manufacturing_file = create_manufacturing_file_from_upload(
@@ -5211,7 +5303,8 @@ class AddonApiWorkflowTests(TestCase):
             make_fcstd_bytes("Box geaendert", xlinks=[("Chip.FCStd", "VarSet")]),
             "R0002",
         )
-        noisy_deckel = noisy_fcstd_bytes(deckel_revision.file.read(), plm_revision="R0002")
+        with deckel_revision.file.open("rb") as source:
+            noisy_deckel = noisy_fcstd_bytes(source.read(), plm_revision="R0002")
         metadata = [
             {
                 "field": "file_0",
@@ -5272,7 +5365,8 @@ class AddonApiWorkflowTests(TestCase):
             {"snapshot_id": snapshot.id},
         )
         checkout_id = checkout_response.json()["checkout"]["id"]
-        noisy_box = noisy_fcstd_bytes(box_revision.file.read(), plm_revision="R0002")
+        with box_revision.file.open("rb") as source:
+            noisy_box = noisy_fcstd_bytes(source.read(), plm_revision="R0002")
         metadata = [
             {
                 "field": "file_0",
