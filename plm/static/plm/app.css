@@ -2172,3 +2172,64 @@ figure {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 }
+
+
+.section-description {
+  color: var(--muted);
+  margin: 0.2rem 0 0;
+}
+
+.secondary-sections {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.overview-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.overview-section > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  list-style: none;
+  padding: var(--space-3) var(--space-4);
+}
+
+.overview-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview-section > summary::before {
+  color: var(--muted);
+  content: "▸";
+  flex: 0 0 auto;
+}
+
+.overview-section[open] > summary::before {
+  content: "▾";
+}
+
+.overview-section-title {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.overview-section-content {
+  border-top: 1px solid var(--border);
+  padding: var(--space-4);
+}
+
+.print-project-actions {
+  margin-top: var(--space-2);
+}
+
+.print-project-table table {
+  min-width: 58rem;
+}

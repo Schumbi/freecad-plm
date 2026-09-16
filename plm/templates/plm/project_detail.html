@@ -48,57 +48,27 @@
       </div>
 
       <div class="section-header">
-        <h2>Druckprojekte</h2>
+        <div>
+          <h2>Druckprojekte</h2>
+          <p class="section-description">3MF-Dateien, Quellen und Druckplatten des Projekts.</p>
+        </div>
+        {% if print_projects %}
+          <button type="button" class="btn btn-outline-secondary" data-dialog-target="#print-projects">
+            {{ print_projects|length }} Druckprojekt{{ print_projects|length|pluralize:"e" }} anzeigen
+          </button>
+        {% endif %}
       </div>
       {% if print_projects %}
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Code</th><th>Name</th><th>Quellen</th><th>3MF / Druckplatten</th><th>Druck-Snapshots</th></tr></thead>
-            <tbody>
-              {% for print_project in print_projects %}
-                <tr>
-                  <td>{{ print_project.code }}</td>
-                  <td>{{ print_project.name }}</td>
-                  <td>
-                    <ul class="compact-list">
-                      {% for source in print_project.sources.all %}
-                        <li>{{ source.get_source_type_display }}{% if source.label %}: {{ source.label }}{% endif %}</li>
-                      {% endfor %}
-                    </ul>
-                    {% if can_create_part %}
-                      <form class="print-project-source-form" method="post" enctype="multipart/form-data" action="{% url 'plm:upload_print_project_source' print_project.id %}">
-                        {% csrf_token %}
-                        <input type="text" name="label" maxlength="160" placeholder="Bezeichnung (optional)" aria-label="Bezeichnung der STL-Quelle">
-                        <input type="file" name="file" accept=".stl" required aria-label="Externe STL-Datei">
-                        <button class="btn btn-outline-secondary btn-sm" type="submit">STL hinzufügen</button>
-                      </form>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if print_project.slicer_file %}
-                      <div>{{ print_project.slicer_original_filename }}</div>
-                      <div>
-                        <a class="btn btn-outline-secondary btn-sm" href="{% url 'plm:download_print_project_slicer' print_project.id %}">3MF herunterladen</a>
-                      </div>
-                      {% if print_project.plates.all %}
-                        <div class="print-project-plates">
-                          {% for plate in print_project.plates.all %}
-                            <figure class="print-project-plate">
-                              {% if plate.preview %}<img src="{% url 'plm:print_project_plate_preview' plate.id %}" alt="Vorschau {{ plate.name }}">{% endif %}
-                              <figcaption>{{ plate.name }}</figcaption>
-                            </figure>
-                          {% endfor %}
-                        </div>
-                      {% else %}
-                        <span class="muted">Keine Plattenvorschau im 3MF gefunden.</span>
-                      {% endif %}
-                    {% else %}Noch kein Slicer-Projekt{% endif %}
-                  </td>
-                  <td>{{ print_project.snapshots.all|length }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="plm-dialog" id="print-projects" role="dialog" aria-modal="true" aria-labelledby="print-projects-title" hidden>
+          <div class="plm-dialog-panel wide">
+            <div class="plm-dialog-header">
+              <h5 class="plm-dialog-title" id="print-projects-title">Druckprojekte · {{ project.code }}</h5>
+              <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
+            </div>
+            <div class="plm-dialog-body">
+              {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_create_part show_primary_revision=True %}
+            </div>
+          </div>
         </div>
       {% else %}
         <p class="muted">Noch keine Druckprojekte. Sie werden über „Druckprojekt öffnen/erstellen“ in FreeCAD angelegt.</p>

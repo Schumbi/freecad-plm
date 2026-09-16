@@ -87,6 +87,8 @@ class PrintProjectViewTests(TestCase):
         )
         self.assertRedirects(response, reverse("plm:project_detail", args=[self.project.id]))
         response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+        self.assertContains(response, 'data-dialog-target="#print-projects"')
+        self.assertContains(response, 'id="print-projects"')
         self.assertContains(response, "Mount und Figur")
         self.assertContains(response, "STL hinzufügen")
         self.assertContains(response, "Figur")
@@ -144,6 +146,13 @@ class PrintProjectViewTests(TestCase):
         )
         self.assertContains(project_response, download_url)
         self.assertContains(project_response, "3MF herunterladen")
+
+        part_response = self.client.get(
+            reverse("plm:part_detail", args=[self.revision.part_id])
+        )
+        self.assertContains(part_response, "Druckprojekt DP-1")
+        self.assertContains(part_response, "Druckprojekte")
+        self.assertContains(part_response, download_url)
 
         response = self.client.get(download_url)
         self.assertEqual(response.status_code, 200)

@@ -31,79 +31,6 @@
       </div>
       <p class="mobile-properties-link"><a href="{% url 'plm:part_properties' part.id %}">Eigenschaften anzeigen</a></p>
 
-      <div class="section-header">
-        <h2>FreeCAD-Anmerkungen</h2>
-        {% if annotations %}
-          <span class="muted">{{ open_annotations_count }} offen · {{ annotations|length }} gesamt</span>
-        {% endif %}
-      </div>
-      {% if annotations %}
-        <div class="annotation-list">
-          {% for annotation in annotations %}
-            <article class="annotation-card">
-              <div class="annotation-title-row">
-                <span class="status-badge status-{{ annotation.status }}">{{ annotation.get_status_display }}</span>
-                {% if annotation.revision %}
-                  <span class="revision-code">{{ annotation.revision.revision_code }}</span>
-                {% else %}
-                  <span class="meta-line">Teilübergreifend</span>
-                {% endif %}
-                {% if annotation.object_name %}
-                  <span class="artifact-pill">{{ annotation.object_name }}{% if annotation.subelement %} · {{ annotation.subelement }}{% endif %}</span>
-                {% elif annotation.subelement %}
-                  <span class="artifact-pill">{{ annotation.subelement }}</span>
-                {% endif %}
-              </div>
-              <p class="annotation-text">{{ annotation.text }}</p>
-              <p class="meta-line">{{ annotation.created_at|date:"d.m.Y H:i" }} · {{ annotation.created_by }}</p>
-            </article>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="empty-state">Noch keine FreeCAD-Anmerkungen vorhanden.</div>
-      {% endif %}
-
-      {% if bom_tree %}
-        <section class="part-bom">
-          <div class="section-header">
-            <h2>Baugruppenstruktur</h2>
-            {% if bom_tree.snapshot %}<span class="muted">Projektstand {{ bom_tree.snapshot.name }}</span>{% endif %}
-          </div>
-          {% if not bom_tree.snapshot %}
-            <p class="field-hint">Die Referenzen werden aus der aktuellen Revision gelesen. Ohne Projektstand können Dateiverweise nicht sicher einem PLM-Teil zugeordnet werden.</p>
-          {% endif %}
-          <ul class="bom-tree bom-tree-root">
-            {% include "plm/includes/bom_node.html" with node=bom_tree %}
-          </ul>
-        </section>
-      {% endif %}
-
-      {% if lifecycle_events %}
-        <section class="part-lifecycle">
-          <div class="section-header">
-            <h2>Lebenszyklus</h2>
-            <span class="muted">CAD, Slicer und Fertigung</span>
-          </div>
-          <ol class="lifecycle-list">
-            {% for event in lifecycle_events %}
-              <li class="lifecycle-event lifecycle-{{ event.kind }}">
-                <span class="lifecycle-marker" aria-hidden="true"></span>
-                <div>
-                  <div class="lifecycle-title-row">
-                    <strong>{{ event.title }}</strong>
-                    <span class="status-badge status-{{ event.status }}">{{ event.timestamp|date:"d.m.Y H:i" }}</span>
-                  </div>
-                  <p class="meta-line">
-                    <a href="#revision-{{ event.revision.id }}">{{ event.revision.revision_code }}</a>
-                    {% if event.detail %} · {{ event.detail }}{% endif %}
-                  </p>
-                </div>
-              </li>
-            {% endfor %}
-          </ol>
-        </section>
-      {% endif %}
-
       <div class="toolbar">
         <div class="toolbar-group">
           <span class="muted" id="revision-filter-count" data-filter-default="{{ revisions|length }} Revisionen">{{ revisions|length }} Revisionen</span>
@@ -165,6 +92,9 @@
                       <span class="artifact-pill">Fertigung {{ manufacturing_file.get_file_type_display }}</span>
                     {% endif %}
                   {% endfor %}
+                  {% for print_project in revision.primary_print_projects.all %}
+                    <span class="artifact-pill">Druckprojekt {{ print_project.code }}</span>
+                  {% endfor %}
                   {% for job in revision.export_jobs.all %}
                     <span class="job-status-pill job-{{ job.status }}">{{ job.get_job_type_display }}: {{ job.get_status_display }}</span>
                   {% endfor %}
@@ -205,12 +135,12 @@
                 </div>
                 <div class="revision-actions-secondary">
                   <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">Anmerkungen</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#manufacturing-{{ revision.id }}">Fertigung</button>
                   <details class="action-menu">
                     <summary>Mehr</summary>
                     <div class="action-menu-content">
                     <button type="button" data-dialog-target="#revision-properties-{{ revision.id }}">Eigenschaften</button>
                     <button type="button" data-dialog-target="#freecad-{{ revision.id }}">Metadaten</button>
-                    <button type="button" data-dialog-target="#manufacturing-{{ revision.id }}">Fertigung</button>
                     <button type="button" data-dialog-target="#jobs-{{ revision.id }}">Jobs und Artefakte</button>
                     {% if can_upload %}
                       <form method="post" action="{% url 'plm:create_revision_viewer_preview' revision.id %}">
@@ -360,7 +290,14 @@
                   <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
-                  <h5>Verwendbare Fertigungsdateien</h5>
+                  {% with print_projects=revision.primary_print_projects.all %}
+                    {% if print_projects %}
+                      <h5>Druckprojekte</h5>
+                      {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_upload show_primary_revision=False %}
+                    {% endif %}
+                  {% endwith %}
+
+                  <h5>Weitere Fertigungsdateien</h5>
                   {% if revision.manufacturing_files.all %}
                     <div data-manufacturing-browser>
                     <div class="table-wrap">
@@ -473,7 +410,7 @@
                     </section>
                     </div>
                   {% else %}
-                    <div class="empty-state">Noch keine verwendbare Fertigungsdatei fuer diese Revision.</div>
+                    <div class="empty-state">Noch keine weitere Fertigungsdatei für diese Revision.</div>
                   {% endif %}
 
                   {% if can_upload %}
@@ -571,6 +508,87 @@
       {% else %}
         <div class="empty-state">Noch keine Revisionen vorhanden.</div>
       {% endif %}
+
+      <div class="secondary-sections">
+        <details class="overview-section">
+          <summary>
+            <span class="overview-section-title">FreeCAD-Anmerkungen</span>
+            {% if annotations %}<span class="muted">{{ open_annotations_count }} offen · {{ annotations|length }} gesamt</span>{% endif %}
+          </summary>
+          <div class="overview-section-content">
+            {% if annotations %}
+              <div class="annotation-list">
+                {% for annotation in annotations %}
+                  <article class="annotation-card">
+                    <div class="annotation-title-row">
+                      <span class="status-badge status-{{ annotation.status }}">{{ annotation.get_status_display }}</span>
+                      {% if annotation.revision %}
+                        <span class="revision-code">{{ annotation.revision.revision_code }}</span>
+                      {% else %}
+                        <span class="meta-line">Teilübergreifend</span>
+                      {% endif %}
+                      {% if annotation.object_name %}
+                        <span class="artifact-pill">{{ annotation.object_name }}{% if annotation.subelement %} · {{ annotation.subelement }}{% endif %}</span>
+                      {% elif annotation.subelement %}
+                        <span class="artifact-pill">{{ annotation.subelement }}</span>
+                      {% endif %}
+                    </div>
+                    <p class="annotation-text">{{ annotation.text }}</p>
+                    <p class="meta-line">{{ annotation.created_at|date:"d.m.Y H:i" }} · {{ annotation.created_by }}</p>
+                  </article>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-state">Noch keine FreeCAD-Anmerkungen vorhanden.</div>
+            {% endif %}
+          </div>
+        </details>
+
+        {% if bom_tree %}
+          <details class="overview-section">
+            <summary>
+              <span class="overview-section-title">Baugruppenstruktur</span>
+              {% if bom_tree.snapshot %}<span class="muted">Projektstand {{ bom_tree.snapshot.name }}</span>{% endif %}
+            </summary>
+            <div class="overview-section-content">
+              {% if not bom_tree.snapshot %}
+                <p class="field-hint">Die Referenzen werden aus der aktuellen Revision gelesen. Ohne Projektstand können Dateiverweise nicht sicher einem PLM-Teil zugeordnet werden.</p>
+              {% endif %}
+              <ul class="bom-tree bom-tree-root">
+                {% include "plm/includes/bom_node.html" with node=bom_tree %}
+              </ul>
+            </div>
+          </details>
+        {% endif %}
+
+        {% if lifecycle_events %}
+          <details class="overview-section">
+            <summary>
+              <span class="overview-section-title">Lebenszyklus</span>
+              <span class="muted">CAD, Slicer und Fertigung</span>
+            </summary>
+            <div class="overview-section-content">
+              <ol class="lifecycle-list">
+                {% for event in lifecycle_events %}
+                  <li class="lifecycle-event lifecycle-{{ event.kind }}">
+                    <span class="lifecycle-marker" aria-hidden="true"></span>
+                    <div>
+                      <div class="lifecycle-title-row">
+                        <strong>{{ event.title }}</strong>
+                        <span class="status-badge status-{{ event.status }}">{{ event.timestamp|date:"d.m.Y H:i" }}</span>
+                      </div>
+                      <p class="meta-line">
+                        <a href="#revision-{{ event.revision.id }}">{{ event.revision.revision_code }}</a>
+                        {% if event.detail %} · {{ event.detail }}{% endif %}
+                      </p>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ol>
+            </div>
+          </details>
+        {% endif %}
+      </div>
     </div>
 
     <aside class="properties-panel">

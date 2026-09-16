@@ -123,6 +123,20 @@ class UxFeatureTests(TestCase):
         self.assertContains(response, "Kindteil")
         self.assertNotContains(response, "Fremdteil")
 
+    def test_part_detail_prioritizes_revisions_and_collapses_secondary_sections(self):
+        self.client.force_login(self.reader)
+
+        response = self.client.get(
+            reverse("plm:part_detail", args=[self.assembly.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertLess(html.index("<h2>Revisionen</h2>"), html.index("Baugruppenstruktur"))
+        self.assertLess(html.index("<h2>Revisionen</h2>"), html.index("Lebenszyklus"))
+        self.assertContains(response, '<details class="overview-section">', count=3)
+        self.assertNotContains(response, '<details class="overview-section" open>')
+
     def test_lifecycle_combines_revision_slicer_file_and_run(self):
         slicer_file = ManufacturingFile.objects.create(
             revision=self.assembly_revision,

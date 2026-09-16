@@ -3,12 +3,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Prefetch
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ManufacturingFileUploadForm, PartForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
-from ..models import Annotation, AuditEvent, ExportJob, Part, Project
+from ..models import Annotation, AuditEvent, ExportJob, Part, PrintProject, Project
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
 from ..services import (
     assembly_bom_tree,
@@ -89,7 +90,17 @@ def part_detail(request, part_id):
     )
     revisions = (
         part.revisions.select_related("created_by")
-        .prefetch_related("artifacts", "export_jobs", "manufacturing_files")
+        .prefetch_related(
+            "artifacts",
+            "export_jobs",
+            "manufacturing_files",
+            Prefetch(
+                "primary_print_projects",
+                queryset=PrintProject.objects.prefetch_related(
+                    "sources", "plates", "snapshots"
+                ),
+            ),
+        )
         .order_by("-created_at")
     )
     selected_revision = None
