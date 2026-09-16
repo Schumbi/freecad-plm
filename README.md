@@ -51,10 +51,8 @@ Unter Linux Mint: `python3 scripts/run_contract_tests.py`. Für eine andere
 Verzeichnisstruktur: `--addon /pfad/zu/freecad-plm-addon`.
 Ein fehlendes Addon führt zu einem Fehler, nicht zu übersprungenen Vertragstests.
 
-`plm/test_review_regressions.py` enthält Sollverhalten für die offenen
-Review-Befunde. `expectedFailure` kennzeichnet bekannte Fehler; beim Beheben
-muss der jeweilige Dekorator entfernt werden, sonst meldet die Suite einen
-unerwarteten Erfolg und schlägt fehl. Der Parallel-Schreibtest benötigt
+`plm/test_review_regressions.py` enthält dauerhafte Regressionstests für die
+behobenen Review-Befunde. Der Parallel-Schreibtest benötigt
 PostgreSQL und wird unter SQLite ausdrücklich übersprungen. Die HTTP-Vertragstests
 sind ein separater Pflichtlauf bei Änderungen an der Server/Addon-Schnittstelle.
 
