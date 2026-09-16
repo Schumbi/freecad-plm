@@ -26,7 +26,7 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 - Die aktuelle Serverversion ist `0.2.0`. Der V1-Funktionsumfang ist im Code
   weitgehend vollständig (Stand 2026-09-16). Die Testabdeckung umfasst
   301 Servertests, 226 Addon-Tests und 8 separate HTTP-Vertragstests.
-  Unter SQLite: 11 erwartete Server-Fehlschläge, 10 erwartete Addon-Fehlschläge
+  Unter SQLite: 6 erwartete Server-Fehlschläge, 4 erwartete Addon-Fehlschläge
   für offene Review-Befunde; ein PostgreSQL-Paralleltest wird übersprungen.
   Diese Markierungen bedeuten noch keine Behebung der Fehler.
 - Offen fuer V1.0: allgemeine Browser-Abnahme gemaess

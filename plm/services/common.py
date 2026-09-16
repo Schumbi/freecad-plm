@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from hashlib import sha256
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, PureWindowsPath
 
 from django.core.exceptions import ValidationError
 
@@ -46,7 +46,16 @@ def upload_file_digest(uploaded_file):
 
 
 def safe_snapshot_path(path):
-    normalized = PurePosixPath(path)
-    if normalized.is_absolute() or ".." in normalized.parts:
+    raw = str(path)
+    windows_path = PureWindowsPath(raw)
+    normalized = PurePosixPath(raw.replace("\\", "/"))
+    if (
+        not raw.strip()
+        or "\0" in raw
+        or windows_path.drive
+        or windows_path.root
+        or normalized.is_absolute()
+        or ".." in normalized.parts
+    ):
         raise ValidationError("ZIP enthaelt einen unsicheren Dateipfad.")
     return str(normalized)

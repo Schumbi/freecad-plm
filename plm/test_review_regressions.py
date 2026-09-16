@@ -273,7 +273,6 @@ class SnapshotPathTests(SimpleTestCase):
             with self.subTest(name=name), self.assertRaises(ValidationError):
                 safe_snapshot_path(name)
 
-    @expectedFailure  # Review 3, explicitly simulate a Linux ZIP reader on Windows.
     def test_linux_zip_cannot_supply_windows_traversal(self):
         buffer = BytesIO()
         with patch("zipfile.os.sep", "/"):
@@ -336,7 +335,7 @@ def _unsafe_path_case(name):
     def test(self):
         with self.assertRaises(ValidationError):
             safe_snapshot_path(name)
-    return expectedFailure(test)
+    return test
 
 
 # Separate cases: fixing one representation must not hide the others.

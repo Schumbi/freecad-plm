@@ -43,7 +43,7 @@ dokumentiert.
 
 ### Qualität
 
-- 301 automatisierte Servertests; unter SQLite davon 11 erwartete Fehlschläge
+- 301 automatisierte Servertests; unter SQLite davon 6 erwartete Fehlschläge
   für offene Review-Befunde und ein übersprungener PostgreSQL-Paralleltest.
 - Deaktivierte Benutzer werden bei der API-Token-Authentifizierung abgewiesen;
   abgewiesene Tokens aktualisieren den Zeitstempel `last_used_at` nicht.
