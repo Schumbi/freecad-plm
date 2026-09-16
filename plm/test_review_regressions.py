@@ -42,17 +42,23 @@ class TokenBoundaryTests(PrintProjectFixture, TestCase):
         self.assertEqual(self.create().status_code, status)
         self.assertEqual(PrintProject.objects.count(), before)
 
-    @expectedFailure  # Review 1
-    def test_inactive_user_cannot_read(self):
+    def deactivate_user(self):
         self.user.is_active = False
         self.user.save(update_fields=["is_active"])
-        self.assertEqual(self.client.get("/api/print-projects/").status_code, 401)
 
-    @expectedFailure  # Review 1
+    def assert_token_was_not_used(self):
+        self.token.refresh_from_db()
+        self.assertIsNone(self.token.last_used_at)
+
+    def test_inactive_user_cannot_read(self):
+        self.deactivate_user()
+        self.assertEqual(self.client.get("/api/print-projects/").status_code, 401)
+        self.assert_token_was_not_used()
+
     def test_inactive_user_cannot_create(self):
-        self.user.is_active = False
-        self.user.save(update_fields=["is_active"])
+        self.deactivate_user()
         self.assert_denied_without_mutation(401)
+        self.assert_token_was_not_used()
 
     def test_revoked_token_cannot_read_or_write(self):
         self.token.revoked_at = timezone.now()

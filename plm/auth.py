@@ -56,7 +56,7 @@ def authenticate_api_token(request):
         .filter(token_hash=token_hash)
         .first()
     )
-    if token is None or not token.is_active():
+    if token is None or not token.is_active() or not token.user.is_active:
         return None
     token.last_used_at = timezone.now()
     token.save(update_fields=["last_used_at", "updated_at"])

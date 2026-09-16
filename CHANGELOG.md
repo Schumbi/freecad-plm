@@ -43,8 +43,10 @@ dokumentiert.
 
 ### Qualität
 
-- 301 automatisierte Servertests; unter SQLite davon 13 erwartete Fehlschläge
+- 301 automatisierte Servertests; unter SQLite davon 11 erwartete Fehlschläge
   für offene Review-Befunde und ein übersprungener PostgreSQL-Paralleltest.
+- Deaktivierte Benutzer werden bei der API-Token-Authentifizierung abgewiesen;
+  abgewiesene Tokens aktualisieren den Zeitstempel `last_used_at` nicht.
 - 8 zusätzliche HTTP-Vertragstests mit dem echten Addon-Client, separat über
   `scripts/run_contract_tests.py` ausführbar.
 - Regressionstests für Tokens, plattformübergreifende Pfade, Upload-Konflikte,
