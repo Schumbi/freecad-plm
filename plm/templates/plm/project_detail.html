@@ -77,6 +77,9 @@
                   <td>
                     {% if print_project.slicer_file %}
                       <div>{{ print_project.slicer_original_filename }}</div>
+                      <div>
+                        <a class="btn btn-outline-secondary btn-sm" href="{% url 'plm:download_print_project_slicer' print_project.id %}">3MF herunterladen</a>
+                      </div>
                       {% if print_project.plates.all %}
                         <div class="print-project-plates">
                           {% for plate in print_project.plates.all %}

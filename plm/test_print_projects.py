@@ -120,6 +120,39 @@ class PrintProjectViewTests(TestCase):
         print_project = PrintProject.objects.get(id=print_project_id)
         self.assertTrue(print_project.sources.filter(revision=second_revision).exists())
 
+    def test_logged_in_user_can_download_print_project_from_web_ui(self):
+        print_project_id = self.create_print_project()
+        upload = bambu_project_upload()
+        expected_content = upload.read()
+        upload.seek(0)
+        response = self.client.post(
+            reverse("plm:api_print_project_slicer", args=[print_project_id]),
+            {"file": upload},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.client.defaults.pop("HTTP_AUTHORIZATION")
+        download_url = reverse(
+            "plm:download_print_project_slicer", args=[print_project_id]
+        )
+        response = self.client.get(download_url)
+        self.assertRedirects(response, f"{reverse('plm:login')}?next={download_url}")
+
+        self.client.force_login(self.user)
+        project_response = self.client.get(
+            reverse("plm:project_detail", args=[self.project.id])
+        )
+        self.assertContains(project_response, download_url)
+        self.assertContains(project_response, "3MF herunterladen")
+
+        response = self.client.get(download_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b"".join(response.streaming_content), expected_content)
+        self.assertEqual(
+            response.headers["Content-Disposition"],
+            'attachment; filename="druckprojekt.3mf"',
+        )
+
     def test_revision_from_another_project_is_rejected_as_print_source(self):
         print_project_id = self.create_print_project()
         other_project = Project.objects.create(code="OTHER", name="Anderes Projekt")

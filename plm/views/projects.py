@@ -245,6 +245,18 @@ def upload_print_project_source(request, print_project_id):
 
 
 @login_required
+def download_print_project_slicer(request, print_project_id):
+    print_project = get_object_or_404(PrintProject, id=print_project_id)
+    if not print_project.slicer_file:
+        return HttpResponseForbidden("Noch kein Slicer-Projekt vorhanden.")
+    return FileResponse(
+        print_project.slicer_file.open("rb"),
+        as_attachment=True,
+        filename=print_project.slicer_original_filename,
+    )
+
+
+@login_required
 def print_project_plate_preview(request, plate_id):
     plate = get_object_or_404(PrintProjectPlate, id=plate_id)
     if not plate.preview:
