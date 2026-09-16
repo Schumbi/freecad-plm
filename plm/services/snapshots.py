@@ -28,6 +28,10 @@ from ..models import (
     ManufacturingRunAttachment,
     ProjectSnapshot,
     ProjectSnapshotEntry,
+    PrintProject,
+    PrintProjectPlate,
+    PrintProjectSnapshot,
+    PrintProjectSource,
     Revision,
     RevisionArtifact,
 )
@@ -198,6 +202,7 @@ def delete_project_tree(project, actor):
         "manufacturing_files": ManufacturingFile.objects.filter(
             revision__part__project=project
         ).count(),
+        "print_projects": PrintProject.objects.filter(project=project).count(),
         "snapshots": project.snapshots.count(),
         "annotations": project.annotations.count(),
         "checkouts": Checkout.objects.filter(part__project=project).count(),
@@ -228,6 +233,26 @@ def delete_project_tree(project, actor):
         )
         if item.file
     ]
+    print_project_files = [
+        item.slicer_file
+        for item in PrintProject.objects.filter(project=project)
+        if item.slicer_file
+    ]
+    print_source_files = [
+        item.file
+        for item in PrintProjectSource.objects.filter(print_project__project=project)
+        if item.file
+    ]
+    print_plate_previews = [
+        item.preview
+        for item in PrintProjectPlate.objects.filter(print_project__project=project)
+        if item.preview
+    ]
+    print_snapshot_files = [
+        item.file
+        for item in PrintProjectSnapshot.objects.filter(print_project__project=project)
+        if item.file
+    ]
 
     AuditEvent.objects.create(
         actor=actor,
@@ -247,21 +272,37 @@ def delete_project_tree(project, actor):
         manufacturing_file__revision__part__project=project
     ).delete()
     ManufacturingFile.objects.filter(revision__part__project=project).delete()
+    PrintProjectSnapshot.objects.filter(print_project__project=project).delete()
+    PrintProjectPlate.objects.filter(print_project__project=project).delete()
+    PrintProjectSource.objects.filter(print_project__project=project).delete()
+    PrintProject.objects.filter(project=project).delete()
     RevisionArtifact.objects.filter(revision__part__project=project).delete()
     ExportJob.objects.filter(revision__part__project=project).delete()
     revisions.delete()
     project.parts.all().delete()
     project.delete()
 
-    for field_file in [
-        *manufacturing_attachments,
-        *manufacturing_thumbnails,
-        *manufacturing_files,
-        *artifact_files,
-        *revision_files,
-    ]:
-        field_file.delete(save=False)
+    stored_files = [
+        (field_file.storage, field_file.name)
+        for field_file in [
+            *print_snapshot_files,
+            *print_plate_previews,
+            *print_source_files,
+            *print_project_files,
+            *manufacturing_attachments,
+            *manufacturing_thumbnails,
+            *manufacturing_files,
+            *artifact_files,
+            *revision_files,
+        ]
+        if field_file and field_file.name
+    ]
 
+    def delete_stored_files():
+        for storage, name in stored_files:
+            storage.delete(name)
+
+    transaction.on_commit(delete_stored_files)
     return summary
 
 

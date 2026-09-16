@@ -1,14 +1,13 @@
 """Regression targets for CODE_REVIEW_2026-09-16 (numbered comments).
 
-expectedFailure means an unfixed defect, not a waived requirement. Remove the
-decorator with its fix; unexpected successes deliberately fail the test run.
+The former expected failures remain as regression tests after their fixes.
 """
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 from threading import Barrier
-from unittest import expectedFailure, skipUnless
+from unittest import skipUnless
 from unittest.mock import patch
 from zipfile import ZipFile
 import json
@@ -158,7 +157,6 @@ class PrintProjectWriteTests(PrintProjectFixture, TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.slicer_sha256, base)
 
-    @expectedFailure  # Review 8
     def test_empty_geometry_cannot_replace_valid_file(self):
         base = self.initial_upload()
         previous = Path(self.item.slicer_file.path).read_bytes()
@@ -167,6 +165,15 @@ class PrintProjectWriteTests(PrintProjectFixture, TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.slicer_sha256, base)
         self.assertEqual(Path(self.item.slicer_file.path).read_bytes(), previous)
+
+    def test_empty_geometry_cannot_create_first_file(self):
+        response = self.client.post(self.url, {
+            "file": mesh_upload(geometry=False), "base_sha256": "",
+        })
+        self.assertEqual(response.status_code, 400)
+        self.item.refresh_from_db()
+        self.assertFalse(self.item.slicer_file)
+        self.assertFalse(self.item.plates.exists())
 
     def test_same_revision_allows_distinct_codes(self):
         data = {"revision_id": self.revision.pk, "code": "DP-2", "name": "Second"}
@@ -188,7 +195,6 @@ class PrintProjectWriteTests(PrintProjectFixture, TestCase):
 
 
 class PrintProjectStorageTests(PrintProjectFixture, TestCase):
-    @expectedFailure  # Review 6
     def test_replacement_removes_old_3mf_only_after_commit(self):
         base = self.initial_upload()
         old_path = Path(self.item.slicer_file.path)
@@ -200,7 +206,6 @@ class PrintProjectStorageTests(PrintProjectFixture, TestCase):
         self.assertTrue(Path(self.item.slicer_file.path).is_file())
         self.assertFalse(old_path.exists())
 
-    @expectedFailure  # Review 6: a DB rollback must not destroy the old preview.
     def test_failed_replacement_preserves_previous_preview_and_file(self):
         base = self.initial_upload()
         preview = Path(self.item.plates.get().preview.path)
@@ -215,7 +220,6 @@ class PrintProjectStorageTests(PrintProjectFixture, TestCase):
         self.assertTrue(preview.is_file())
         self.assertEqual({path for path in Path(self.media_root).rglob("*") if path.is_file()}, previous_files)
 
-    @expectedFailure  # Review 6: include sources, plate previews and archived snapshots.
     def test_delete_project_cleans_print_project_records_and_files(self):
         self.initial_upload()
         PrintProjectSource.objects.create(

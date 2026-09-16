@@ -91,46 +91,74 @@ def print_project_slicer_api(request, print_project_id):
         return JsonResponse({"error": str(exc)}, status=400)
     if not info["original_filename"].lower().endswith(".3mf"):
         return JsonResponse({"error": "Ein Druckprojekt benötigt eine 3MF-Datei."}, status=400)
+    if info["metadata"].get("geometry", {}).get("triangles", 0) < 1:
+        return JsonResponse({"error": "Die 3MF enthält keine Geometriedreiecke."}, status=400)
     plates = extract_3mf_plate_previews(uploaded)
     base_sha256 = request.POST.get("base_sha256", "").strip().lower()
-    with transaction.atomic():
-        item = (
-            PrintProject.objects.select_for_update()
-            .prefetch_related("sources", "plates", "snapshots")
-            .get(pk=item.pk)
-        )
-        current_sha256 = item.slicer_sha256 if item.slicer_file else ""
-        if current_sha256 != base_sha256:
-            return JsonResponse(
-                {
-                    "error": "Das Druckprojekt wurde seit dem Öffnen geändert.",
-                    "current_sha256": current_sha256,
-                },
-                status=409,
+    new_stored_files = []
+    try:
+        with transaction.atomic():
+            item = (
+                PrintProject.objects.select_for_update()
+                .prefetch_related("sources", "plates", "snapshots")
+                .get(pk=item.pk)
             )
-        for plate in item.plates.exclude(preview=""):
-            plate.preview.delete(save=False)
-        item.plates.all().delete()
-        item.slicer_file = uploaded
-        item.slicer_original_filename = info["original_filename"]
-        item.slicer_sha256 = info["sha256"]
-        item.slicer_size_bytes = info["size_bytes"]
-        item.slicer_metadata = info["metadata"]
-        item.slicer_updated_by = request.user
-        item.save()
-        for plate_data in plates:
-            plate = PrintProjectPlate(
-                print_project=item,
-                plate_number=plate_data["plate_number"],
-                name=plate_data["name"],
-            )
-            if plate_data["preview_content"]:
-                plate.preview.save(
-                    plate_data["preview_name"] or f"plate_{plate.plate_number}.png",
-                    ContentFile(plate_data["preview_content"]),
-                    save=False,
+            current_sha256 = item.slicer_sha256 if item.slicer_file else ""
+            if current_sha256 != base_sha256:
+                return JsonResponse(
+                    {
+                        "error": "Das Druckprojekt wurde seit dem Öffnen geändert.",
+                        "current_sha256": current_sha256,
+                    },
+                    status=409,
                 )
-            plate.save()
+            old_stored_files = [
+                (field_file.storage, field_file.name)
+                for field_file in [item.slicer_file, *[plate.preview for plate in item.plates.all()]]
+                if field_file and field_file.name
+            ]
+            item.plates.all().delete()
+            item.slicer_file = uploaded
+            item.slicer_original_filename = info["original_filename"]
+            item.slicer_sha256 = info["sha256"]
+            item.slicer_size_bytes = info["size_bytes"]
+            item.slicer_metadata = info["metadata"]
+            item.slicer_updated_by = request.user
+            item.save()
+            new_stored_files.append((item.slicer_file.storage, item.slicer_file.name))
+            for plate_data in plates:
+                plate = PrintProjectPlate(
+                    print_project=item,
+                    plate_number=plate_data["plate_number"],
+                    name=plate_data["name"],
+                )
+                if plate_data["preview_content"]:
+                    plate.preview.save(
+                        plate_data["preview_name"] or f"plate_{plate.plate_number}.png",
+                        ContentFile(plate_data["preview_content"]),
+                        save=False,
+                    )
+                    new_stored_files.append((plate.preview.storage, plate.preview.name))
+                plate.save()
+
+            new_names = {name for _storage, name in new_stored_files}
+
+            def delete_replaced_files():
+                for storage, name in old_stored_files:
+                    if name not in new_names:
+                        storage.delete(name)
+
+            transaction.on_commit(delete_replaced_files)
+    except Exception:
+        # A failing on_commit cleanup may occur after the new row was committed.
+        # Never delete the file that the database now references.
+        new_file_name = new_stored_files[0][1] if new_stored_files else ""
+        if not new_file_name or not PrintProject.objects.filter(
+            pk=item.pk, slicer_file=new_file_name
+        ).exists():
+            for storage, name in new_stored_files:
+                storage.delete(name)
+        raise
     return JsonResponse({"print_project": payload(item, request)})
 
 

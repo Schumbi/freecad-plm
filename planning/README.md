@@ -25,10 +25,9 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 - Django ist die technische Basis; Docker Compose mit PostgreSQL, Media-Volume und FreeCADCmd-Worker ist umgesetzt.
 - Die aktuelle Serverversion ist `0.2.0`. Der V1-Funktionsumfang ist im Code
   weitgehend vollständig (Stand 2026-09-16). Die Testabdeckung umfasst
-  301 Servertests, 226 Addon-Tests und 8 separate HTTP-Vertragstests.
-  Unter SQLite: 4 erwartete Server-Fehlschläge, einen erwarteten Addon-Fehlschlag
-  für offene Review-Befunde; ein PostgreSQL-Paralleltest wird übersprungen.
-  Diese Markierungen bedeuten noch keine Behebung der Fehler.
+  302 Servertests, 233 Addon-Tests und 9 separate HTTP-Vertragstests.
+  Unter SQLite sind alle ausführbaren Tests grün; ein PostgreSQL-Paralleltest
+  wird weiterhin übersprungen und benötigt die isolierte PostgreSQL-Testumgebung.
 - Offen fuer V1.0: allgemeine Browser-Abnahme gemaess
   `planning/V1_ACCEPTANCE.md`, abschließende Betriebsabnahme sowie der
   Zwei-Rechner-Test der implementierten PrintProject-Versionssperre. Der Einzelrechner-Addon-E2E mit

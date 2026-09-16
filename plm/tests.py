@@ -3296,10 +3296,14 @@ class ManufacturingFileTests(TestCase):
         self.assertTrue(attachment_path.exists())
         self.client.force_login(self.admin)
 
-        response = self.client.post(
-            reverse("plm:delete_project", args=[self.project.id]),
-            {"confirmation": "MFG"},
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("plm:delete_project", args=[self.project.id]),
+                {"confirmation": "MFG"},
+            )
+            self.assertTrue(manufacturing_path.exists())
+            self.assertTrue(thumbnail_path.exists())
+            self.assertTrue(attachment_path.exists())
 
         self.assertRedirects(response, reverse("plm:project_list"))
         self.assertFalse(ManufacturingFile.objects.exists())
@@ -3380,10 +3384,13 @@ class ProjectDeleteTests(TestCase):
         self.assertTrue(artifact_path.exists())
         self.client.force_login(self.admin)
 
-        response = self.client.post(
-            reverse("plm:delete_project", args=[self.project.id]),
-            {"confirmation": "DEL"},
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("plm:delete_project", args=[self.project.id]),
+                {"confirmation": "DEL"},
+            )
+            self.assertTrue(revision_path.exists())
+            self.assertTrue(artifact_path.exists())
 
         self.assertRedirects(response, reverse("plm:project_list"))
         self.assertFalse(Project.objects.filter(id=self.project.id).exists())
