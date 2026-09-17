@@ -1481,6 +1481,8 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
 
         self.assertContains(response, "3D anzeigen")
+        self.assertContains(response, "Kanten hervorheben")
+        self.assertContains(response, 'id="model-viewer-edges"')
         self.assertContains(response, reverse("plm:revision_viewer_source", args=[revision.id]))
         self.assertContains(response, reverse("plm:create_revision_viewer_preview", args=[revision.id]))
         self.assertContains(response, reverse("plm:revision_viewer_status", args=[revision.id]))

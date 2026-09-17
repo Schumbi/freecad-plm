@@ -12,6 +12,7 @@ const resetButton = document.getElementById("model-viewer-reset");
 const topButton = document.getElementById("model-viewer-top");
 const bottomButton = document.getElementById("model-viewer-bottom");
 const wireframeButton = document.getElementById("model-viewer-wireframe");
+const edgesButton = document.getElementById("model-viewer-edges");
 const downloadLink = document.getElementById("model-viewer-download");
 const annotateButton = document.getElementById("model-viewer-annotate");
 const annotationForm = document.getElementById("model-viewer-annotation-form");
@@ -25,6 +26,8 @@ let controls;
 let currentObject;
 let animationFrame;
 let wireframe = false;
+let featureEdges = false;
+const originalPolygonOffsets = new Map();
 let activeLoadId = 0;
 let canvasResizeObserver;
 let annotationsUrl = "";
@@ -57,17 +60,19 @@ function ensureScene() {
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
   canvasHost.appendChild(renderer.domElement);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x6f7f88, 2.2));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6f7f88, 0.9));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.3);
   keyLight.position.set(80, 120, 90);
   scene.add(keyLight);
-  const undersideLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  const undersideLight = new THREE.DirectionalLight(0xffffff, 1.3);
   undersideLight.position.set(50, -100, 80);
   scene.add(undersideLight);
 
@@ -112,6 +117,7 @@ function animate() {
 
 function clearModel() {
   if (!currentObject) return;
+  clearFeatureEdges();
   scene.remove(currentObject);
   currentObject.traverse((item) => {
     if (item.geometry) item.geometry.dispose();
@@ -144,6 +150,57 @@ function setWireframe(enabled) {
       material.wireframe = wireframe;
       material.needsUpdate = true;
     });
+  });
+}
+
+function clearFeatureEdges() {
+  currentObject?.traverse((item) => {
+    if (!item.isMesh) return;
+    const overlay = item.userData.viewerFeatureEdges;
+    if (!overlay) return;
+    item.remove(overlay);
+    overlay.geometry.dispose();
+    overlay.material.dispose();
+    delete item.userData.viewerFeatureEdges;
+  });
+  for (const [material, original] of originalPolygonOffsets) {
+    material.polygonOffset = original.enabled;
+    material.polygonOffsetFactor = original.factor;
+    material.polygonOffsetUnits = original.units;
+    material.needsUpdate = true;
+  }
+  originalPolygonOffsets.clear();
+}
+
+function setFeatureEdges(enabled) {
+  clearFeatureEdges();
+  featureEdges = enabled;
+  edgesButton?.classList.toggle("btn-primary", enabled);
+  edgesButton?.setAttribute("aria-pressed", String(enabled));
+  if (!enabled || !currentObject) return;
+  currentObject.traverse((item) => {
+    if (!item.isMesh || !item.geometry) return;
+    const materials = Array.isArray(item.material) ? item.material : [item.material];
+    materials.filter(Boolean).forEach((material) => {
+      if (!originalPolygonOffsets.has(material)) {
+        originalPolygonOffsets.set(material, {
+          enabled: material.polygonOffset,
+          factor: material.polygonOffsetFactor,
+          units: material.polygonOffsetUnits,
+        });
+      }
+      material.polygonOffset = true;
+      material.polygonOffsetFactor = 1;
+      material.polygonOffsetUnits = 1;
+      material.needsUpdate = true;
+    });
+    const overlay = new THREE.LineSegments(
+      new THREE.EdgesGeometry(item.geometry, 25),
+      new THREE.LineBasicMaterial({ color: 0x17232b, depthWrite: false }),
+    );
+    overlay.name = "viewer-feature-edges";
+    item.userData.viewerFeatureEdges = overlay;
+    item.add(overlay);
   });
 }
 
@@ -286,6 +343,7 @@ async function openViewer(trigger) {
     currentObject = parseModel(buffer, format);
     scene.add(currentObject);
     setWireframe(wireframe);
+    setFeatureEdges(featureEdges);
     showView(initialView);
     await loadViewerAnnotations();
     setStatus("", false);
@@ -472,6 +530,8 @@ resetButton?.addEventListener("click", () => {
 
 topButton?.addEventListener("click", () => showView("top"));
 bottomButton?.addEventListener("click", () => showView("bottom"));
+
+edgesButton?.addEventListener("click", () => setFeatureEdges(!featureEdges));
 
 wireframeButton?.addEventListener("click", () => {
   setWireframe(!wireframe);
