@@ -1604,6 +1604,10 @@ td form {
   width: 100%;
 }
 
+.model-viewer-status[hidden] {
+  display: none;
+}
+
 .model-viewer-status {
   align-items: center;
   background: rgba(17, 24, 39, 0.78);

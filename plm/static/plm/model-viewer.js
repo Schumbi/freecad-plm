@@ -179,7 +179,7 @@ function setFeatureEdges(enabled) {
   edgesButton?.setAttribute("aria-pressed", String(enabled));
   if (!enabled || !currentObject) return;
   currentObject.traverse((item) => {
-    if (!item.isMesh || !item.geometry) return;
+    if (!item.isMesh || !item.geometry || item.userData.viewerCoplanarDetail) return;
     const materials = Array.isArray(item.material) ? item.material : [item.material];
     materials.filter(Boolean).forEach((material) => {
       if (!originalPolygonOffsets.has(material)) {
@@ -306,10 +306,57 @@ function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+// Some slicers store lettering as separate volumes flush with a larger body.
+// Use a depth bias for those surfaces; do not move the actual geometry.
+function highlightCoplanarDetails(object) {
+  object.updateMatrixWorld(true);
+  const parts = object.children.map((child) => {
+    const box = new THREE.Box3().setFromObject(child);
+    return { child, box, size: box.getSize(new THREE.Vector3()) };
+  }).filter(({ box }) => !box.isEmpty());
+  let highlighted = 0;
+  for (const part of parts) {
+    if (part.size.y > 1) continue;
+    const body = parts.find((candidate) => {
+      if (candidate === part || candidate.size.y < part.size.y * 4) return false;
+      const tolerance = Math.max(candidate.size.y * 0.002, 0.05);
+      const sameFace =
+        Math.abs(part.box.min.y - candidate.box.min.y) <= tolerance ||
+        Math.abs(part.box.max.y - candidate.box.max.y) <= tolerance;
+      const withinFace =
+        part.box.min.x >= candidate.box.min.x - tolerance &&
+        part.box.max.x <= candidate.box.max.x + tolerance &&
+        part.box.min.z >= candidate.box.min.z - tolerance &&
+        part.box.max.z <= candidate.box.max.z + tolerance;
+      return sameFace && withinFace;
+    });
+    if (!body) continue;
+    part.child.traverse((item) => {
+      if (!item.isMesh || !item.material) return;
+      const materials = Array.isArray(item.material) ? item.material : [item.material];
+      const colored = materials.map((original) => {
+        const material = original.clone();
+        if (material.color?.getHex() === 0xffffff && !material.map && !material.vertexColors) {
+          material.color.setHex(0x2563eb);
+        }
+        material.polygonOffset = true;
+        material.polygonOffsetFactor = -2;
+        material.polygonOffsetUnits = -2;
+        return material;
+      });
+      item.material = Array.isArray(item.material) ? colored : colored[0];
+      item.userData.viewerCoplanarDetail = true;
+    });
+    highlighted += 1;
+  }
+  return highlighted;
+}
+
 function parseModel(buffer, format) {
   if (format === "3mf") {
     const object = new ThreeMFLoader().parse(buffer);
     object.rotation.set(-Math.PI / 2, 0, 0);
+    object.userData.viewerCoplanarDetailCount = highlightCoplanarDetails(object);
     return object;
   }
 
@@ -341,6 +388,9 @@ async function openViewer(trigger) {
     const buffer = await loadModelBuffer(trigger, sourceUrl, loadId);
     if (loadId !== activeLoadId) return;
     currentObject = parseModel(buffer, format);
+    if (currentObject.userData.viewerCoplanarDetailCount) {
+      formatElement.textContent = `${format.toUpperCase()} · bündige Details hervorgehoben`;
+    }
     scene.add(currentObject);
     setWireframe(wireframe);
     setFeatureEdges(featureEdges);
