@@ -29,7 +29,8 @@ def payload(item, request=None):
             for source in item.sources.select_related("revision").order_by("id")
         ],
         "plates": [
-            {"number": plate.plate_number, "name": plate.name, "has_preview": bool(plate.preview)}
+            {"number": plate.plate_number, "name": plate.name, "has_preview": bool(plate.preview),
+             "preview_url": f"/api/print-project-plates/{plate.id}/preview/" if plate.preview else None}
             for plate in item.plates.all()
         ],
         "snapshots": [
@@ -64,6 +65,8 @@ def print_projects_api(request):
         project=revision.part.project, code=code,
         defaults={"primary_revision": revision, "name": name, "description": str(data.get("description", "")).strip()},
     )
+    if not created and data.get("require_new"):
+        return JsonResponse({"error": "Dieser Druckprojekt-Code ist bereits vergeben. Bitte einen anderen Code wählen."}, status=409)
     if item.primary_revision_id != revision.id:
         return JsonResponse({"error": "Der Druckprojekt-Code ist bereits einer anderen Revision zugeordnet."}, status=409)
     PrintProjectSource.objects.get_or_create(
@@ -231,3 +234,15 @@ def print_project_slicer_file_api(request, print_project_id):
     if not item.slicer_file:
         return JsonResponse({"error": "Noch kein Slicer-Projekt vorhanden."}, status=404)
     return FileResponse(item.slicer_file.open("rb"), as_attachment=True, filename=item.slicer_original_filename)
+
+
+@api_auth_required(get=ApiToken.Scope.READ)
+@require_http_methods(["GET"])
+def print_project_plate_preview_api(request, plate_id):
+    plate = get_object_or_404(PrintProjectPlate, id=plate_id)
+    if not plate.preview:
+        return JsonResponse({"error": "Keine Vorschau vorhanden."}, status=404)
+    response = FileResponse(plate.preview.open("rb"), content_type="image/png")
+    response["Cache-Control"] = "private, no-cache"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

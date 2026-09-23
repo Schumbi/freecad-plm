@@ -262,6 +262,7 @@ urlpatterns = [
         api.revision_slicer_project_api,
         name="api_revision_slicer_project",
     ),
+    path("api/print-project-plates/<int:plate_id>/preview/", api.print_project_plate_preview_api, name="api_print_project_plate_preview"),
     path("api/print-projects/", api.print_projects_api, name="api_print_projects"),
     path("api/print-projects/<int:print_project_id>/slicer-project/", api.print_project_slicer_api, name="api_print_project_slicer"),
     path("api/print-projects/<int:print_project_id>/slicer-project/file/", api.print_project_slicer_file_api, name="api_print_project_slicer_file"),

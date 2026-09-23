@@ -54,6 +54,7 @@ from .manufacturing import (
     revision_slicer_project_api,
 )
 from .print_projects import (
+    print_project_plate_preview_api,
     print_project_slicer_api,
     print_project_slicer_file_api,
     print_project_source_api,

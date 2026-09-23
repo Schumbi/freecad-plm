@@ -835,3 +835,9 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Die interaktive Vorschau verwendet getrennte Volumenkörper in 3MF statt eines gemeinsamen STL-Netzes. Feinere Vernetzung erhält kleine Oberflächendetails; bündige Einlagen werden auch an Seitenflächen hervorgehoben.
 - Vorschau-Version 4 löst beim Öffnen die Neuerzeugung älterer Vorschauen aus. CAD-Koordinaten bleiben für bestehende Anmerkungen erhalten.
 - Der echte Export von RODELN A-001 R0007 wurde mit FreeCADCmd geprüft: vier getrennte Volumenkörper einschließlich der dünnen Einlagen. Die visuelle Browser-Abnahme übernimmt der Anwender nach dem Deployment.
+
+## Druckprojekte im Addon explizit auswählen
+
+- Der Auswahldialog bietet immer Neuerstellung oder Öffnen eines vorhandenen Druckprojekts der Revision an, einschließlich optionaler Plattenvorschau.
+- Eine token-geschützte Preview-API ergänzt die Plattendaten. `require_new` weist belegte Codes mit HTTP 409 ab, statt ein vorhandenes Projekt zurückzugeben.
+- Vorhandene Slicerstände werden beim normalen Öffnen beibehalten; Neuaufbau bleibt eine eigene bestätigte Aktion.

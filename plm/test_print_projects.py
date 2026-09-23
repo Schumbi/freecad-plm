@@ -77,6 +77,35 @@ class PrintProjectViewTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["print_project"]["id"]
 
+    def test_preview_api_requires_token_and_returns_plate_image(self):
+        project_id = self.create_print_project()
+        response = self.client.post(
+            reverse("plm:api_print_project_slicer", args=[project_id]),
+            {"file": bambu_project_upload()},
+        )
+        plates = response.json()["print_project"]["plates"]
+        url = next(plate["preview_url"] for plate in plates if plate["has_preview"])
+        self.assertTrue(any(plate["preview_url"] is None for plate in plates))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertEqual(b"".join(response.streaming_content), b"plate-one")
+        response.close()
+        self.client.defaults.pop("HTTP_AUTHORIZATION")
+        self.assertEqual(self.client.get(url).status_code, 401)
+
+    def test_require_new_rejects_existing_code_without_changing_project(self):
+        project_id = self.create_print_project()
+        response = self.client.post(
+            reverse("plm:api_print_projects"),
+            data=json.dumps({"revision_id": self.revision.id, "code": "DP-1",
+                             "name": "Replacement", "require_new": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(PrintProject.objects.get(pk=project_id).name, "Gemischte Platte")
+        self.assertEqual(PrintProject.objects.count(), 1)
+
     def test_3mf_plates_are_extracted_and_external_stl_can_be_added_in_web_ui(self):
         print_project_id = self.create_print_project()
         response = self.client.post(

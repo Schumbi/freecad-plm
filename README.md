@@ -420,6 +420,7 @@ Token-Scopes:
 - `GET/POST /api/print-projects/<id>/slicer-project/`
 - `GET /api/print-projects/<id>/slicer-project/file/`
 - `POST /api/print-projects/<id>/sources/`
+- `GET /api/print-project-plates/<id>/preview/` (Token mit `read`)
 - `GET /api/manufacturing-files/<id>/file/`
 - `POST /api/revisions/<id>/checkout/`
 - `GET /api/checkouts/active/`
