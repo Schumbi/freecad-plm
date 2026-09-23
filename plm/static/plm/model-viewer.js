@@ -233,9 +233,12 @@ function fitCamera(object, viewDirection = new THREE.Vector3(1, 0.75, 1).normali
 function showView(view) {
   if (!currentObject) return;
   if (view === "top" || view === "bottom") {
-    // 3MF models are rotated from Z-up to Y-up when loaded.
-    camera.up.set(0, 0, -1);
-    fitCamera(currentObject, new THREE.Vector3(0, view === "top" ? 1 : -1, 0));
+    const direction = view === "top" ? 1 : -1;
+    const zUp = currentObject.userData.viewerZUp;
+    camera.up.set(0, zUp ? 1 : 0, zUp ? 0 : -1);
+    fitCamera(currentObject, zUp
+      ? new THREE.Vector3(0, 0, direction)
+      : new THREE.Vector3(0, direction, 0));
   } else {
     camera.up.set(0, 1, 0);
     fitCamera(currentObject);
@@ -271,7 +274,12 @@ async function fetchModel(sourceUrl) {
       response.status,
     );
   }
-  return response.arrayBuffer();
+  const contentType = (response.headers.get("Content-Type") || "").split(";")[0];
+  return {
+    buffer: await response.arrayBuffer(),
+    cadCoordinates: response.headers.get("X-PLM-Viewer-Coordinates") === "cad",
+    format: contentType === "model/3mf" ? "3mf" : contentType === "model/stl" ? "stl" : "",
+  };
 }
 
 function csrfToken() {
@@ -316,19 +324,20 @@ function highlightCoplanarDetails(object) {
   }).filter(({ box }) => !box.isEmpty());
   let highlighted = 0;
   for (const part of parts) {
-    if (part.size.y > 1) continue;
     const body = parts.find((candidate) => {
-      if (candidate === part || candidate.size.y < part.size.y * 4) return false;
-      const tolerance = Math.max(candidate.size.y * 0.002, 0.05);
-      const sameFace =
-        Math.abs(part.box.min.y - candidate.box.min.y) <= tolerance ||
-        Math.abs(part.box.max.y - candidate.box.max.y) <= tolerance;
-      const withinFace =
-        part.box.min.x >= candidate.box.min.x - tolerance &&
-        part.box.max.x <= candidate.box.max.x + tolerance &&
-        part.box.min.z >= candidate.box.min.z - tolerance &&
-        part.box.max.z <= candidate.box.max.z + tolerance;
-      return sameFace && withinFace;
+      if (candidate === part) return false;
+      return ["x", "y", "z"].some((axis) => {
+        if (part.size[axis] > 1 || candidate.size[axis] < part.size[axis] * 4) return false;
+        const tolerance = Math.max(candidate.size[axis] * 0.002, 0.05);
+        const sameFace =
+          Math.abs(part.box.min[axis] - candidate.box.min[axis]) <= tolerance ||
+          Math.abs(part.box.max[axis] - candidate.box.max[axis]) <= tolerance;
+        const withinFace = ["x", "y", "z"].filter((other) => other !== axis).every((other) =>
+          part.box.min[other] >= candidate.box.min[other] - tolerance &&
+          part.box.max[other] <= candidate.box.max[other] + tolerance
+        );
+        return sameFace && withinFace;
+      });
     });
     if (!body) continue;
     part.child.traverse((item) => {
@@ -352,17 +361,20 @@ function highlightCoplanarDetails(object) {
   return highlighted;
 }
 
-function parseModel(buffer, format) {
+function parseModel(buffer, format, cadCoordinates = false) {
   if (format === "3mf") {
     const object = new ThreeMFLoader().parse(buffer);
-    object.rotation.set(-Math.PI / 2, 0, 0);
+    if (!cadCoordinates) object.rotation.set(-Math.PI / 2, 0, 0);
+    object.userData.viewerZUp = cadCoordinates;
     object.userData.viewerCoplanarDetailCount = highlightCoplanarDetails(object);
     return object;
   }
 
   const geometry = new STLLoader().parse(buffer);
   geometry.computeVertexNormals();
-  return new THREE.Mesh(geometry, materialForGeometry(geometry));
+  const object = new THREE.Mesh(geometry, materialForGeometry(geometry));
+  object.userData.viewerZUp = true;
+  return object;
 }
 
 async function openViewer(trigger) {
@@ -385,11 +397,13 @@ async function openViewer(trigger) {
   cancelAnnotation();
 
   try {
-    const buffer = await loadModelBuffer(trigger, sourceUrl, loadId);
+    const loaded = await loadModelBuffer(trigger, sourceUrl, loadId);
     if (loadId !== activeLoadId) return;
-    currentObject = parseModel(buffer, format);
+    const actualFormat = loaded.format || format;
+    formatElement.textContent = actualFormat.toUpperCase();
+    currentObject = parseModel(loaded.buffer, actualFormat, loaded.cadCoordinates);
     if (currentObject.userData.viewerCoplanarDetailCount) {
-      formatElement.textContent = `${format.toUpperCase()} · bündige Details hervorgehoben`;
+      formatElement.textContent = `${actualFormat.toUpperCase()} · bündige Details hervorgehoben`;
     }
     scene.add(currentObject);
     setWireframe(wireframe);

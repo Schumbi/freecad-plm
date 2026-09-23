@@ -6,7 +6,7 @@ from hashlib import sha256
 from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from zipfile import ZipFile, ZipInfo
 
 from django.core.exceptions import ValidationError
@@ -1238,24 +1238,14 @@ class RevisionUploadViewTests(TestCase):
                 metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION},
             )
 
-    def create_viewer_stl_artifact(self, revision):
-        content = (
-            b"solid triangle\n"
-            b"facet normal 0 0 1\n"
-            b"outer loop\n"
-            b"vertex 0 0 0\n"
-            b"vertex 1 0 0\n"
-            b"vertex 0 1 0\n"
-            b"endloop\n"
-            b"endfacet\n"
-            b"endsolid triangle\n"
-        )
+    def create_viewer_3mf_artifact(self, revision):
+        content = b"3MF preview data"
         return RevisionArtifact.objects.create(
             revision=revision,
-            artifact_type=RevisionArtifact.ArtifactType.STL,
+            artifact_type=RevisionArtifact.ArtifactType.THREEMF,
             view_name="viewer-preview",
-            file=ContentFile(content, name="preview.stl"),
-            original_filename="preview.stl",
+            file=ContentFile(content, name="preview.3mf"),
+            original_filename="preview.3mf",
             sha256="b" * 64,
             size_bytes=len(content),
             metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION},
@@ -1794,7 +1784,7 @@ class RevisionUploadViewTests(TestCase):
     def test_viewer_status_reports_ready_preview(self):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
-        self.create_viewer_stl_artifact(revision)
+        self.create_viewer_3mf_artifact(revision)
 
         response = self.client.get(reverse("plm:revision_viewer_status", args=[revision.id]))
 
@@ -1808,22 +1798,23 @@ class RevisionUploadViewTests(TestCase):
 
     def test_revision_viewer_source_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
-        self.create_viewer_stl_artifact(revision)
+        self.create_viewer_3mf_artifact(revision)
 
         response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
 
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("plm:login"), response["Location"])
 
-    def test_revision_viewer_source_returns_preview_stl_inline(self):
+    def test_revision_viewer_source_returns_preview_3mf_inline(self):
         self.client.force_login(self.user)
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
-        self.create_viewer_stl_artifact(revision)
+        self.create_viewer_3mf_artifact(revision)
 
         response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "model/stl")
+        self.assertEqual(response["Content-Type"], "model/3mf")
+        self.assertEqual(response["X-PLM-Viewer-Coordinates"], "cad")
         self.assertIn("inline", response["Content-Disposition"])
         response.close()
 
@@ -3504,6 +3495,36 @@ class FreeCADCmdJobTests(TestCase):
             ["Body", "Body002"],
         )
 
+    def test_viewer_export_preserves_each_solid_and_closes_temporary_document(self):
+        namespace = self.freecadcmd_script_namespace()
+        solids = [object(), object(), object()]
+        obj = types.SimpleNamespace(Name="Assembly", Label="Assembly", Shape=types.SimpleNamespace(Solids=solids))
+        meshes = []
+        def add_object(*args):
+            mesh = types.SimpleNamespace()
+            meshes.append(mesh)
+            return mesh
+        preview_doc = types.SimpleNamespace(Name="Preview", addObject=add_object)
+        freecad = namespace["FreeCAD"]
+        freecad.newDocument = Mock(return_value=preview_doc)
+        freecad.closeDocument = Mock()
+        mesh_module = types.SimpleNamespace(export=Mock())
+        meshpart = types.SimpleNamespace(meshFromShape=Mock(side_effect=solids))
+        with patch.dict(sys.modules, {"Mesh": mesh_module, "MeshPart": meshpart}):
+            namespace["export_viewer_preview"]([obj], Path("preview.3mf"))
+        self.assertEqual([mesh.Mesh for mesh in meshes], solids)
+        mesh_module.export.assert_called_once_with(meshes, "preview.3mf")
+        for call, solid in zip(meshpart.meshFromShape.call_args_list, solids):
+            self.assertIs(call.kwargs["Shape"], solid)
+            self.assertFalse(call.kwargs["Relative"])
+            self.assertLessEqual(call.kwargs["LinearDeflection"], 0.03)
+        freecad.closeDocument.assert_called_once_with("Preview")
+        mesh_module.export.side_effect = RuntimeError("export failed")
+        with patch.dict(sys.modules, {"Mesh": mesh_module, "MeshPart": types.SimpleNamespace(meshFromShape=Mock())}):
+            with self.assertRaisesRegex(RuntimeError, "export failed"):
+                namespace["export_viewer_preview"]([obj], Path("preview.3mf"))
+        self.assertEqual(freecad.closeDocument.call_count, 2)
+
     def fake_freecadcmd(self, result_code):
         script = Path(self.media_root.name) / "fake_freecadcmd.py"
         script.write_text(
@@ -3554,6 +3575,8 @@ if missing:
 step_path = output_dir / "preview.step"
 stl_path = output_dir / "preview.stl"
 step_path.write_bytes(b"STEP DATA")
+viewer_path = output_dir / "viewer.3mf"
+viewer_path.write_bytes(b"3MF DATA")
 stl_path.write_text(
     "solid triangle\\n"
     "facet normal 0 0 1\\n"
@@ -3569,7 +3592,8 @@ result = {
     "metadata": {"objects": [], "varsets": []},
     "preview_mesh_path": str(stl_path),
     "artifacts": [
-        {"path": str(step_path), "artifact_type": "step", "view_name": "preview"}
+        {"path": str(step_path), "artifact_type": "step", "view_name": "preview"},
+        {"path": str(viewer_path), "artifact_type": "3mf", "view_name": "viewer-preview"}
     ],
 }
 Path(sys.argv[-1]).write_text(json.dumps(result))
@@ -3758,7 +3782,7 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
         )
         self.assertEqual(
             RevisionArtifact.objects.filter(
-                artifact_type=RevisionArtifact.ArtifactType.STL,
+                artifact_type=RevisionArtifact.ArtifactType.THREEMF,
                 view_name="viewer-preview",
             ).count(),
             1,

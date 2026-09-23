@@ -827,3 +827,11 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
   `Read Status` die Bambuddy-Berechtigung `Manage Archives` erhalten.
 - Automatisierte Abnahme: 255 Server- und 170 Add-on-Tests erfolgreich; beide
   Compose-Varianten sind syntaktisch gültig.
+
+# 2026-09-23
+
+## Detailtreue FCStd-Vorschau
+
+- Die interaktive Vorschau verwendet getrennte Volumenkörper in 3MF statt eines gemeinsamen STL-Netzes. Feinere Vernetzung erhält kleine Oberflächendetails; bündige Einlagen werden auch an Seitenflächen hervorgehoben.
+- Vorschau-Version 4 löst beim Öffnen die Neuerzeugung älterer Vorschauen aus. CAD-Koordinaten bleiben für bestehende Anmerkungen erhalten.
+- Der echte Export von RODELN A-001 R0007 wurde mit FreeCADCmd geprüft: vier getrennte Volumenkörper einschließlich der dünnen Einlagen. Die visuelle Browser-Abnahme übernimmt der Anwender nach dem Deployment.

@@ -126,7 +126,7 @@ def manufacturing_file_viewer_source(request, manufacturing_file_id):
     preview = revision_viewer_artifact(manufacturing_file.revision)
     if not preview:
         return missing_viewer_preview_response()
-    return viewer_file_response(preview.file, preview.original_filename, "stl")
+    return viewer_file_response(preview.file, preview.original_filename, preview.artifact_type, cad_coordinates=True)
 
 
 @login_required

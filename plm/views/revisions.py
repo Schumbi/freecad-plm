@@ -582,7 +582,7 @@ def revision_viewer_source(request, revision_id):
     artifact = revision_viewer_artifact(revision)
     if not artifact:
         return missing_viewer_preview_response()
-    return viewer_file_response(artifact.file, artifact.original_filename, "stl")
+    return viewer_file_response(artifact.file, artifact.original_filename, artifact.artifact_type, cad_coordinates=True)
 
 
 @login_required
@@ -596,12 +596,15 @@ def artifact_viewer_source(request, artifact_id):
 
     file_format = viewer_file_format(artifact.original_filename, artifact.artifact_type)
     if file_format:
-        return viewer_file_response(artifact.file, artifact.original_filename, file_format)
+        return viewer_file_response(
+            artifact.file, artifact.original_filename, file_format,
+            cad_coordinates=artifact.view_name == "viewer-preview",
+        )
 
     preview = revision_viewer_artifact(artifact.revision)
     if not preview:
         return missing_viewer_preview_response()
-    return viewer_file_response(preview.file, preview.original_filename, "stl")
+    return viewer_file_response(preview.file, preview.original_filename, preview.artifact_type, cad_coordinates=True)
 
 
 @login_required

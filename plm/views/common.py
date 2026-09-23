@@ -165,19 +165,23 @@ def viewer_file_format(filename, fallback=""):
 
 def revision_viewer_artifact(revision):
     return revision.artifacts.filter(
-        artifact_type=RevisionArtifact.ArtifactType.STL,
+        artifact_type=RevisionArtifact.ArtifactType.THREEMF,
         view_name=VIEWER_PREVIEW_VIEW_NAME,
         metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
     ).order_by("-created_at", "-id").first()
 
 
-def viewer_file_response(field_file, filename, file_format):
-    return FileResponse(
+def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=False):
+    response = FileResponse(
         field_file.open("rb"),
         as_attachment=False,
         filename=filename,
         content_type=VIEWER_CONTENT_TYPES.get(file_format, "application/octet-stream"),
     )
+
+    if cad_coordinates:
+        response["X-PLM-Viewer-Coordinates"] = "cad"
+    return response
 
 
 def missing_viewer_preview_response():

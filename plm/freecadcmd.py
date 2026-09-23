@@ -32,7 +32,7 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 3
+PREVIEW_GENERATOR_VERSION = 4
 
 
 FREECADCMD_SCRIPT = r'''
@@ -153,6 +153,31 @@ def preview_objects(doc):
     return objects
 
 
+def export_viewer_preview(objects, path):
+    # Keep solids separate, including flush inlays inside assembly compounds.
+    # A temporary document avoids modifying the source or its feature history.
+    import Mesh
+    import MeshPart
+
+    preview_doc = FreeCAD.newDocument("PLMViewerPreview")
+    try:
+        meshes = []
+        for obj in objects:
+            for index, solid in enumerate(obj.Shape.Solids):
+                mesh = preview_doc.addObject("Mesh::Feature", "PreviewSolid")
+                mesh.Label = f"{object_label(obj)} / {index + 1}"
+                mesh.Mesh = MeshPart.meshFromShape(
+                    Shape=solid, LinearDeflection=0.03,
+                    AngularDeflection=0.1, Relative=False,
+                )
+                meshes.append(mesh)
+        if not meshes:
+            raise RuntimeError("Keine Volumenkoerper fuer die 3D-Vorschau gefunden.")
+        Mesh.export(meshes, str(path))
+    finally:
+        FreeCAD.closeDocument(preview_doc.Name)
+
+
 def create_preview_sources(doc, spec, output_dir):
     objects = preview_objects(doc)
 
@@ -163,8 +188,13 @@ def create_preview_sources(doc, spec, output_dir):
     stl_path = output_dir / f"{spec['revision_code']}-preview.stl"
     Import.export(objects, str(step_path))
     Mesh.export(objects, str(stl_path))
+    viewer_path = output_dir / f"{spec['revision_code']}-viewer.3mf"
+    export_viewer_preview(objects, viewer_path)
     return {
-        "artifacts": [{"path": str(step_path), "artifact_type": "step", "view_name": "preview"}],
+        "artifacts": [
+            {"path": str(step_path), "artifact_type": "step", "view_name": "preview"},
+            {"path": str(viewer_path), "artifact_type": "3mf", "view_name": "viewer-preview"},
+        ],
         "preview_mesh_path": str(stl_path),
     }
 
@@ -419,14 +449,6 @@ def run_freecadcmd_job(job):
         result = json.loads(result_path.read_text(encoding="utf-8"))
         preview_mesh_path = result.pop("preview_mesh_path", "")
         if preview_mesh_path:
-            preview_mesh = Path(preview_mesh_path)
-            result.setdefault("artifacts", []).append(
-                {
-                    "path": str(preview_mesh),
-                    "artifact_type": "stl",
-                    "view_name": "viewer-preview",
-                }
-            )
             result.setdefault("artifacts", []).extend(
                 render_stl_views(
                     preview_mesh_path,
