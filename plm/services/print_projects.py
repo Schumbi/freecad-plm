@@ -88,3 +88,25 @@ def delete_bambuddy_snapshot(snapshot):
     if stored_file is not None:
         transaction.on_commit(lambda: _delete_stored_files([stored_file]))
     return metadata
+
+
+@transaction.atomic
+def reassign_print_project(print_project, revision, actor, *, expected_revision_id):
+    item = PrintProject.objects.select_for_update().get(pk=print_project.pk)
+    if item.primary_revision_id != expected_revision_id:
+        raise ValidationError("Die Zuordnung wurde inzwischen geändert. Bitte die Seite neu laden.")
+    if revision.part.project_id != item.project_id or revision.file_format != "fcstd":
+        raise ValidationError("Bitte eine FCStd-Revision desselben Projekts auswählen.")
+    if item.primary_revision_id == revision.id:
+        return item
+    previous_id = item.primary_revision_id
+    item.primary_revision = revision
+    item.save(update_fields=["primary_revision", "updated_at"])
+    # The source list records actual provenance, not the new organizational link.
+    AuditEvent.objects.create(
+        actor=actor, action=AuditEvent.Action.PRINT_PROJECT_REASSIGNED,
+        object_repr=str(item), metadata={"print_project_id": item.id,
+            "previous_revision_id": previous_id, "primary_revision_id": revision.id,
+            "slicer_sha256": item.slicer_sha256},
+    )
+    return item

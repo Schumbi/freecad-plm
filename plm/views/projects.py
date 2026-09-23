@@ -4,14 +4,15 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, HttpResponseForbidden
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
-from ..forms import ProjectForm, ProjectSnapshotUploadForm
+from ..forms import PrintProjectReassignForm, ProjectForm, ProjectSnapshotUploadForm
 from ..models import AuditEvent, Part, PrintProject, PrintProjectPlate, PrintProjectSource, Project, ProjectSnapshot, Revision
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
 from ..services.manufacturing import inspect_manufacturing_upload
-from ..services.print_projects import delete_print_project
+from ..services.print_projects import delete_print_project, reassign_print_project
 
 
 @login_required
@@ -393,3 +394,22 @@ def download_project_snapshot(request, snapshot_id):
         as_attachment=True,
         filename=f"{snapshot.project.code}-{snapshot.name}.zip",
     )
+
+
+@login_required
+def reassign_print_project_view(request, print_project_id):
+    item = get_object_or_404(PrintProject.objects.select_related("project", "primary_revision__part"), pk=print_project_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Zuordnen von Druckprojekten.")
+    form = PrintProjectReassignForm(request.POST if request.method == "POST" else None, print_project=item)
+    if request.method == "POST" and form.is_valid():
+        try:
+            reassign_print_project(item, form.cleaned_data["revision"], request.user,
+                                   expected_revision_id=form.cleaned_data["expected_revision_id"])
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(request, f"Druckprojekt {item.code} wurde neu zugeordnet. Der 3MF-Stand bleibt erhalten.")
+            revision = form.cleaned_data["revision"]
+            return redirect(f"{reverse('plm:part_detail', args=[revision.part_id])}#revision-{revision.id}")
+    return render(request, "plm/print_project_reassign.html", {"print_project": item, "form": form})

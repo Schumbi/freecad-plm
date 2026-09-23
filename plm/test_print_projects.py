@@ -77,6 +77,67 @@ class PrintProjectViewTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["print_project"]["id"]
 
+    def new_assignment_revision(self, part=None, file_format="fcstd"):
+        return Revision.objects.create(
+            part=part or self.revision.part, revision_code="R0002", file_format=file_format,
+            file=SimpleUploadedFile("Updated.FCStd", b"new"), original_filename="Updated.FCStd",
+            sha256="b" * 64, size_bytes=3, created_by=self.user,
+        )
+
+    def test_web_reassignment_preserves_slicer_sources_and_snapshots(self):
+        project_id = self.create_print_project()
+        self.client.post(reverse("plm:api_print_project_slicer", args=[project_id]), {"file": bambu_project_upload()})
+        item = PrintProject.objects.get(pk=project_id)
+        snapshot = PrintProjectSnapshot.objects.create(
+            print_project=item, file=SimpleUploadedFile("snapshot.3mf", b"snapshot"),
+            original_filename="snapshot.3mf", sha256="e" * 64, size_bytes=8, created_by=self.user,
+        )
+        original = (item.slicer_file.name, item.slicer_sha256, Path(item.slicer_file.path).read_bytes())
+        sources = list(item.sources.values_list("id", "revision_id"))
+        target = self.new_assignment_revision()
+        self.client.force_login(self.user)
+        url = reverse("plm:reassign_print_project", args=[project_id])
+        self.assertContains(self.client.get(url), "R0002")
+        response = self.client.post(url, {"revision": target.id, "expected_revision_id": self.revision.id})
+        self.assertEqual(response.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.primary_revision_id, target.id)
+        self.assertEqual((item.slicer_file.name, item.slicer_sha256, Path(item.slicer_file.path).read_bytes()), original)
+        self.assertEqual(list(item.sources.values_list("id", "revision_id")), sources)
+        self.assertTrue(item.snapshots.filter(pk=snapshot.pk).exists())
+        event = AuditEvent.objects.get(action=AuditEvent.Action.PRINT_PROJECT_REASSIGNED)
+        self.assertEqual(event.metadata["previous_revision_id"], self.revision.id)
+        payload = self.client.get(reverse("plm:api_print_projects")).json()["print_projects"][0]
+        self.assertEqual(payload["primary_revision"]["revision_code"], "R0002")
+        self.assertEqual(payload["primary_revision"]["part_number"], self.revision.part.number)
+        self.assertEqual(payload["primary_revision"]["original_filename"], "Updated.FCStd")
+
+    def test_reassignment_rejects_foreign_project_and_non_fcstd(self):
+        project_id = self.create_print_project()
+        other_project = Project.objects.create(code="OTHER", name="Other")
+        other_part = Part.objects.create(project=other_project, number="P-1", name="Other")
+        targets = [self.new_assignment_revision(part=other_part), self.new_assignment_revision(file_format="stl")]
+        self.client.force_login(self.user)
+        for target in targets:
+            response = self.client.post(reverse("plm:reassign_print_project", args=[project_id]),
+                                        {"revision": target.id, "expected_revision_id": self.revision.id})
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.context["form"].errors)
+            self.assertEqual(PrintProject.objects.get(pk=project_id).primary_revision_id, self.revision.id)
+        self.assertFalse(AuditEvent.objects.filter(action=AuditEvent.Action.PRINT_PROJECT_REASSIGNED).exists())
+
+    def test_reassignment_rejects_stale_form_and_reader(self):
+        project_id = self.create_print_project()
+        target = self.new_assignment_revision()
+        self.client.force_login(self.user)
+        url = reverse("plm:reassign_print_project", args=[project_id])
+        response = self.client.post(url, {"revision": target.id, "expected_revision_id": -1})
+        self.assertContains(response, "inzwischen geändert")
+        self.assertEqual(PrintProject.objects.get(pk=project_id).primary_revision_id, self.revision.id)
+        self.user.groups.clear()
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(url, {"revision": target.id, "expected_revision_id": self.revision.id}).status_code, 403)
+
     def test_preview_api_requires_token_and_returns_plate_image(self):
         project_id = self.create_print_project()
         response = self.client.post(

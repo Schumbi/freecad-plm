@@ -1,0 +1,16 @@
+{% extends "plm/base.html" %}
+{% block content %}
+<div class="page-header"><h1>Revision zuordnen · {{ print_project.code }}</h1></div>
+<div class="data-card form-shell">
+  <p>Aktuell: {{ print_project.primary_revision.part.number }} · {{ print_project.primary_revision.revision_code }}</p>
+  <p>Ordne diesen Druckstand einer anderen FCStd-Revision desselben Projekts zu, wenn er dafür weiterhin passt. Die 3MF, Druck-Snapshots und ursprünglichen CAD-Quellen bleiben erhalten. Es wird keine neue Geometrie erzeugt.</p>
+  <form method="post" class="form-card">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Zuordnung speichern</button>
+      <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' print_project.project_id %}">Abbrechen</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

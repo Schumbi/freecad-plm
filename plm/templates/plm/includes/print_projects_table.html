@@ -8,7 +8,7 @@
         <th>Quellen</th>
         <th>3MF / Druckplatten</th>
         <th>Druck-Snapshots</th>
-        {% if can_delete_print_projects %}<th>Aktionen</th>{% endif %}
+        {% if can_manage_print_projects or can_delete_print_projects %}<th>Aktionen</th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -68,9 +68,11 @@
             {% endif %}
           </td>
           <td>{{ print_project.snapshots.all|length }}</td>
-          {% if can_delete_print_projects %}
+          {% if can_manage_print_projects or can_delete_print_projects %}
             <td>
-              <a class="btn btn-danger btn-sm" href="{% url 'plm:delete_print_project' print_project.id %}">Löschen</a>
+              {% if can_manage_print_projects %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'plm:reassign_print_project' print_project.id %}">Revision zuordnen</a>{% endif %}
+              {% if can_delete_print_projects %}
+              <a class="btn btn-danger btn-sm" href="{% url 'plm:delete_print_project' print_project.id %}">Löschen</a>{% endif %}
             </td>
           {% endif %}
         </tr>

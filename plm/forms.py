@@ -469,3 +469,21 @@ class ManufacturingFileUploadForm(forms.ModelForm):
         if self.upload_info:
             cleaned_data["file_type"] = self.upload_info["file_type"]
         return cleaned_data
+
+
+class PrintProjectRevisionChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, revision):
+        return f"{revision.part.number} · {revision.part.name} · {revision.revision_code} · {revision.original_filename}"
+
+
+class PrintProjectReassignForm(forms.Form):
+    revision = PrintProjectRevisionChoiceField(queryset=Revision.objects.none(), label="FCStd-Revision")
+    expected_revision_id = forms.IntegerField(widget=forms.HiddenInput)
+
+    def __init__(self, *args, print_project, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["revision"].queryset = Revision.objects.filter(
+            part__project_id=print_project.project_id, file_format=Revision.FileFormat.FCSTD,
+        ).select_related("part").order_by("part__number", "-revision_code")
+        self.initial.setdefault("revision", print_project.primary_revision_id)
+        self.initial.setdefault("expected_revision_id", print_project.primary_revision_id)

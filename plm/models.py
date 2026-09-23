@@ -836,6 +836,7 @@ class AuditEvent(models.Model):
         MANUFACTURING_FILE_UPDATED = "manufacturing_file_updated", "Fertigungsdatei geaendert"
         MANUFACTURING_FILE_STATUS_CHANGED = "manufacturing_file_status_changed", "Fertigungsdatei-Status geaendert"
         MANUFACTURING_FILE_DELETED = "manufacturing_file_deleted", "Fertigungsdatei geloescht"
+        PRINT_PROJECT_REASSIGNED = "print_project_reassigned", "Druckprojekt neu zugeordnet"
         PRINT_PROJECT_DELETED = "print_project_deleted", "Druckprojekt geloescht"
         BAMBUDDY_SOURCE_ATTACHED = "bambuddy_source_attached", "3MF an Bambuddy-Druck angehängt"
         BAMBUDDY_REVISION_LINKED = "bambuddy_revision_linked", "PLM-Revision mit Bambuddy-Druck verknüpft"

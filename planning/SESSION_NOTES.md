@@ -841,3 +841,10 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Der Auswahldialog bietet immer Neuerstellung oder Öffnen eines vorhandenen Druckprojekts der Revision an, einschließlich optionaler Plattenvorschau.
 - Eine token-geschützte Preview-API ergänzt die Plattendaten. `require_new` weist belegte Codes mit HTTP 409 ab, statt ein vorhandenes Projekt zurückzugeben.
 - Vorhandene Slicerstände werden beim normalen Öffnen beibehalten; Neuaufbau bleibt eine eigene bestätigte Aktion.
+
+## Druckprojekte anderen FCStd-Revisionen zuordnen
+
+- Editor/Admin können im Web-UI unter Druckprojekten oder Fertigung die Hauptrevision über `Revision zuordnen` ändern. Ziele sind FCStd-Revisionen desselben Projekts. Veraltete Formulare werden abgewiesen; Änderungen werden auditiert.
+- Die organisatorische Zuordnung ändert weder 3MF und Snapshots noch die ursprünglichen Quellen.
+- Die Addon-Auswahl zeigt alle Druckprojekte des PLM-Projekts mit Teil/Datei, Revision und Vorschau. Beim Öffnen gilt die zugeordnete Revision des gewählten Druckprojekts.
+- Prüfung: 317 Server-Tests (einer übersprungen), 243 Addon-Tests und nativer PySide6-Dialogtest erfolgreich.

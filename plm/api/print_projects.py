@@ -16,6 +16,11 @@ from .common import json_body, user_can_mutate_models
 def payload(item, request=None):
     result = {
         "id": item.id, "project_id": item.project_id, "primary_revision_id": item.primary_revision_id,
+        "primary_revision": {"id": item.primary_revision_id,
+            "revision_code": item.primary_revision.revision_code,
+            "part_id": item.primary_revision.part_id,
+            "part_number": item.primary_revision.part.number,
+            "original_filename": item.primary_revision.original_filename},
         "code": item.code, "name": item.name, "description": item.description,
         "slicer_project": {
             "original_filename": item.slicer_original_filename,
@@ -51,7 +56,7 @@ def payload(item, request=None):
 @require_http_methods(["GET", "POST"])
 def print_projects_api(request):
     if request.method == "GET":
-        projects = PrintProject.objects.select_related("project", "primary_revision").prefetch_related("sources", "plates", "snapshots")
+        projects = PrintProject.objects.select_related("project", "primary_revision__part").prefetch_related("sources", "plates", "snapshots")
         return JsonResponse({"print_projects": [payload(item, request) for item in projects]})
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung für Druckprojekte."}, status=403)

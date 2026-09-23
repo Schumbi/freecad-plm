@@ -47,6 +47,7 @@ from .users import (
 from .projects import (
     create_project,
     delete_print_project_view,
+    reassign_print_project_view,
     delete_project,
     download_print_project_slicer,
     download_project_snapshot,
