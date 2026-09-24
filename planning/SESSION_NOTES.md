@@ -848,3 +848,11 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Die organisatorische Zuordnung ändert weder 3MF und Snapshots noch die ursprünglichen Quellen.
 - Die Addon-Auswahl zeigt alle Druckprojekte des PLM-Projekts mit Teil/Datei, Revision und Vorschau. Beim Öffnen gilt die zugeordnete Revision des gewählten Druckprojekts.
 - Prüfung: 317 Server-Tests (einer übersprungen), 243 Addon-Tests und nativer PySide6-Dialogtest erfolgreich.
+
+# 2026-09-24
+
+## Bambuddy: Source-3MF für Plattendrucke
+
+- Laufende Synchronisation scheiterte an Drucknamen wie `SONST_DP-191_plate_1`, weil nur der Basisname verglichen wurde. Numerische Platten-Endungen werden jetzt eindeutig zugeordnet; Kollisionen mit echten Druckprojekt-Codes bleiben mehrdeutig.
+- Aktuelle 3MF werden nur zugeordnet, wenn der gespeicherte PLM-Stand nicht jünger als der Druckstart ist. Bereits eingefrorene Snapshots werden bei Wiederholungen unverändert verwendet. Alte Archive erhalten keinen ungeprüften heutigen Stand.
+- Live-Dry-Run: 7 Zuordnungen, davon 4 wegen eines später geänderten Quellenstands übersprungen. 324 Tests erfolgreich (einer übersprungen).

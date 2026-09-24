@@ -803,3 +803,83 @@ class BambuddySnapshotPruneTests(TestCase):
         self.assertTrue(
             PrintProjectSnapshot.objects.filter(id=self.snapshot.id).exists()
         )
+
+
+class BambuddyPrintProjectSyncTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from hashlib import sha256
+        from django.utils import timezone
+        BambuddySnapshotPruneTests.setUp(self)
+        self.snapshot.delete()
+        self.content = b"saved source 3mf"
+        self.print_project.slicer_file = SimpleUploadedFile("SYNC_DP-1.3mf", self.content)
+        self.print_project.slicer_original_filename = "SYNC_DP-1.3mf"
+        self.print_project.slicer_sha256 = sha256(self.content).hexdigest()
+        self.print_project.slicer_size_bytes = len(self.content)
+        self.print_project.slicer_updated_by = self.user
+        self.print_project.save()
+        self.archive = {"id": 42, "print_name": "SYNC_DP-1_plate_2", "printer_id": 1,
+                        "status": "printing", "source_3mf_path": None,
+                        "started_at": (timezone.now() + timedelta(seconds=1)).isoformat()}
+        self.remote = Mock()
+        self.remote.list_archives.return_value = [self.archive]
+        self.remote.get_archive.return_value = self.archive
+        self.uploads = []
+        self.remote.upload_source_3mf.side_effect = lambda archive_id, source, name: self.uploads.append(source.read())
+
+    def sync(self, **kwargs):
+        from .services.bambuddy import sync_bambuddy_print_projects
+        return sync_bambuddy_print_projects(client=self.remote, printer_ids=[1], **kwargs)
+
+    def test_plate_suffix_uploads_frozen_original_and_audits(self):
+        result = self.sync()
+        self.assertEqual(result.uploaded, 1)
+        self.assertEqual(self.uploads, [self.content])
+        snapshot = PrintProjectSnapshot.objects.get(bambuddy_archive_id=42)
+        self.assertEqual(snapshot.print_project_id, self.print_project.id)
+        self.assertEqual(snapshot.sha256, self.print_project.slicer_sha256)
+        self.assertTrue(AuditEvent.objects.filter(action=AuditEvent.Action.BAMBUDDY_SOURCE_ATTACHED).exists())
+
+    def test_exact_name_and_plate_alias_collision_are_ambiguous(self):
+        other = PrintProject.objects.create(project=self.print_project.project,
+            primary_revision=self.print_project.primary_revision, code="DP-1_plate_2", name="Different",
+            slicer_file=SimpleUploadedFile("other.3mf", b"different"))
+        result = self.sync()
+        self.assertEqual(result.ambiguous, 1)
+        self.remote.upload_source_3mf.assert_not_called()
+
+    def test_existing_source_is_never_overwritten(self):
+        self.archive["source_3mf_path"] = "already/source.3mf"
+        self.assertEqual(self.sync().already_attached, 1)
+        self.remote.upload_source_3mf.assert_not_called()
+
+    def test_source_changed_after_start_is_not_attached_to_old_print(self):
+        self.archive["started_at"] = "2020-01-01T00:00:00"
+        self.archive["status"] = "completed"
+        self.assertEqual(self.sync().skipped_source_changed, 1)
+        self.assertFalse(PrintProjectSnapshot.objects.exists())
+        self.remote.upload_source_3mf.assert_not_called()
+
+    def test_retry_uses_frozen_snapshot_even_if_current_source_changes(self):
+        self.remote.upload_source_3mf.side_effect = BambuddyConnectionError("offline")
+        with self.assertRaises(BambuddyConnectionError):
+            self.sync()
+        self.print_project.slicer_file.save("changed.3mf", SimpleUploadedFile("changed.3mf", b"changed"))
+        self.print_project.slicer_sha256 = "f" * 64
+        self.print_project.save()
+        self.remote.upload_source_3mf.side_effect = lambda archive_id, source, name: self.uploads.append(source.read())
+        self.assertEqual(self.sync().uploaded, 1)
+        self.assertEqual(self.uploads, [self.content])
+
+    def test_dry_run_and_unknown_suffix_do_not_write(self):
+        self.assertEqual(self.sync(dry_run=True).matched, 1)
+        self.assertFalse(PrintProjectSnapshot.objects.exists())
+        self.archive["print_name"] = "SYNC_DP-1_plate_2_edited"
+        self.assertEqual(self.sync().unmatched, 1)
+        self.remote.upload_source_3mf.assert_not_called()
+
+    def test_missing_print_timestamp_is_not_treated_as_proven_original(self):
+        self.archive.pop("started_at")
+        self.assertEqual(self.sync().skipped_source_changed, 1)
+        self.remote.upload_source_3mf.assert_not_called()

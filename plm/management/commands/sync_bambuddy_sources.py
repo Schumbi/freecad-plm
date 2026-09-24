@@ -51,6 +51,9 @@ class Command(BaseCommand):
                 f"Druckprojekt-{mode}: {print_result.inspected} geprüft, "
                 f"{print_result.matched} eindeutig zugeordnet, "
                 f"{print_result.uploaded} hochgeladen, "
+                f"{print_result.unmatched} ohne Treffer, "
+                f"{print_result.ambiguous} mehrdeutig, "
+                f"{print_result.skipped_source_changed} Quellenstand nicht zum Druckstart belegbar, "
                 f"{print_result.deleted} in Bambuddy gelöschte Snapshots entfernt."
             )
         )

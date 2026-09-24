@@ -1,8 +1,13 @@
 from dataclasses import asdict, dataclass
+from datetime import timezone as datetime_timezone
+import re
+from hashlib import sha256
 from urllib.parse import urljoin, urlsplit
 
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import transaction
+from django.utils.dateparse import parse_datetime
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,6 +34,7 @@ class BambuddySourceSyncResult:
     unmatched: int = 0
     ambiguous: int = 0
     deleted: int = 0
+    skipped_source_changed: int = 0
 
     def as_dict(self):
         return asdict(self)
@@ -94,6 +100,56 @@ def print_projects_by_print_name():
     return matches
 
 
+def matching_print_projects(matches, print_name):
+    name = str(print_name or "").strip()
+    names = [name]
+    plate = re.fullmatch(r"(.+)_plate_[1-9][0-9]*", name)
+    if plate:
+        names.append(plate.group(1))
+    # An exact code can itself end in _plate_N. Never prefer one candidate
+    # implicitly when both the full name and the plate alias match.
+    candidates = {item.pk: item for key in names for item in matches.get(key, [])}
+    return list(candidates.values())
+
+
+def source_existed_at_print_start(project, archive):
+    try:
+        started = parse_datetime(str(archive.get("started_at") or archive.get("created_at") or ""))
+    except ValueError:
+        return False
+    if started is None:
+        return False
+    # Bambuddy serializes its UTC timestamps without a timezone suffix.
+    if timezone.is_naive(started):
+        started = started.replace(tzinfo=datetime_timezone.utc)
+    return project.updated_at <= started
+
+
+@transaction.atomic
+def freeze_print_project_source(project, archive):
+    project = PrintProject.objects.select_for_update().get(pk=project.pk)
+    snapshot = PrintProjectSnapshot.objects.filter(bambuddy_archive_id=int(archive["id"])).first()
+    if snapshot and snapshot.file:
+        return snapshot if snapshot.print_project_id == project.id else None
+    if not source_existed_at_print_start(project, archive):
+        return None
+    if snapshot and (snapshot.print_project_id != project.id or snapshot.sha256 != project.slicer_sha256):
+        return None
+    with project.slicer_file.open("rb") as source:
+        content = source.read()
+    if sha256(content).hexdigest() != project.slicer_sha256:
+        raise BambuddyProtocolError("Der PLM-3MF-Stand hat eine abweichende Prüfsumme.")
+    if snapshot is None:
+        snapshot = PrintProjectSnapshot(
+            bambuddy_archive_id=int(archive["id"]), print_project=project,
+            original_filename=project.slicer_original_filename,
+            sha256=project.slicer_sha256, size_bytes=len(content),
+            created_by=project.slicer_updated_by,
+        )
+    snapshot.file.save(snapshot.original_filename, ContentFile(content), save=True)
+    return snapshot
+
+
 def prune_deleted_bambuddy_snapshots(*, client, dry_run=False):
     deleted = 0
     snapshots = PrintProjectSnapshot.objects.exclude(
@@ -129,7 +185,7 @@ def sync_bambuddy_print_projects(*, client=None, printer_ids=None, limit=20, dry
         if archive.get("source_3mf_path"):
             result.already_attached += 1
             continue
-        candidates = matches.get(str(archive.get("print_name") or "").strip(), [])
+        candidates = matching_print_projects(matches, archive.get("print_name"))
         if not candidates:
             result.unmatched += 1
             continue
@@ -137,29 +193,29 @@ def sync_bambuddy_print_projects(*, client=None, printer_ids=None, limit=20, dry
             result.ambiguous += 1
             continue
         result.matched += 1
+        project = candidates[0]
+        frozen = PrintProjectSnapshot.objects.filter(bambuddy_archive_id=archive_id).first()
+        if not (frozen and frozen.file and frozen.print_project_id == project.id) and not source_existed_at_print_start(project, archive):
+            result.skipped_source_changed += 1
+            continue
         if dry_run:
             continue
-        project = candidates[0]
         current = client.get_archive(archive_id)
         if current.get("source_3mf_path"):
             result.already_attached += 1
             continue
-        snapshot, _created = PrintProjectSnapshot.objects.get_or_create(
-            bambuddy_archive_id=archive_id,
-            defaults={
-                "print_project": project,
-                "original_filename": project.slicer_original_filename,
-                "sha256": project.slicer_sha256,
-                "size_bytes": project.slicer_size_bytes,
-                "created_by": project.slicer_updated_by,
-            },
-        )
-        if not snapshot.file:
-            with project.slicer_file.open("rb") as source:
-                snapshot.file.save(project.slicer_original_filename, ContentFile(source.read()), save=True)
+        snapshot = freeze_print_project_source(project, current)
+        if snapshot is None:
+            result.skipped_source_changed += 1
+            continue
         with snapshot.file.open("rb") as source:
             client.upload_source_3mf(archive_id, source, snapshot.original_filename)
         result.uploaded += 1
+        AuditEvent.objects.create(
+            actor=project.slicer_updated_by, action=AuditEvent.Action.BAMBUDDY_SOURCE_ATTACHED,
+            object_repr=str(project), metadata={"print_project_id": project.id,
+                "bambuddy_archive_id": archive_id, "source_sha256": snapshot.sha256},
+        )
     return result
 
 

@@ -498,3 +498,9 @@ Auf einem Server mit nativer FreeCAD-Installation reicht meistens:
 ```bash
 FREECADCMD_COMMAND=/usr/bin/FreeCADCmd .venv/bin/python manage.py process_export_jobs
 ```
+
+Druckprojekt-Synchronisation nach Bambuddy erkennt auch Plattennamen wie
+`<Projektcode>_<Druckprojektcode>_plate_1`. Bereits vorhandene Source-Dateien
+werden nicht ersetzt. Ohne vorhandenen Snapshot muss der PLM-Stand vor dem
+Druckstart gespeichert worden sein; neuere oder zeitlich nicht prüfbare Stände
+werden nicht automatisch als Original eines älteren Drucks hochgeladen.
