@@ -11,6 +11,8 @@ from ..models import ApiToken, AuditEvent, Project
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import import_project_snapshot
 
+from ..services.project_tags import filter_projects, set_project_tags, tag_names
+
 from .common import (
     json_body,
     project_import_payload,
@@ -22,14 +24,19 @@ from .common import (
 @csrf_exempt
 @api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.ADMIN)
 @require_http_methods(["GET", "POST"])
+@transaction.atomic
 def projects_api(request):
     if request.method == "GET":
-        projects = Project.objects.filter(is_archived=False).order_by("code")
+        projects = filter_projects(Project.objects.filter(is_archived=False).prefetch_related("tags").order_by("code"), request.GET)
         return JsonResponse({"projects": [project_payload(project) for project in projects]})
 
     if not is_plm_admin(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Anlegen von Projekten."}, status=403)
     data = json_body(request)
+    try:
+        names = tag_names(data["tags"]) if "tags" in data else None
+    except ValidationError as exc:
+        return validation_error_response(exc)
     project = Project.objects.create(
         code=data.get("code", "").strip().upper(),
         name=data.get("name", "").strip(),
@@ -37,6 +44,8 @@ def projects_api(request):
         status=data.get("status", Project.Status.RUNNING),
         project_date=parse_date(data.get("project_date", "")) or timezone.localdate(),
     )
+    if names is not None:
+        set_project_tags(project, names)
     AuditEvent.objects.create(
         actor=request.user,
         action=AuditEvent.Action.PROJECT_CREATED,
@@ -88,6 +97,7 @@ def project_import_api(request):
 @csrf_exempt
 @api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.ADMIN)
 @require_http_methods(["GET", "POST"])
+@transaction.atomic
 def project_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == "GET":
@@ -96,6 +106,10 @@ def project_api(request, project_id):
     if not is_plm_admin(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Bearbeiten von Projekten."}, status=403)
     data = json_body(request)
+    try:
+        names = tag_names(data["tags"]) if "tags" in data else None
+    except ValidationError as exc:
+        return validation_error_response(exc)
     if "code" in data:
         project.code = data["code"].strip().upper()
     for field in ("name", "description", "status"):
@@ -106,6 +120,8 @@ def project_api(request, project_id):
     if "is_archived" in data:
         project.is_archived = bool(data["is_archived"])
     project.save()
+    if names is not None:
+        set_project_tags(project, names)
     AuditEvent.objects.create(
         actor=request.user,
         action=AuditEvent.Action.PROJECT_UPDATED,

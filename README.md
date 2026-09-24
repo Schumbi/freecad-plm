@@ -504,3 +504,31 @@ Druckprojekt-Synchronisation nach Bambuddy erkennt auch Plattennamen wie
 werden nicht ersetzt. Ohne vorhandenen Snapshot muss der PLM-Stand vor dem
 Druckstart gespeichert worden sein; neuere oder zeitlich nicht prüfbare Stände
 werden nicht automatisch als Original eines älteren Drucks hochgeladen.
+
+## Projekte mit Tags organisieren
+
+Projekte können mehrere zentral verwaltete Tags tragen. Unter **Eigenschaften bearbeiten**
+vorhandene Tags auswählen oder neue Namen durch Kommas getrennt eingeben.
+Groß-/Kleinschreibung und überzählige Leerzeichen erzeugen keine doppelten Tags.
+Die bisherigen Freitext-Tags an Teilen bleiben unabhängig davon.
+
+Die Projektübersicht bietet Textsuche, Tag-Auswahl mit Projektanzahlen und die
+Kombination **Alle ausgewählten** (UND) oder **Mindestens eines** (ODER).
+**Ohne Tags** hilft beim Einsortieren; **Alle Projekte** setzt die Filter zurück.
+Ein Klick auf einen Tag am Projekt zeigt die zugehörigen Projekte.
+Tags sind außerdem über die globale Textsuche auffindbar.
+
+Unter **Tags verwalten** können Administratoren Tags umbenennen, durch Umbenennen
+in einen bestehenden Namen zusammenführen oder bestätigt entfernen. Dabei bleiben
+Projekte, Dateien und Revisionen erhalten, auch bei archivierten Projekten.
+Die Verwaltung wird im Audit protokolliert.
+
+`GET /api/projects/` und `GET /api/projects/<id>/` liefern `tags` als Liste aus
+`{"id": 1, "name": "Modellbau"}`. Beim Anlegen/Bearbeiten nimmt `tags` eine Liste
+von Namen entgegen; eine leere Liste entfernt die Zuordnungen, ein fehlendes Feld
+lässt sie unverändert. Die Projektliste unterstützt `q`, wiederholtes `tag=<id>`,
+`mode=all|any` (Standard: all) und `untagged=1` (ignoriert ausgewählte Tags).
+Bestehende Authentifizierung und Administratorrechte für Änderungen gelten weiter.
+
+Die Datenbankmigration `0026` ergänzt Tags und Zuordnungen; bestehende Projekte
+starten ohne Tags. Das Addon unterstützt Anzeige, Filter und Bearbeitung ab 0.1.9.

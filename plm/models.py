@@ -13,6 +13,22 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+class ProjectTag(models.Model):
+    name = models.CharField(max_length=80)
+    key = models.CharField(max_length=240, unique=True, editable=False)
+
+    class Meta:
+        ordering = ["key"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.name = " ".join(self.name.split())
+        self.key = self.name.casefold()
+        super().save(*args, **kwargs)
+
+
 class Project(TimeStampedModel):
     class Status(models.TextChoices):
         RUNNING = "running", "Laufend"
@@ -21,6 +37,7 @@ class Project(TimeStampedModel):
         IMPORTANT = "important", "Wichtig"
         ORDER = "order", "Auftrag"
 
+    tags = models.ManyToManyField(ProjectTag, blank=True, related_name="projects")
     code = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -818,6 +835,7 @@ class ProjectSnapshotEntry(models.Model):
 
 class AuditEvent(models.Model):
     class Action(models.TextChoices):
+        PROJECT_TAG_UPDATED = "project_tag_updated", "Projekt-Tag geändert"
         PROJECT_CREATED = "project_created", "Projekt angelegt"
         PROJECT_UPDATED = "project_updated", "Projekt geaendert"
         PROJECT_DELETED = "project_deleted", "Projekt geloescht"

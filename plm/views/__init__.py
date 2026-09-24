@@ -44,6 +44,7 @@ from .users import (
     set_user_password,
     user_management_list,
 )
+from .tags import manage_project_tags
 from .projects import (
     create_project,
     delete_print_project_view,

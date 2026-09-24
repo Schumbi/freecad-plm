@@ -3,6 +3,15 @@
 Alle wesentlichen Änderungen am FreeCAD-PLM-Server werden in dieser Datei
 dokumentiert.
 
+## [Unreleased] - 2026-09-24
+
+- Zentrale Projekt-Tags mit Mehrfachzuordnung, Web-/API-Filtern, kombinierter
+  Textsuche und Tag-Verwaltung (Umbenennen, Zusammenführen, Entfernen).
+- Bestehende Clients behalten Tags bei Updates ohne Tag-Feld; Migration 0026
+  ergänzt ausschließlich neue Tabellen/Zuordnungen und Audit-Auswahl.
+- Bambuddy erkennt Drucknamen mit `_plate_N` und hängt den zeitlich belegbaren,
+  gesicherten PLM-3MF-Stand automatisch an.
+
 ## [0.2.0] - 2026-09-16
 
 ### Hinzugefügt

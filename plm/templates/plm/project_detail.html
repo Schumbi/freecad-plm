@@ -10,6 +10,10 @@
 {% endblock %}
 
 {% block content %}
+  <div class="project-tag-chips" aria-label="Projekt-Tags">
+    {% for tag in project.tags.all %}<a class="project-tag-chip" href="{% url 'plm:project_list' %}?tag={{ tag.id }}">{{ tag.name }}</a>{% endfor %}
+  </div>
+
   <div class="object-layout">
     <div class="object-main">
       <div class="page-header">

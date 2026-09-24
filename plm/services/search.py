@@ -67,7 +67,8 @@ def search_plm(
             Q(code__icontains=term)
             | Q(name__icontains=term)
             | Q(description__icontains=term)
-        )
+            | Q(tags__name__icontains=term)
+        ).distinct()
         part_query = part_query.filter(
             Q(number__icontains=term)
             | Q(name__icontains=term)

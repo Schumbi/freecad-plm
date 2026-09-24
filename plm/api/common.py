@@ -25,6 +25,7 @@ def project_payload(project):
         "status": project.status,
         "project_date": project.project_date.isoformat(),
         "is_archived": project.is_archived,
+        "tags": [{"id": tag.id, "name": tag.name} for tag in project.tags.all()],
     }
 
 

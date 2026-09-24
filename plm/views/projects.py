@@ -1,3 +1,6 @@
+from django.db.models import Count, Q
+from ..models import ProjectTag
+from ..services.project_tags import filter_projects
 from io import BytesIO
 from zipfile import ZipFile
 from django.contrib import messages
@@ -75,13 +78,19 @@ def global_search(request):
 
 @login_required
 def project_list(request):
-    projects = Project.objects.filter(is_archived=False).order_by("code")
+    projects = filter_projects(Project.objects.filter(is_archived=False).prefetch_related("tags").order_by("code"), request.GET)
     return render(
         request,
         "plm/project_list.html",
         {
             "projects": projects,
             "can_create_project": is_plm_admin(request.user),
+            "tags": ProjectTag.objects.annotate(project_count=Count("projects", filter=Q(projects__is_archived=False))),
+            "selected_tags": request.GET.getlist("tag"),
+            "query": request.GET.get("q", ""),
+            "tag_mode": request.GET.get("mode", "all"),
+            "untagged": request.GET.get("untagged") == "1",
+
         },
     )
 

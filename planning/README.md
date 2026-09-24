@@ -24,8 +24,8 @@ Der erste fachliche Schwerpunkt ist die robuste Verwaltung von FreeCAD-`FCStd`-D
 - Der alte nanoPLM-Code wurde nach `old/` verschoben.
 - Django ist die technische Basis; Docker Compose mit PostgreSQL, Media-Volume und FreeCADCmd-Worker ist umgesetzt.
 - Die aktuelle Serverversion ist `0.2.0`. Der V1-Funktionsumfang ist im Code
-  weitgehend vollständig (Stand 2026-09-16). Die Testabdeckung umfasst
-  302 Servertests, 233 Addon-Tests und 9 separate HTTP-Vertragstests.
+  weitgehend vollständig (Stand 2026-09-24). Die Testabdeckung umfasst
+  338 Servertests, 247 Addon-Tests und 9 separate HTTP-Vertragstests.
   Unter SQLite sind alle ausführbaren Tests grün; ein PostgreSQL-Paralleltest
   wird weiterhin übersprungen und benötigt die isolierte PostgreSQL-Testumgebung.
 - Offen fuer V1.0: allgemeine Browser-Abnahme gemaess

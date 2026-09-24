@@ -22,27 +22,32 @@
     {% endif %}
   </div>
 
-  <div class="toolbar">
-    <div class="toolbar-group">
-      <span class="muted" id="project-filter-count" data-filter-default="{{ projects|length }} Projekte">{{ projects|length }} Projekte</span>
-    </div>
-    <div class="toolbar-group">
-      <input
-        type="search"
-        class="filter-input"
-        placeholder="In dieser Liste filtern …"
-        aria-label="Projekte in dieser Liste filtern"
-        data-filter-input="#project-list"
-        data-filter-count="#project-filter-count"
-        data-filter-empty="#project-filter-empty">
-    </div>
-    <div class="toolbar-group">
-      <span class="status-badge status-running">Laufend</span>
-      <span class="status-badge status-important">Wichtig</span>
-      <span class="status-badge status-order">Auftrag</span>
-    </div>
-  </div>
-
+  <div class="project-tag-layout">
+    <aside class="data-card project-tag-sidebar" aria-label="Projektfilter">
+      <h2>Tags</h2>
+      <a href="{% url 'plm:project_list' %}">Alle Projekte</a> ·
+      <a href="?untagged=1">Ohne Tags</a>
+      <form method="get">
+        <label for="project-query">Projekte suchen</label>
+        <input id="project-query" type="search" name="q" value="{{ query }}" placeholder="Name, Code oder Tag …">
+        <label for="tag-mode">Tags kombinieren</label>
+        <select name="mode" id="tag-mode">
+          <option value="all" {% if tag_mode != 'any' %}selected{% endif %}>Alle ausgewählten</option>
+          <option value="any" {% if tag_mode == 'any' %}selected{% endif %}>Mindestens eines</option>
+        </select>
+        <label><input type="checkbox" name="untagged" value="1" {% if untagged %}checked{% endif %}> Nur ohne Tags (ignoriert Tag-Auswahl)</label>
+        <div class="project-tag-options">
+          {% for tag in tags %}
+            <label><input type="checkbox" name="tag" value="{{ tag.id }}" {% if tag.id|stringformat:"s" in selected_tags %}checked{% endif %}>
+              {{ tag.name }} <span class="muted">({{ tag.project_count }})</span></label>
+          {% empty %}<p>Noch keine Tags. Beim Bearbeiten eines Projekts kannst Du welche anlegen.</p>{% endfor %}
+        </div>
+        <button type="submit">Filtern</button>
+      </form>
+      {% if can_create_project %}<a href="{% url 'plm:manage_project_tags' %}">Tags verwalten</a>{% endif %}
+    </aside>
+    <section aria-label="Projekte">
+      <p>{{ projects|length }} Projekte</p>
   {% if projects %}
     <div class="project-grid" id="project-list">
       {% for project in projects %}
@@ -58,6 +63,9 @@
             <a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a>
           </h2>
           <p class="project-card-desc">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p>
+          <div class="project-tag-chips">
+            {% for tag in project.tags.all %}<a class="project-tag-chip" href="?tag={{ tag.id }}">{{ tag.name }}</a>{% endfor %}
+          </div>
           <div class="project-card-footer">
             <span>{{ project.parts.count }} Teile</span>
             <span>{{ project.snapshots.count }} Stände</span>
@@ -66,18 +74,12 @@
         </article>
       {% endfor %}
     </div>
-    <div class="empty-state" id="project-filter-empty" hidden>
-      <strong>Keine Treffer</strong>
-      Für diesen Filter wurden keine Projekte gefunden.
-    </div>
   {% else %}
     <div class="empty-state">
-      <strong>Noch keine Projekte</strong>
-      {% if can_create_project %}
-        Lege das erste Projekt an, um Teile und Revisionen zu verwalten.
-      {% else %}
-        Es sind noch keine Projekte vorhanden.
-      {% endif %}
+      <strong>Keine Projekte gefunden</strong>
+      Ändere die Filter oder lege ein Projekt an.
     </div>
   {% endif %}
+    </section>
+  </div>
 {% endblock %}

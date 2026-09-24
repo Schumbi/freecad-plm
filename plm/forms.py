@@ -178,10 +178,35 @@ def token_preset_label(preset):
 
 
 class ProjectForm(forms.ModelForm):
+    new_tags = forms.CharField(label="Neue Tags", required=False,
+        help_text="Mehrere Namen durch Kommas trennen. Vorhandene Tags oben auswählen.")
+
+    def clean_new_tags(self):
+        from .services.project_tags import tag_names
+        return tag_names(self.cleaned_data.get("new_tags", ""))
+
+    def clean(self):
+        from .services.project_tags import tag_names
+        data = super().clean()
+        tag_names([tag.name for tag in data.get("tags", [])] + data.get("new_tags", []))
+        return data
+
+    def _save_m2m(self):
+        from .services.project_tags import set_project_tags
+        super()._save_m2m()
+        set_project_tags(self.instance, [tag.name for tag in self.cleaned_data["tags"]]
+                         + self.cleaned_data.get("new_tags", []))
+
+    def save(self, commit=True):
+        from django.db import transaction
+        with transaction.atomic():
+            return super().save(commit=commit)
+
     class Meta:
         model = Project
-        fields = ["code", "name", "status", "project_date", "description"]
+        fields = ["code", "name", "status", "project_date", "description", "tags", "new_tags"]
         widgets = {
+            "tags": forms.CheckboxSelectMultiple(),
             "project_date": forms.DateInput(
                 attrs={"type": "date"},
                 format="%Y-%m-%d",
@@ -189,6 +214,7 @@ class ProjectForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 4}),
         }
         labels = {
+            "tags": "Tags",
             "code": "Code",
             "name": "Name",
             "status": "Status",

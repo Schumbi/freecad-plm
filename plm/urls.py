@@ -50,6 +50,7 @@ urlpatterns = [
         views.revoke_api_token,
         name="revoke_api_token",
     ),
+    path("projects/tags/", views.manage_project_tags, name="manage_project_tags"),
     path("projects/new/", views.create_project, name="create_project"),
     path("projects/<int:project_id>/", views.project_detail, name="project_detail"),
     path(

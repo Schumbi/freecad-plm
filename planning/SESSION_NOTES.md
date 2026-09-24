@@ -856,3 +856,16 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Laufende Synchronisation scheiterte an Drucknamen wie `SONST_DP-191_plate_1`, weil nur der Basisname verglichen wurde. Numerische Platten-Endungen werden jetzt eindeutig zugeordnet; Kollisionen mit echten Druckprojekt-Codes bleiben mehrdeutig.
 - Aktuelle 3MF werden nur zugeordnet, wenn der gespeicherte PLM-Stand nicht jünger als der Druckstart ist. Bereits eingefrorene Snapshots werden bei Wiederholungen unverändert verwendet. Alte Archive erhalten keinen ungeprüften heutigen Stand.
 - Live-Dry-Run: 7 Zuordnungen, davon 4 wegen eines später geänderten Quellenstands übersprungen. 324 Tests erfolgreich (einer übersprungen).
+
+
+## 2026-09-24: Projekte nach Tags organisieren
+
+- Zentrale Projekt-Tags mit normalisierten, eindeutigen Namen und M:N-Zuordnung.
+- Web: Tag-Seitenleiste, UND/ODER, Textsuche, Ohne Tags, Tag-Verwaltung mit
+  Zusammenführung und bestätigtem Entfernen; Rechte und Audit berücksichtigt.
+- API: additive tags-Payloads, bestehende Clients erhalten Zuordnungen;
+  Filterparameter q, tag (mehrfach), mode und untagged.
+- Addon 0.1.9: lokale Filter über dem Projektbaum, Tags im Eigenschaftendialog,
+  Vervollständigung kommaseparierter Namen; kompatibel mit Servern ohne Tags.
+- Validierung: 338 Server-Tests (1 SQLite-Skip), 247 Addon-Tests; echte PySide6-
+  Widgets aus FreeCAD 1.1 für Filter, Zurücksetzen und Vervollständigung geprüft.

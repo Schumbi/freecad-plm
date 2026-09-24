@@ -1,0 +1,22 @@
+{% extends "plm/base.html" %}
+{% block content %}
+<h1>Projekt-Tags verwalten</h1>
+<p><a href="{% url 'plm:project_list' %}">Zur Projektübersicht</a></p>
+<p>Beim Umbenennen in einen vorhandenen Namen werden beide Tags zusammengeführt. Alle Zuordnungen bleiben erhalten, auch bei archivierten Projekten.</p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% for tag in tags %}
+<div class="data-card">
+  <form method="post" class="form-card">
+    {% csrf_token %}<input type="hidden" name="tag_id" value="{{ tag.id }}">
+    <label for="tag-name-{{ tag.id }}">{{ tag.project_count }} Projekte · Tag-Name</label>
+    <input id="tag-name-{{ tag.id }}" name="name" value="{{ tag.name }}" maxlength="80" required>
+    <button name="action" value="rename">Umbenennen / zusammenführen</button>
+  </form>
+  <form method="post" class="form-card">
+    {% csrf_token %}<input type="hidden" name="tag_id" value="{{ tag.id }}">
+    <label><input type="checkbox" name="confirm" value="yes" required> „{{ tag.name }}“ von allen Projekten entfernen. Projekte und Dateien bleiben erhalten.</label>
+    <button name="action" value="delete">Tag entfernen</button>
+  </form>
+</div>
+{% empty %}<p>Noch keine Tags vorhanden.</p>{% endfor %}
+{% endblock %}

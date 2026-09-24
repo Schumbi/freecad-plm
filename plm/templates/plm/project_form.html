@@ -26,6 +26,7 @@
   <div class="data-card form-shell">
     <form class="form-card" method="post">
       {% csrf_token %}
+      {{ form.non_field_errors }}
       {% include "plm/includes/form_fields.html" with form=form %}
       <div class="form-actions">
         <button type="submit">{{ submit_label|default:"Anlegen" }}</button>

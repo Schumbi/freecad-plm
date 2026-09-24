@@ -4,6 +4,8 @@
   <dd>{{ project.code }}</dd>
   <dt>Name</dt>
   <dd>{{ project.name }}</dd>
+  <dt>Tags</dt>
+  <dd>{% for tag in project.tags.all %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% empty %}Keine{% endfor %}</dd>
   <dt>Status</dt>
   <dd>{{ project.get_status_display }}</dd>
   <dt>Datum</dt>
