@@ -56,12 +56,26 @@ class Project(TimeStampedModel):
         return f"{self.code} - {self.name}"
 
 
+class PartFamily(TimeStampedModel):
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="part_families")
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
+
 class Part(TimeStampedModel):
     class Category(models.TextChoices):
         PART = "part", "Teil"
         ASSEMBLY = "assembly", "Baugruppe"
 
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="parts")
+    family = models.ForeignKey(
+        PartFamily, on_delete=models.PROTECT, related_name="parts", null=True, blank=True,
+    )
+    variant_source_revision = models.ForeignKey(
+        "Revision", on_delete=models.PROTECT, related_name="derived_variants", null=True, blank=True,
+    )
     number = models.CharField(max_length=80)
     name = models.CharField(max_length=200)
     category = models.CharField(

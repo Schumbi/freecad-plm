@@ -4858,6 +4858,7 @@ class AddonApiWorkflowTests(TestCase):
                 "sha256": revision.sha256,
                 "size_bytes": revision.size_bytes,
                 "download_url": expected_download_url,
+                "reference_files": [],
             },
         )
         self.assertFalse(Checkout.objects.exists())

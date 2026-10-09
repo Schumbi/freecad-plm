@@ -82,7 +82,9 @@ def create_part(request, project_id):
 
 @login_required
 def part_detail(request, part_id):
-    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    part = get_object_or_404(
+        Part.objects.select_related("project", "family", "variant_source_revision__part"), id=part_id,
+    )
     annotations = list(
         part.annotations.select_related("created_by", "revision").order_by(
             "status", "-created_at"
@@ -113,6 +115,7 @@ def part_detail(request, part_id):
         "plm/part_detail.html",
         {
             "part": part,
+            "variants": part.family.parts.filter(is_archived=False) if part.family_id else [],
             "annotations": annotations,
             "open_annotations_count": sum(
                 annotation.status == Annotation.Status.OPEN

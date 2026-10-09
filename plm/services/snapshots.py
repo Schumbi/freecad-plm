@@ -278,8 +278,10 @@ def delete_project_tree(project, actor):
     PrintProject.objects.filter(project=project).delete()
     RevisionArtifact.objects.filter(revision__part__project=project).delete()
     ExportJob.objects.filter(revision__part__project=project).delete()
+    project.parts.update(variant_source_revision=None)
     revisions.delete()
     project.parts.all().delete()
+    project.part_families.all().delete()
     project.delete()
 
     stored_files = [

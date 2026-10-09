@@ -70,6 +70,7 @@ def manifest_file_payload(entry):
         "file_format": revision.file_format,
         "sha256": revision.sha256,
         "size_bytes": revision.size_bytes,
+        "reference_files": revision_reference_files(revision),
     }
 
 

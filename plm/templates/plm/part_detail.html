@@ -18,6 +18,19 @@
           <span class="page-kicker">{{ part.project.code }} · {{ part.get_category_display }}</span>
           <h1>{{ part.number }} · {{ part.name }}</h1>
           <p class="object-subtitle">{{ part.description|default:"Keine Beschreibung hinterlegt." }}</p>
+          {% if part.family %}
+            <p class="meta-line">Teilefamilie: {{ part.family.name }}</p>
+            <div class="pill-row" aria-label="Varianten">
+              {% for variant in variants %}
+                <a class="artifact-pill" href="{% url 'plm:part_detail' variant.id %}">{{ variant.number }} · {{ variant.name }}</a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if part.variant_source_revision %}
+            <p class="meta-line">Ausgang:
+              <a href="{% url 'plm:part_detail' part.variant_source_revision.part_id %}#revision-{{ part.variant_source_revision_id }}">{{ part.variant_source_revision }}</a>
+            </p>
+          {% endif %}
         </div>
         <div class="page-header-actions">
           <span class="type-pill">{{ part.get_category_display }}</span>

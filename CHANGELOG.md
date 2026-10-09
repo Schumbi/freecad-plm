@@ -3,7 +3,13 @@
 Alle wesentlichen Änderungen am FreeCAD-PLM-Server werden in dieser Datei
 dokumentiert.
 
-## [Unreleased] - 2026-09-24
+## [Unreleased] - 2026-10-09
+
+- Geometrische Teilevarianten mit optionaler Teilefamilie und konkreter
+  Herkunftsrevision. Jede Variante hat eigene Revisionen und Druckprojekte.
+- Variantenanlage aus dem FreeCAD-Add-on inklusive verknüpfter Parameter-
+  und CAD-Dateien, eigenem Projektstand und Checkout sowie Rechteprüfung.
+- Familiennavigation und Herkunft auf der Teilseite; Migration 0027.
 
 - Zentrale Projekt-Tags mit Mehrfachzuordnung, Web-/API-Filtern, kombinierter
   Textsuche und Tag-Verwaltung (Umbenennen, Zusammenführen, Entfernen).

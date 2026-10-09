@@ -1,13 +1,13 @@
 from pathlib import PurePosixPath
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from ..auth import api_auth_required, token_has_scope
-from ..models import ApiToken, AuditEvent, Checkout, Part, Project
+from ..models import ApiToken, AuditEvent, Checkout, Part, Project, ProjectSnapshot, Revision
 from ..permissions import is_plm_admin
 from ..services import (
     add_checkout_file,
@@ -16,6 +16,8 @@ from ..services import (
     create_revision_from_upload,
     next_part_number,
 )
+
+from ..services.variants import create_variant_checkout
 
 from .common import (
     add_manifest_download_urls,
@@ -34,7 +36,7 @@ from .common import (
 def project_parts_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == "GET":
-        parts = project.parts.filter(is_archived=False).order_by("number")
+        parts = project.parts.filter(is_archived=False).select_related("family").order_by("number")
         return JsonResponse({"parts": [part_payload(part) for part in parts]})
 
     if not user_can_mutate_models(request.user):
@@ -83,6 +85,20 @@ def create_fcstd_part_api(request, project_id):
             status=400,
         )
 
+    source_revision = None
+    source_revision_id = request.POST.get("source_revision_id", "").strip()
+    if source_revision_id:
+        if not source_revision_id.isdecimal():
+            return JsonResponse({"error": "Ungültige Herkunftsrevision."}, status=400)
+        source_revision = get_object_or_404(
+            Revision.objects.select_related("part"), id=source_revision_id,
+            part__project=project,
+        )
+        if source_revision.file_format != Revision.FileFormat.FCSTD or source_revision.part.is_archived:
+            return JsonResponse({"error": "Eine aktive FreeCAD-Quelle ist erforderlich."}, status=409)
+        if request.POST.get("checkout_id", "").strip():
+            return JsonResponse({"error": "Eine Variante erhält einen eigenen Checkout."}, status=400)
+
     category = request.POST.get("category", Part.Category.PART).strip()
     if category not in Part.Category.values:
         return JsonResponse({"error": "Ungueltige Teilekategorie."}, status=400)
@@ -95,8 +111,35 @@ def create_fcstd_part_api(request, project_id):
         )
 
     name = request.POST.get("name", "").strip()
+    if source_revision is not None and not name:
+        return JsonResponse({"error": "Ein Variantenname ist erforderlich."}, status=400)
     if not name:
         name = PurePosixPath(uploaded_file.name).stem or number
+
+    if source_revision is not None:
+        snapshot = None
+        snapshot_id = request.POST.get("source_snapshot_id", "").strip()
+        if snapshot_id:
+            if not snapshot_id.isdecimal():
+                return JsonResponse({"error": "Ungültiger Ausgangsprojektstand."}, status=400)
+            snapshot = get_object_or_404(ProjectSnapshot, id=snapshot_id, project=project)
+            if not snapshot.entries.filter(revision=source_revision).exists():
+                return JsonResponse({"error": "Die Quelle gehört nicht zum Projektstand."}, status=409)
+        try:
+            part, revision, checkout = create_variant_checkout(
+                source_revision=source_revision, uploaded_file=uploaded_file,
+                name=name, number=request.POST.get("number", "").strip(), actor=request.user,
+                snapshot=snapshot, workspace_hint=request.POST.get("workspace_hint", ""),
+            )
+        except ValidationError as exc:
+            return validation_error_response(exc, status=409)
+        except IntegrityError:
+            return JsonResponse({"error": "Diese Teilenummer existiert bereits."}, status=409)
+        return JsonResponse({
+            "part": part_payload(part), "revision": revision_payload(revision, request),
+            "checkout": checkout_payload(checkout),
+            "manifest": add_manifest_download_urls(checkout_manifest(checkout), request),
+        }, status=201)
 
     target_checkout = None
     checkout_id = request.POST.get("checkout_id", "").strip()
@@ -136,6 +179,10 @@ def create_fcstd_part_api(request, project_id):
 
     try:
         with transaction.atomic():
+            # Serialize number allocation and first family creation within the project.
+            Project.objects.select_for_update().get(pk=project.pk)
+            if not request.POST.get("number", "").strip():
+                number = next_part_number(project)
             part = Part.objects.create(
                 project=project,
                 number=number,
@@ -185,6 +232,8 @@ def create_fcstd_part_api(request, project_id):
             )
     except ValidationError as exc:
         return validation_error_response(exc, status=409)
+    except IntegrityError:
+        return JsonResponse({"error": "Diese Teilenummer existiert bereits. Bitte erneut versuchen."}, status=409)
 
     payload = {
         "part": part_payload(part),
@@ -201,13 +250,20 @@ def create_fcstd_part_api(request, project_id):
 @api_auth_required(get=ApiToken.Scope.READ, post=ApiToken.Scope.WRITE)
 @require_http_methods(["GET", "POST"])
 def part_api(request, part_id):
-    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    part = get_object_or_404(Part.objects.select_related("project", "family"), id=part_id)
     if request.method == "GET":
         revisions = part.revisions.order_by("-created_at")
         active_checkout = part.checkouts.filter(status=Checkout.Status.ACTIVE).first()
         return JsonResponse(
             {
                 "part": part_payload(part),
+                "variants": [part_payload(item) for item in part.family.parts.filter(is_archived=False).select_related("family")] if part.family_id else [],
+                "can_create_variant": (
+                    user_can_mutate_models(request.user)
+                    and token_has_scope(request.api_token, ApiToken.Scope.WRITE)
+                    and token_has_scope(request.api_token, ApiToken.Scope.CHECKOUT)
+                    and not part.is_archived
+                ),
                 "revisions": [revision_payload(revision, request) for revision in revisions],
                 "active_checkout": (
                     checkout_payload(active_checkout) if active_checkout else None

@@ -28,6 +28,40 @@ from freecad_plm_addon.workspace import sha256_file
 
 
 class AddonServerContracts(PrintProjectFixture, LiveServerTestCase):
+    def test_variant_bundle_and_independent_reusable_slicer_project(self):
+        from zipfile import ZipFile
+        from plm.services import import_project_snapshot
+        from plm.tests import make_project_zip_upload
+
+        self.token.scopes.append(ApiToken.Scope.CHECKOUT)
+        self.token.save()
+        snapshot = import_project_snapshot(self.project, make_project_zip_upload(), self.user)
+        source = snapshot.entries.get(path="Druck.FCStd").revision
+        bundle = self.local / "variant.zip"
+        with ZipFile(bundle, "w") as archive:
+            for entry in snapshot.entries.select_related("revision"):
+                if entry.path == "Zusammenbau.FCStd":
+                    continue
+                with entry.revision.file.open("rb") as file:
+                    archive.writestr(entry.path, file.read())
+        created = self.api.create_variant(
+            self.project.pk, source.pk, {"name": "Chipbox – 20 Chips"}, bundle,
+            source_snapshot_id=snapshot.pk,
+        )
+        self.assertEqual(len(created["manifest"]["files"]), 4)
+        detail = self.api.get_part(created["part"]["id"])
+        self.assertTrue(detail["can_create_variant"])
+        self.assertEqual(detail["part"]["variant_source_revision_id"], source.pk)
+        print_project = self.api.create_print_project(created["revision"]["id"], "BOX20", "20 Chips")
+        saved = self.api.sync_print_project(print_project["id"], self.mesh)
+        reopened = self.api.get_print_project(print_project["id"])
+        self.assertEqual(saved["slicer_project"]["sha256"], reopened["slicer_project"]["sha256"])
+        target = self.local / "saved-20.3mf"
+        self.api.download_revision_file(reopened["slicer_project"]["download_url"], target, reopened["slicer_project"]["sha256"])
+        self.assertEqual(target.read_bytes(), self.mesh.read_bytes())
+        self.item.refresh_from_db()
+        self.assertFalse(self.item.slicer_file)
+
     def setUp(self):
         super().setUp()
         self.api = PLMClient(self.live_server_url, self.raw_token, timeout=5)
