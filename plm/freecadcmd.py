@@ -16,6 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .mesh_preview import render_stl_views
+from .fcstd import fcstd_viewer_colors
 from .models import AuditEvent, ExportJob, Revision, RevisionArtifact
 
 logger = logging.getLogger(__name__)
@@ -32,13 +33,15 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 4
+PREVIEW_GENERATOR_VERSION = 5
 
 
 FREECADCMD_SCRIPT = r'''
 import json
 import sys
 from pathlib import Path
+from xml.etree import ElementTree as ET
+from zipfile import ZipFile, ZIP_DEFLATED
 
 import FreeCAD
 
@@ -153,15 +156,78 @@ def preview_objects(doc):
     return objects
 
 
-def export_viewer_preview(objects, path):
+def write_viewer_3mf(meshes, colors, path):
+    # Write explicit standard materials: Mesh.export in a headless process
+    # cannot reliably recover colours stored by FreeCADGui.
+    ns = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+    ET.register_namespace("", ns)
+    def node(parent, tag, **attrs):
+        return ET.SubElement(parent, "{" + ns + "}" + tag, {k: str(v) for k, v in attrs.items()})
+    model = ET.Element("{" + ns + "}model", {"unit": "millimeter"})
+    resources = node(model, "resources")
+    materials = node(resources, "basematerials", id=1)
+    palette = list(dict.fromkeys(colors))
+    for color in palette:
+        node(materials, "base", name=color, displaycolor=color)
+    build = node(model, "build")
+    for index, (mesh, color) in enumerate(zip(meshes, colors), start=2):
+        obj = node(resources, "object", id=index, type="model", name=mesh.Label,
+                   pid=1, pindex=palette.index(color))
+        geometry = node(obj, "mesh")
+        vertices = node(geometry, "vertices")
+        triangles = node(geometry, "triangles")
+        points, facets = mesh.Mesh.Topology
+        for point in points:
+            node(vertices, "vertex", x=point.x, y=point.y, z=point.z)
+        for facet in facets:
+            node(triangles, "triangle", v1=facet[0], v2=facet[1], v3=facet[2])
+        node(build, "item", objectid=index)
+    with ZipFile(path, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr("3D/3dmodel.model", ET.tostring(model, encoding="utf-8", xml_declaration=True))
+        archive.writestr("[Content_Types].xml", '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>')
+        archive.writestr("_rels/.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')
+
+
+def same_viewer_solid(solid, candidate):
+    if solid.isSame(candidate):
+        return True
+    # Part::Compound can copy its children, losing OpenCascade identity.
+    # Reject different bounds cheaply before checking coincident geometry.
+    try:
+        volume = float(solid.Volume)
+        tolerance = max(volume * 1e-7, 1e-9)
+        if abs(volume - float(candidate.Volume)) > tolerance:
+            return False
+        a, b = solid.BoundBox, candidate.BoundBox
+        for key in ("XMin", "YMin", "ZMin", "XMax", "YMax", "ZMax"):
+            if abs(float(getattr(a, key)) - float(getattr(b, key))) > 1e-7:
+                return False
+        return abs(float(solid.common(candidate).Volume) - volume) <= tolerance
+    except (AttributeError, TypeError, ValueError, RuntimeError):
+        return False
+
+
+def solid_viewer_color(obj, solid, colors, fallback="#8193A1"):
+    # Compounds may contain separately coloured child objects. Keep their
+    # identities where OpenCascade can match the constituent solids.
+    color = colors.get(obj.Name, fallback)
+    if getattr(obj, "TypeId", "") == "Part::Compound":
+        for child in getattr(obj, "OutList", []):
+            for child_solid in getattr(getattr(child, "Shape", None), "Solids", []):
+                if same_viewer_solid(solid, child_solid):
+                    return solid_viewer_color(child, child_solid, colors, color)
+    return color
+
+
+def export_viewer_preview(objects, path, colors=None):
     # Keep solids separate, including flush inlays inside assembly compounds.
     # A temporary document avoids modifying the source or its feature history.
-    import Mesh
     import MeshPart
 
     preview_doc = FreeCAD.newDocument("PLMViewerPreview")
     try:
         meshes = []
+        mesh_colors = []
         for obj in objects:
             for index, solid in enumerate(obj.Shape.Solids):
                 mesh = preview_doc.addObject("Mesh::Feature", "PreviewSolid")
@@ -171,9 +237,10 @@ def export_viewer_preview(objects, path):
                     AngularDeflection=0.1, Relative=False,
                 )
                 meshes.append(mesh)
+                mesh_colors.append(solid_viewer_color(obj, solid, colors or {}))
         if not meshes:
             raise RuntimeError("Keine Volumenkoerper fuer die 3D-Vorschau gefunden.")
-        Mesh.export(meshes, str(path))
+        write_viewer_3mf(meshes, mesh_colors, path)
     finally:
         FreeCAD.closeDocument(preview_doc.Name)
 
@@ -189,7 +256,7 @@ def create_preview_sources(doc, spec, output_dir):
     Import.export(objects, str(step_path))
     Mesh.export(objects, str(stl_path))
     viewer_path = output_dir / f"{spec['revision_code']}-viewer.3mf"
-    export_viewer_preview(objects, viewer_path)
+    export_viewer_preview(objects, viewer_path, spec.get("viewer_colors", {}))
     return {
         "artifacts": [
             {"path": str(step_path), "artifact_type": "step", "view_name": "preview"},
@@ -399,6 +466,9 @@ def run_freecadcmd_job(job):
                     "export_format": job.export_format,
                     "selected_objects": job.selected_objects,
                     "parameters": job.parameters,
+                    "viewer_colors": fcstd_viewer_colors(fcstd_path)
+                    if job.revision.file_format == Revision.FileFormat.FCSTD
+                    and job.job_type == ExportJob.JobType.PNG_VIEWS else {},
                 }
             ),
             encoding="utf-8",

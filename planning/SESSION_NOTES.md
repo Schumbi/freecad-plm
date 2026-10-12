@@ -869,3 +869,23 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
   Vervollständigung kommaseparierter Namen; kompatibel mit Servern ohne Tags.
 - Validierung: 338 Server-Tests (1 SQLite-Skip), 247 Addon-Tests; echte PySide6-
   Widgets aus FreeCAD 1.1 für Filter, Zurücksetzen und Vervollständigung geprüft.
+
+
+# 2026-10-12
+
+## Weißer Viewer-Hintergrund und Bauteilfarben
+
+- Der vorhandene Three.js-Viewer verwendet einen weißen Hintergrund, neutrale Beleuchtung, sRGB-Ausgabe und standardmäßig sichtbare Formkanten. Kanten bleiben abschaltbar.
+- Standardmaterialien und Farbgruppen aus 3MF bleiben erhalten. Bündige weiße Einlagen werden nicht mehr automatisch blau eingefärbt; ihre Tiefenverschiebung und Konturen erhalten die Sichtbarkeit.
+- FCStd-Vorschauen übernehmen gespeicherte Objektfarben aus `ShapeColor` sowie aus dem ersten Material von `ShapeAppearance` (Formate 0/2/3). Der Server liest diese ohne FreeCADGui mit begrenztem Binärzugriff und sicherem XML-Parser.
+- Der Worker schreibt die getrennten Vorschau-Netze mit expliziten Standardmaterialien in 3MF. Zugeordnete Kindfarben von Part-Compounds werden bei übereinstimmenden Volumenkörpern erhalten (auch bei kopierter Geometrie nach einer geprüften Schnittvolumen-Zuordnung); Objekte ohne gespeicherte Farbe bekommen einen neutralen Ersatzfarbton. Die Originaldateien bleiben unverändert.
+- Vorschau-Version 5 löst beim Öffnen die Neuerzeugung älterer FCStd-Vorschauen aus. Individuelle Flächenfarben, Transparenz und slicerspezifische Filament-/Malinformationen sind nicht Teil dieser Änderung.
+- Validierung: 354 Servertests erfolgreich (1 bestehender SQLite/PostgreSQL-Skip), Django-Systemprüfung und JavaScript-Syntaxprüfung erfolgreich. Echter Export mit FreeCADCmd 1.1.4 von roten, blauen und weißen Bauteilen sowie die Farbzuordnung eines echten Part-Compounds geprüft. Chromium-Browserprüfung erfolgreich: Farben, weißer Hintergrund, weiße bündige Einlage, Kanten-Umschaltung, Ansichtswechsel und Drahtgitter; keine JavaScript-Fehler. Screenshots liegen unter `/tmp/plm-viewer-colors/`. Keine Änderungen an Produktionsdiensten.
+
+
+## Farbänderungen beim Check-in erkennen
+
+- Ursache: Sowohl Add-on als auch Server verglichen ausschließlich normalisiertes `Document.xml`; gespeicherte Darstellungseigenschaften waren deshalb keine eincheckbare Änderung.
+- Der Vergleich berücksichtigt jetzt objektbezogene `ShapeColor`, `ShapeAppearance`, `DiffuseColor`, `ShapeMaterial`, `LineColor`, `PointColor`, `Transparency` und `Visibility` aus `GuiDocument.xml`, einschließlich referenzierter Binärdateien. Kamerazustand, Fensterdaten, Speicherflags, ZIP-Zeitstempel und generierte Materialdateinamen bleiben ohne Einfluss.
+- Signaturregeln Version 4: Alte Server-Signaturen werden aus den unveränderlichen Revisionsdateien neu berechnet. Neue Add-on-Checkouts speichern einen zusätzlichen Darstellungshash; vorhandene Checkouts ohne diesen Hash reichen Dateiänderungen konservativ zum Serververgleich weiter. Lokale Änderungen werden weder überschrieben noch als neue Basis gespeichert; ein Abbruch/Neuauschecken ist nicht erforderlich.
+- Regressionen decken alte XML-Farben, Änderungen ausschließlich in modernen Material-Binärdateien, Kamerabewegungen, umbenannte Materialdateien und Check-in mit altem Signaturcache ab.

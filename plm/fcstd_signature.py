@@ -3,9 +3,11 @@ from io import BytesIO
 from pathlib import Path
 import re
 from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
 from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError
+from .fcstd_appearance import fcstd_appearance_signature
 
 
 IGNORED_DOCUMENT_PROPERTIES = {
@@ -27,7 +29,7 @@ CHECKOUT_FILE_REFERENCE_RE = re.compile(
     re.IGNORECASE,
 )
 FLOAT_RE = re.compile(r"^[+-]?(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?$")
-SIGNATURE_RULES_VERSION = 3
+SIGNATURE_RULES_VERSION = 4
 
 
 def read_file_or_path(file_or_path):
@@ -187,7 +189,14 @@ def normalized_fcstd_document_xml(file_or_path):
 
 
 def fcstd_document_signature(file_or_path):
-    return sha256(normalized_fcstd_document_xml(file_or_path)).hexdigest()
+    data = read_file_or_path(file_or_path)
+    document = normalized_fcstd_document_xml(data)
+    try:
+        with ZipFile(BytesIO(data)) as archive:
+            appearance = fcstd_appearance_signature(archive)
+    except (ElementTree.ParseError, DefusedXmlException, KeyError) as exc:
+        raise ValidationError("FCStd-Darstellungseigenschaften konnten nicht gelesen werden.") from exc
+    return sha256(document + b"\0appearance\0" + appearance.encode("ascii")).hexdigest()
 
 
 def fcstd_diagnostic_hashes(file_or_path):

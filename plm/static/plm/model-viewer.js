@@ -26,7 +26,7 @@ let controls;
 let currentObject;
 let animationFrame;
 let wireframe = false;
-let featureEdges = false;
+let featureEdges = true;
 const originalPolygonOffsets = new Map();
 let activeLoadId = 0;
 let canvasResizeObserver;
@@ -53,14 +53,15 @@ function ensureScene() {
   if (renderer) return;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x20282d);
+  scene.background = new THREE.Color(0xffffff);
 
   camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 100000);
   camera.position.set(120, 100, 120);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
   renderer.toneMappingExposure = 1;
   canvasHost.appendChild(renderer.domElement);
 
@@ -68,11 +69,11 @@ function ensureScene() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x6f7f88, 0.9));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 2.3);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x718096, 1.2));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
   keyLight.position.set(80, 120, 90);
   scene.add(keyLight);
-  const undersideLight = new THREE.DirectionalLight(0xffffff, 1.3);
+  const undersideLight = new THREE.DirectionalLight(0xffffff, 0.8);
   undersideLight.position.set(50, -100, 80);
   scene.add(undersideLight);
 
@@ -179,7 +180,7 @@ function setFeatureEdges(enabled) {
   edgesButton?.setAttribute("aria-pressed", String(enabled));
   if (!enabled || !currentObject) return;
   currentObject.traverse((item) => {
-    if (!item.isMesh || !item.geometry || item.userData.viewerCoplanarDetail) return;
+    if (!item.isMesh || !item.geometry) return;
     const materials = Array.isArray(item.material) ? item.material : [item.material];
     materials.filter(Boolean).forEach((material) => {
       if (!originalPolygonOffsets.has(material)) {
@@ -190,8 +191,11 @@ function setFeatureEdges(enabled) {
         });
       }
       material.polygonOffset = true;
-      material.polygonOffsetFactor = 1;
-      material.polygonOffsetUnits = 1;
+      // Flush inlays retain their existing depth bias over the body.
+      if (!item.userData.viewerCoplanarDetail) {
+        material.polygonOffsetFactor = 1;
+        material.polygonOffsetUnits = 1;
+      }
       material.needsUpdate = true;
     });
     const overlay = new THREE.LineSegments(
@@ -255,7 +259,7 @@ function materialForGeometry(geometry) {
     });
   }
   return new THREE.MeshStandardMaterial({
-    color: 0xb7c7d1,
+    color: 0x8193a1,
     roughness: 0.62,
     metalness: 0.05,
     wireframe,
@@ -345,9 +349,6 @@ function highlightCoplanarDetails(object) {
       const materials = Array.isArray(item.material) ? item.material : [item.material];
       const colored = materials.map((original) => {
         const material = original.clone();
-        if (material.color?.getHex() === 0xffffff && !material.map && !material.vertexColors) {
-          material.color.setHex(0x2563eb);
-        }
         material.polygonOffset = true;
         material.polygonOffsetFactor = -2;
         material.polygonOffsetUnits = -2;

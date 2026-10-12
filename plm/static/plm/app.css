@@ -1588,7 +1588,7 @@ td form {
 }
 
 .model-viewer-canvas {
-  background: #111827;
+  background: #fff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   height: 100%;

@@ -1,4 +1,5 @@
 import json
+import struct
 import sys
 import types
 from datetime import date, timedelta
@@ -342,6 +343,23 @@ def noisy_fcstd_bytes(data, plm_revision="R0099"):
     return buffer.getvalue()
 
 
+def colored_fcstd_bytes(data, packed_color, *, modern=False, camera="default", member="ShapeAppearance"):
+    buffer = BytesIO()
+    if modern:
+        prop = f'<Property name="ShapeAppearance"><MaterialList file="{member}" version="3"/></Property>'
+    else:
+        prop = f'<Property name="ShapeColor"><PropertyColor value="{packed_color}"/></Property>'
+    gui = f'<GuiDocument camera="{camera}"><ViewProvider name="Body"><Properties>{prop}</Properties></ViewProvider></GuiDocument>'
+    with ZipFile(BytesIO(data)) as source, ZipFile(buffer, "w") as target:
+        for info in source.infolist():
+            if info.filename not in {"GuiDocument.xml", member}:
+                target.writestr(info, source.read(info.filename))
+        target.writestr("GuiDocument.xml", gui)
+        if modern:
+            target.writestr(member, struct.pack("<IIIIIff", 1, 0x555555ff, packed_color, 0x888888ff, 0xff, 0.9, 0.0))
+    return buffer.getvalue()
+
+
 def freecad_build_migration_bytes():
     legacy_xml = """
         <Document ProgramVersion="1.1R44874 (Git)">
@@ -445,7 +463,7 @@ class FcstdValidationTests(SimpleTestCase):
             len(metadata["technical_signature"]["document_xml_sha256"]),
             64,
         )
-        self.assertEqual(metadata["technical_signature"]["rules_version"], 3)
+        self.assertEqual(metadata["technical_signature"]["rules_version"], 4)
         self.assertGreater(metadata["size_bytes"], 0)
 
     @override_settings(PLM_MAX_FCSTD_UPLOAD_BYTES=32)
@@ -494,6 +512,16 @@ class FcstdValidationTests(SimpleTestCase):
             fcstd_document_signature(base),
             fcstd_document_signature(noisy),
         )
+
+    def test_technical_signature_detects_colors_but_ignores_camera_and_material_filenames(self):
+        data = make_zip_upload().read()
+        for modern in (False, True):
+            with self.subTest(modern=modern):
+                red = colored_fcstd_bytes(data, 0xff0000ff, modern=modern)
+                blue = colored_fcstd_bytes(data, 0x0000ffff, modern=modern)
+                camera = colored_fcstd_bytes(data, 0xff0000ff, modern=modern, camera="rotated", member="ShapeAppearance7")
+                self.assertNotEqual(fcstd_document_signature(red), fcstd_document_signature(blue))
+                self.assertEqual(fcstd_document_signature(red), fcstd_document_signature(camera))
 
     def test_technical_signature_ignores_checkout_path_rewrites(self):
         base = make_zip_upload(
@@ -3508,22 +3536,70 @@ class FreeCADCmdJobTests(TestCase):
         freecad = namespace["FreeCAD"]
         freecad.newDocument = Mock(return_value=preview_doc)
         freecad.closeDocument = Mock()
-        mesh_module = types.SimpleNamespace(export=Mock())
         meshpart = types.SimpleNamespace(meshFromShape=Mock(side_effect=solids))
-        with patch.dict(sys.modules, {"Mesh": mesh_module, "MeshPart": meshpart}):
+        namespace["write_viewer_3mf"] = Mock()
+        with patch.dict(sys.modules, {"MeshPart": meshpart}):
             namespace["export_viewer_preview"]([obj], Path("preview.3mf"))
         self.assertEqual([mesh.Mesh for mesh in meshes], solids)
-        mesh_module.export.assert_called_once_with(meshes, "preview.3mf")
+        namespace["write_viewer_3mf"].assert_called_once_with(meshes, ["#8193A1"] * 3, Path("preview.3mf"))
         for call, solid in zip(meshpart.meshFromShape.call_args_list, solids):
             self.assertIs(call.kwargs["Shape"], solid)
             self.assertFalse(call.kwargs["Relative"])
             self.assertLessEqual(call.kwargs["LinearDeflection"], 0.03)
         freecad.closeDocument.assert_called_once_with("Preview")
-        mesh_module.export.side_effect = RuntimeError("export failed")
-        with patch.dict(sys.modules, {"Mesh": mesh_module, "MeshPart": types.SimpleNamespace(meshFromShape=Mock())}):
+        namespace["write_viewer_3mf"].side_effect = RuntimeError("export failed")
+        with patch.dict(sys.modules, {"MeshPart": types.SimpleNamespace(meshFromShape=Mock())}):
             with self.assertRaisesRegex(RuntimeError, "export failed"):
                 namespace["export_viewer_preview"]([obj], Path("preview.3mf"))
         self.assertEqual(freecad.closeDocument.call_count, 2)
+
+    def test_viewer_3mf_keeps_material_assignments_geometry_and_white(self):
+        from xml.etree import ElementTree as ET
+        namespace = self.freecadcmd_script_namespace()
+        points = [types.SimpleNamespace(x=x, y=y, z=0) for x, y in [(0, 0), (1, 0), (0, 1)]]
+        meshes = [types.SimpleNamespace(Label=name, Mesh=types.SimpleNamespace(Topology=(points, [(0, 1, 2)])))
+                  for name in ["Red", "White", "Red again"]]
+        path = Path(self.media_root.name) / "colors.3mf"
+        namespace["write_viewer_3mf"](meshes, ["#FF0000", "#FFFFFF", "#FF0000"], path)
+        with ZipFile(path) as archive:
+            self.assertEqual(set(archive.namelist()), {"3D/3dmodel.model", "_rels/.rels", "[Content_Types].xml"})
+            root = ET.fromstring(archive.read("3D/3dmodel.model"))
+        ns = {"m": "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"}
+        self.assertEqual(root.get("unit"), "millimeter")
+        self.assertEqual([m.get("displaycolor") for m in root.findall("m:resources/m:basematerials/m:base", ns)], ["#FF0000", "#FFFFFF"])
+        objects = root.findall("m:resources/m:object", ns)
+        self.assertEqual([o.get("pindex") for o in objects], ["0", "1", "0"])
+        self.assertEqual([o.get("pid") for o in objects], ["1"] * 3)
+        self.assertEqual([o.get("name") for o in objects], ["Red", "White", "Red again"])
+        for obj in objects:
+            self.assertEqual(len(obj.findall("m:mesh/m:vertices/m:vertex", ns)), 3)
+            self.assertEqual(obj.find("m:mesh/m:triangles/m:triangle", ns).attrib, {"v1": "0", "v2": "1", "v3": "2"})
+
+    def test_compound_preview_uses_matching_child_color(self):
+        namespace = self.freecadcmd_script_namespace()
+        solid = Mock()
+        other_solid = object()
+        child_solid = object()
+        solid.isSame.side_effect = lambda candidate: candidate is child_solid
+        other = types.SimpleNamespace(Name="Other", Shape=types.SimpleNamespace(Solids=[other_solid]))
+        child = types.SimpleNamespace(Name="Child", Shape=types.SimpleNamespace(Solids=[child_solid]))
+        compound = types.SimpleNamespace(Name="Assembly", TypeId="Part::Compound", OutList=[other, child])
+        self.assertEqual(namespace["solid_viewer_color"](compound, solid, {"Child": "#FF0000", "Assembly": "#FFFFFF"}), "#FF0000")
+        self.assertEqual(namespace["solid_viewer_color"](compound, solid, {"Assembly": "#FFFFFF"}), "#FFFFFF")
+
+    def test_copied_compound_solid_requires_coincident_geometry(self):
+        namespace = self.freecadcmd_script_namespace()
+        bounds = types.SimpleNamespace(XMin=0, YMin=0, ZMin=0, XMax=1, YMax=1, ZMax=1)
+        solid = types.SimpleNamespace(Volume=1, BoundBox=bounds, isSame=Mock(return_value=False),
+                                      common=Mock(return_value=types.SimpleNamespace(Volume=1)))
+        candidate = types.SimpleNamespace(Volume=1, BoundBox=bounds)
+        self.assertTrue(namespace["same_viewer_solid"](solid, candidate))
+        solid.common.return_value.Volume = 0.5
+        self.assertFalse(namespace["same_viewer_solid"](solid, candidate))
+        candidate.BoundBox = types.SimpleNamespace(**{**vars(bounds), "XMin": 2})
+        solid.common.reset_mock()
+        self.assertFalse(namespace["same_viewer_solid"](solid, candidate))
+        solid.common.assert_not_called()
 
     def fake_freecadcmd(self, result_code):
         script = Path(self.media_root.name) / "fake_freecadcmd.py"
@@ -5135,6 +5211,28 @@ class AddonApiWorkflowTests(TestCase):
             payload["ignored_files"],
             [{"path": "part.FCStd", "reason": "no_model_change"}],
         )
+
+    def test_color_only_checkin_creates_revision_with_old_signature_cache(self):
+        self.authorize_token([ApiToken.Scope.CHECKOUT])
+        for modern in (False, True):
+            with self.subTest(modern=modern):
+                part = Part.objects.create(project=self.project, number=f"COLOR-{modern}", name="Farbtest")
+                source = colored_fcstd_bytes(make_zip_upload().read(), 0xff0000ff, modern=modern)
+                revision = create_revision_from_upload(part, SimpleUploadedFile("part.FCStd", source), self.user)
+                metadata = revision.extracted_metadata
+                metadata["technical_signature"]["rules_version"] = 3
+                revision.save(update_fields=["extracted_metadata"])
+                checkout_id = self.post_json(reverse("plm:api_revision_checkout", args=[revision.id]), {}).json()["checkout"]["id"]
+                blue = colored_fcstd_bytes(source, 0x0000ffff, modern=modern)
+                response = self.client.post(reverse("plm:api_checkout_checkin", args=[checkout_id]), {
+                    "file": SimpleUploadedFile("part.FCStd", fcstd_with_plm_revision(blue, "R0002")),
+                    "change_summary": "Nur Farbe geändert.",
+                })
+                self.assertEqual(response.status_code, 201, response.content)
+                self.assertEqual(part.revisions.count(), 2)
+                checkout = Checkout.objects.get(id=checkout_id)
+                self.assertIsNotNone(checkout.completed_revision)
+                self.assertEqual(checkout.completed_revision.revision_code, "R0002")
 
     def test_checkin_recalculates_base_signature_after_rules_update(self):
         self.authorize_token([ApiToken.Scope.CHECKOUT])

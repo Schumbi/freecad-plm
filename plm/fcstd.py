@@ -1,6 +1,7 @@
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from struct import unpack_from
 from xml.etree import ElementTree as StandardElementTree
 from zipfile import BadZipFile, ZipFile
 
@@ -39,6 +40,53 @@ XML_SECURITY_ERRORS = (
     ElementTree.ExternalReferenceForbidden,
 )
 XML_PARSE_ERRORS = (ElementTree.ParseError,) + XML_SECURITY_ERRORS
+
+
+def fcstd_viewer_colors(path):
+    """Read saved object colours without requiring FreeCADGui in the worker.
+
+    ShapeAppearance stores 24-byte material records (ambient, diffuse,
+    specular, emissive, shininess, transparency), followed by optional strings.
+    Only the first material is used here: per-face colours are a separate feature.
+    """
+    colors = {}
+    with ZipFile(path) as archive:
+        if "GuiDocument.xml" not in archive.namelist():
+            return colors
+        info = archive.getinfo("GuiDocument.xml")
+        if info.file_size > DEFAULT_PLM_MAX_ZIP_MEMBER_BYTES:
+            raise ValidationError("FCStd-Grafikdaten überschreiten das Lesebudget.")
+        root = ElementTree.fromstring(archive.read(info))
+        for provider in root.iter("ViewProvider"):
+            properties = {
+                prop.get("name"): prop
+                for prop in provider.findall("./Properties/Property")
+            }
+            packed = None
+            appearance = properties.get("ShapeAppearance")
+            if appearance is not None:
+                material = appearance.find("MaterialList")
+                if material is not None and material.get("version", "0") in {"0", "2", "3"}:
+                    filename = material.get("file")
+                    if filename and filename in archive.namelist():
+                        # Read only the header and the first fixed-size record.
+                        with archive.open(filename) as source:
+                            data = source.read(28)
+                        if len(data) == 28:
+                            count, = unpack_from("<I", data)
+                            if 0 < count <= 1000000:
+                                packed, = unpack_from("<I", data, 8)
+            if packed is None:
+                shape_color = properties.get("ShapeColor")
+                value = shape_color.find("PropertyColor") if shape_color is not None else None
+                if value is not None:
+                    try:
+                        packed = int(value.get("value", ""))
+                    except ValueError:
+                        continue
+            if packed is not None and 0 <= packed <= 0xffffffff:
+                colors[provider.get("name")] = "#{:06X}".format((packed >> 8) & 0xffffff)
+    return colors
 
 
 def setting_int(name, default):
