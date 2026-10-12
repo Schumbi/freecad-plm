@@ -910,6 +910,6 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 
 ### 2026-10-12 – Farben in Draft-Arrays
 
-- Zusammenbau R0005 enthält zwei Draft-Arrays mit jeweils zehn verlinkten Chips. Die Body-Farben Rot #ED333B und Grün #33D17A waren korrekt in Chip R0003 gespeichert; der Viewer behandelte die Arrays bisher als einzelne Features mit grauer Ersatzfarbe.
+- Die lokal bearbeitete Checkout-Kopie von Zusammenbau R0005 enthält zwei Draft-Arrays mit jeweils zehn verlinkten Chips; die gespeicherte R0005-Revision enthält jeweils 25. Die Body-Farben Rot #ED333B und Grün #33D17A waren korrekt in Chip R0003 gespeichert; der Viewer behandelte die Arrays bisher als einzelne Features mit grauer Ersatzfarbe.
 - Der Vorschau-Export durchläuft nun auch Draft-Array-Instanzen mit ihren transformierten Unterobjekten und übernimmt die Farbe des jeweiligen Quell-Bodies. Generator-Version 7 erneuert vorhandene Vorschauen; frühere Vorschauen bleiben während der Berechnung verfügbar.
-- Die Farbzuordnung wurde am echten Zusammenbau R0005 geprüft: zehn grüne und zehn rote Chip-Instanzen. Eine Regression prüft mehrere Platzierungen derselben verlinkten Quelle.
+- Die Farbzuordnung wurde zunächst an der lokal bearbeiteten Checkout-Kopie geprüft: zehn grüne und zehn rote Chip-Instanzen. Nach dem Deployment wurde die tatsächlich ausgelieferte Vorschau der unveränderlichen R0005-Revision gegen ihre Array-Parameter geprüft: 25 grüne und 25 rote Chips, insgesamt 76 Volumenkörper, Generator-Version 7. Eine Regression prüft mehrere Platzierungen derselben verlinkten Quelle.
