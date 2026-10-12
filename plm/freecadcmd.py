@@ -33,7 +33,7 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 6
+PREVIEW_GENERATOR_VERSION = 7
 
 
 def preview_source_context(revision):
@@ -258,7 +258,7 @@ def linked_solid_color(root, solid, document_colors, fallback, path="", visited=
     container = getattr(obj, "TypeId", "") in {
         "App::Link", "App::Part", "App::DocumentObjectGroup",
         "Assembly::AssemblyObject", "Part::Compound",
-    }
+    } or (getattr(obj, "TypeId", "") == "Part::FeaturePython" and hasattr(obj, "ArrayType"))
     for sub in obj.getSubObjects() if container else []:
         child_path = path + sub
         found = linked_solid_color(root, solid, document_colors, color, child_path, visited)

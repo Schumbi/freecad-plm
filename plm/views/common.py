@@ -175,7 +175,10 @@ def revision_viewer_artifact(revision, *, allow_previous=False):
         return current
     # Version 4 has the same solid separation and CAD coordinates as version 5.
     # It is suitable as an interim view while current materials are generated.
-    return artifacts.filter(metadata__preview_generator_version__in=[4, 5, 6]).order_by("-created_at", "-id").first()
+    return artifacts.filter(
+        metadata__preview_generator_version__gte=4,
+        metadata__preview_generator_version__lte=PREVIEW_GENERATOR_VERSION,
+    ).order_by("-created_at", "-id").first()
 
 
 def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=False, refresh_required=False):

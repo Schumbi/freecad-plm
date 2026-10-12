@@ -907,3 +907,9 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Referenz-Check-ins zeigen ihren Kommentar an der unveränderten Hauptrevision. Vorhandene Kommentare werden aus den betroffenen Teilrevisionen gelesen; neue Check-ins speichern den vollständigen Kommentar zusätzlich im Audit-Ereignis. Historische Revisionsnotizen werden nicht überschrieben.
 - Validierung: 358 Servertests erfolgreich, ein bestehender PostgreSQL-Skip. Regressionen prüfen transformierte verlinkte Farben, neue Referenzstände, gepinnte Jobs, veraltete Vorschauen und Kommentare an der Hauptrevision.
 - Echter Export von RODELN A-001 R0008 mit Deckel R0013 (Projektstand 73) erfolgreich: 26 getrennte Volumenkörper, darunter das gespeicherte Gelb #F8E45C sowie Weiß, Rot und Grau. Native gemeinsam genutzte Topologie und identische BREP-Kopien vermeiden unnötige boolesche Schnittberechnungen bei der Farbzuordnung.
+
+### 2026-10-12 – Farben in Draft-Arrays
+
+- Zusammenbau R0005 enthält zwei Draft-Arrays mit jeweils zehn verlinkten Chips. Die Body-Farben Rot #ED333B und Grün #33D17A waren korrekt in Chip R0003 gespeichert; der Viewer behandelte die Arrays bisher als einzelne Features mit grauer Ersatzfarbe.
+- Der Vorschau-Export durchläuft nun auch Draft-Array-Instanzen mit ihren transformierten Unterobjekten und übernimmt die Farbe des jeweiligen Quell-Bodies. Generator-Version 7 erneuert vorhandene Vorschauen; frühere Vorschauen bleiben während der Berechnung verfügbar.
+- Die Farbzuordnung wurde am echten Zusammenbau R0005 geprüft: zehn grüne und zehn rote Chip-Instanzen. Eine Regression prüft mehrere Platzierungen derselben verlinkten Quelle.

@@ -3645,6 +3645,24 @@ class FreeCADCmdJobTests(TestCase):
         self.assertFalse(namespace["same_viewer_solid"](solid, candidate))
         solid.common.assert_not_called()
 
+    def test_draft_array_preview_preserves_link_color_at_each_placement(self):
+        namespace = self.freecadcmd_script_namespace()
+        root_doc = types.SimpleNamespace(Name="Root", FileName="/tmp/Root.FCStd")
+        source_doc = types.SimpleNamespace(Name="Chip", FileName="/tmp/Chip.FCStd")
+        source = types.SimpleNamespace(Name="Body", Document=source_doc)
+        link = types.SimpleNamespace(Name="ChipLink", TypeId="App::Link", Document=root_doc,
+                                     getSubObjects=lambda: [], getLinkedObject=lambda: source)
+        solids = [Mock(), Mock()]
+        for solid in solids:
+            solid.isSame.side_effect = lambda other, current=solid: other is current
+        array = types.SimpleNamespace(Name="Array", TypeId="Part::FeaturePython", ArrayType="ortho",
+                                      Document=root_doc, getSubObjects=lambda: ["0.", "1."],
+                                      getSubObject=lambda path, *args: link if args else
+                                      types.SimpleNamespace(Solids=[solids[int(path[:-1])]]))
+        colors = {"/tmp/Chip.FCStd": {"Body": "#ED333B"}}
+        self.assertEqual([namespace["solid_viewer_color"](
+            array, solid, {}, document_colors=colors) for solid in solids], ["#ED333B"] * 2)
+
     def fake_freecadcmd(self, result_code):
         script = Path(self.media_root.name) / "fake_freecadcmd.py"
         script.write_text(
