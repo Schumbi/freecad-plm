@@ -77,10 +77,6 @@ function ensureScene() {
   undersideLight.position.set(50, -100, 80);
   scene.add(undersideLight);
 
-  const axes = new THREE.AxesHelper(60);
-  axes.name = "viewer-axes";
-  scene.add(axes);
-
   annotationMarkers = new THREE.Group();
   annotationMarkers.name = "viewer-annotations";
   scene.add(annotationMarkers);
