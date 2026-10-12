@@ -51,6 +51,7 @@ from .common import (
     revision_png_status_needs_poll,
     revision_png_status_payload,
     revision_viewer_artifact,
+    viewer_preview_response,
     save_pending_revision_upload,
     snapshot_entry_for_revision_download,
     viewer_file_format,
@@ -579,10 +580,10 @@ def revision_viewer_source(request, revision_id):
     )
     if revision.file_format == Revision.FileFormat.STL:
         return viewer_file_response(revision.file, revision.original_filename, "stl")
-    artifact = revision_viewer_artifact(revision)
+    artifact = revision_viewer_artifact(revision, allow_previous=True)
     if not artifact:
         return missing_viewer_preview_response()
-    return viewer_file_response(artifact.file, artifact.original_filename, artifact.artifact_type, cad_coordinates=True)
+    return viewer_preview_response(artifact)
 
 
 @login_required
@@ -596,15 +597,17 @@ def artifact_viewer_source(request, artifact_id):
 
     file_format = viewer_file_format(artifact.original_filename, artifact.artifact_type)
     if file_format:
+        if artifact.view_name == "viewer-preview":
+            return viewer_preview_response(artifact)
         return viewer_file_response(
             artifact.file, artifact.original_filename, file_format,
             cad_coordinates=artifact.view_name == "viewer-preview",
         )
 
-    preview = revision_viewer_artifact(artifact.revision)
+    preview = revision_viewer_artifact(artifact.revision, allow_previous=True)
     if not preview:
         return missing_viewer_preview_response()
-    return viewer_file_response(preview.file, preview.original_filename, preview.artifact_type, cad_coordinates=True)
+    return viewer_preview_response(preview)
 
 
 @login_required

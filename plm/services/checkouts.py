@@ -5,8 +5,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from ..derivatives import prepare_revision_derivatives
+from ..cad_files import validate_project_file_upload
 from ..models import AuditEvent, Checkout, CheckoutFileAddition
-from .common import safe_snapshot_path, upload_file_digest
+from .common import safe_snapshot_path
 from .manifests import (
     manifest_entries_by_path,
     manifest_entries_for_checkout,
@@ -17,6 +18,13 @@ from .snapshots import (
     create_snapshot_from_checkout_revisions,
     snapshot_entry_for_revision,
 )
+
+
+def validate_checkin_upload(uploaded_file):
+    metadata = validate_project_file_upload(uploaded_file)
+    if metadata["file_format"] != "fcstd":
+        raise ValidationError("Beim Check-in sind nur FreeCAD-Dateien erlaubt.")
+    return metadata
 
 
 @transaction.atomic
@@ -225,7 +233,8 @@ def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
 def checkin_checkout(checkout, uploaded_file, actor, notes=""):
     if checkout.status != Checkout.Status.ACTIVE:
         raise ValidationError("Nur aktive Checkouts koennen eingecheckt werden.")
-    if not fcstd_model_changed(checkout.base_revision, uploaded_file):
+    validated = validate_checkin_upload(uploaded_file)
+    if not fcstd_model_changed(checkout.base_revision, uploaded_file, validated_metadata=validated):
         return {
             "root_revision": None,
             "revisions": [],
@@ -242,6 +251,7 @@ def checkin_checkout(checkout, uploaded_file, actor, notes=""):
         uploaded_file=uploaded_file,
         created_by=actor,
         notes=notes,
+        _validated_metadata=validated,
     )
     complete_checkout(
         checkout,
@@ -305,10 +315,11 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
         uploaded_file = uploaded_files.get(field)
         if uploaded_file is None:
             raise ValidationError("Upload-Datei fehlt fuer files_metadata.")
-        uploaded_sha256, _size = upload_file_digest(uploaded_file)
+        validated = validate_checkin_upload(uploaded_file)
+        uploaded_sha256 = validated["sha256"]
         if item.get("sha256") and item["sha256"] != uploaded_sha256:
             raise ValidationError("Upload-Hash passt nicht zu files_metadata.")
-        if not fcstd_model_changed(manifest_revision, uploaded_file):
+        if not fcstd_model_changed(manifest_revision, uploaded_file, validated_metadata=validated):
             ignored_files.append(
                 {
                     "path": path,
@@ -322,6 +333,7 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
             uploaded_file=uploaded_file,
             created_by=actor,
             notes=notes,
+            _validated_metadata=validated,
         )
         revision_entry = {
             "path": path,

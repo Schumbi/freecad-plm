@@ -889,3 +889,13 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Der Vergleich berücksichtigt jetzt objektbezogene `ShapeColor`, `ShapeAppearance`, `DiffuseColor`, `ShapeMaterial`, `LineColor`, `PointColor`, `Transparency` und `Visibility` aus `GuiDocument.xml`, einschließlich referenzierter Binärdateien. Kamerazustand, Fensterdaten, Speicherflags, ZIP-Zeitstempel und generierte Materialdateinamen bleiben ohne Einfluss.
 - Signaturregeln Version 4: Alte Server-Signaturen werden aus den unveränderlichen Revisionsdateien neu berechnet. Neue Add-on-Checkouts speichern einen zusätzlichen Darstellungshash; vorhandene Checkouts ohne diesen Hash reichen Dateiänderungen konservativ zum Serververgleich weiter. Lokale Änderungen werden weder überschrieben noch als neue Basis gespeichert; ein Abbruch/Neuauschecken ist nicht erforderlich.
 - Regressionen decken alte XML-Farben, Änderungen ausschließlich in modernen Material-Binärdateien, Kamerabewegungen, umbenannte Materialdateien und Check-in mit altem Signaturcache ab.
+
+
+## Responsiver Check-in und Übergangsvorschau
+
+- Hintergrundaufgaben mit Qt-Ereignisschleife übernehmen Dateivergleich, Upload-Kopien und Netzwerkaufruf. Das Speichern und Schließen von FreeCAD-Dokumenten bleibt im Hauptthread. Der Zustandstimer pausiert während des Check-ins; doppelte Check-ins werden verhindert.
+- Der Add-on-Vergleich lässt diagnostische BREP-Hashes weg. Revisionsnummern werden nach Annahme des Kommentars in hashgeprüften temporären Kopien angepasst; kein erneuter kompletter Modellvergleich und keine Änderung offener Arbeitsdateien. Der Server übernimmt seine einmal validierten Metadaten nur intern in Vergleich und Revisionsanlage; Basis-/Upload-Hashes und Konfliktprüfungen bleiben erhalten.
+- Vorschauen aus Generator-Version 4 bleiben für dieselbe unveränderliche Revision als gekennzeichnete Übergangsanzeige verfügbar. Version 5 wird im Hintergrund erzeugt und automatisch nachgeladen, ohne die Kamera zurückzusetzen. Bei Fehlern bleibt die bisherige Geometrie sichtbar.
+- Die Statusabfrage läuft über lange Warteschlangen weiter und endet bei Fertigstellung, Fehler oder Schließen des Viewers; kein Abbruch nach drei Minuten. Rendering pausiert bei geschlossenem Fenster.
+- Messung mit Checkout 192: kompletter Dateivergleich etwa 0,32 s statt 1,21 s, außerdem entfällt der zweite Vergleich. Große FCStd-Exporte benötigen weiterhin ihre tatsächliche Rechenzeit im Worker.
+- Validierung: 357 Servertests (1 PostgreSQL-Skip), Add-on-Regressionen zu Upload-Kopien und parallelen Änderungen, echte FreeCAD-Qt-Ereignisschleife und Fehlerweitergabe; Chromium-Szenarien für Übergangsvorschau, mehr als 120 Statusabfragen, fehlende Vorschau, Fehler und Schließen erfolgreich.

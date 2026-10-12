@@ -132,10 +132,12 @@ def uploaded_document_signature(uploaded_file):
     return metadata["technical_signature"]["document_xml_sha256"]
 
 
-def fcstd_model_changed(base_revision, uploaded_file):
-    return revision_document_signature(base_revision) != uploaded_document_signature(
-        uploaded_file
+def fcstd_model_changed(base_revision, uploaded_file, *, validated_metadata=None):
+    signature = (
+        validated_metadata["technical_signature"]["document_xml_sha256"]
+        if validated_metadata is not None else uploaded_document_signature(uploaded_file)
     )
+    return revision_document_signature(base_revision) != signature
 
 
 def freecad_plm_revision(metadata):
@@ -316,8 +318,9 @@ def create_revision_from_upload(
     revision_code=None,
     normalize_plm_revision=False,
     notes="",
+    _validated_metadata=None,
 ):
-    metadata = validate_project_file_upload(uploaded_file)
+    metadata = _validated_metadata if _validated_metadata is not None else validate_project_file_upload(uploaded_file)
     file_data = read_uploaded_file(uploaded_file)
     code = validate_revision_code_argument(revision_code) or next_revision_code(part)
     uploaded_plm_revision = (

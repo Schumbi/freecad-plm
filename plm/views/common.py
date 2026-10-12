@@ -163,15 +163,22 @@ def viewer_file_format(filename, fallback=""):
     return ""
 
 
-def revision_viewer_artifact(revision):
-    return revision.artifacts.filter(
+def revision_viewer_artifact(revision, *, allow_previous=False):
+    artifacts = revision.artifacts.filter(
         artifact_type=RevisionArtifact.ArtifactType.THREEMF,
         view_name=VIEWER_PREVIEW_VIEW_NAME,
+    )
+    current = artifacts.filter(
         metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
     ).order_by("-created_at", "-id").first()
+    if current or not allow_previous:
+        return current
+    # Version 4 has the same solid separation and CAD coordinates as version 5.
+    # It is suitable as an interim view while current materials are generated.
+    return artifacts.filter(metadata__preview_generator_version=4).order_by("-created_at", "-id").first()
 
 
-def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=False):
+def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=False, refresh_required=False):
     response = FileResponse(
         field_file.open("rb"),
         as_attachment=False,
@@ -181,12 +188,22 @@ def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=F
 
     if cad_coordinates:
         response["X-PLM-Viewer-Coordinates"] = "cad"
+    if refresh_required:
+        response["X-PLM-Viewer-Refresh-Required"] = "1"
     return response
 
 
 def missing_viewer_preview_response():
     return HttpResponseNotFound(
         "Fuer diese Datei gibt es noch keine 3D-Vorschau. Erzeuge zuerst die 3D-Vorschau."
+    )
+
+
+def viewer_preview_response(artifact):
+    return viewer_file_response(
+        artifact.file, artifact.original_filename, artifact.artifact_type,
+        cad_coordinates=True,
+        refresh_required=artifact.metadata.get("preview_generator_version") != PREVIEW_GENERATOR_VERSION,
     )
 
 

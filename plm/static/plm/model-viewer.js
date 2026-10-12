@@ -110,7 +110,10 @@ function resizeRenderer() {
 }
 
 function animate() {
-  if (!renderer) return;
+  if (!renderer || dialog.hidden) {
+    animationFrame = null;
+    return;
+  }
   controls.update();
   renderer.render(scene, camera);
   animationFrame = requestAnimationFrame(animate);
@@ -282,6 +285,7 @@ async function fetchModel(sourceUrl) {
   return {
     buffer: await response.arrayBuffer(),
     cadCoordinates: response.headers.get("X-PLM-Viewer-Coordinates") === "cad",
+    refreshRequired: response.headers.get("X-PLM-Viewer-Refresh-Required") === "1",
     format: contentType === "model/3mf" ? "3mf" : contentType === "model/stl" ? "stl" : "",
   };
 }
@@ -399,7 +403,7 @@ async function openViewer(trigger) {
 
   try {
     const loaded = await loadModelBuffer(trigger, sourceUrl, loadId);
-    if (loadId !== activeLoadId) return;
+    if (loadId !== activeLoadId || dialog.hidden) return;
     const actualFormat = loaded.format || format;
     formatElement.textContent = actualFormat.toUpperCase();
     currentObject = parseModel(loaded.buffer, actualFormat, loaded.cadCoordinates);
@@ -413,8 +417,11 @@ async function openViewer(trigger) {
     await loadViewerAnnotations();
     setStatus("", false);
     if (!animationFrame) animate();
+    if (loaded.refreshRequired) refreshDisplayedModel(trigger, sourceUrl, loadId, actualFormat);
   } catch (error) {
-    setStatus(error.message || "3D-Modell konnte nicht angezeigt werden.");
+    if (loadId === activeLoadId && !dialog.hidden) {
+      setStatus(error.message || "3D-Modell konnte nicht angezeigt werden.");
+    }
   }
 }
 
@@ -557,17 +564,21 @@ async function loadModelBuffer(trigger, sourceUrl, loadId) {
 }
 
 async function prepareAndLoadModel(sourceUrl, prepareUrl, statusUrl, loadId) {
-  setStatus("3D-Vorschau wird erzeugt...");
-  const initial = await fetchJson(prepareUrl, { method: "POST" });
-  if (loadId !== activeLoadId) throw new Error("3D-Anzeige wurde abgebrochen.");
-  if (initial.message) setStatus(initial.message);
+  return waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, (message) => setStatus(message));
+}
 
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+async function waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, report) {
+  report("3D-Vorschau wird erzeugt...");
+  const initial = await fetchJson(prepareUrl, { method: "POST" });
+  if (initial.message) report(initial.message);
+
+  for (let attempt = 0; ; attempt += 1) {
+    if (loadId !== activeLoadId || dialog.hidden) throw new Error("3D-Anzeige wurde abgebrochen.");
     const status = attempt === 0 ? initial : await fetchJson(statusUrl);
-    if (loadId !== activeLoadId) throw new Error("3D-Anzeige wurde abgebrochen.");
+    if (loadId !== activeLoadId || dialog.hidden) throw new Error("3D-Anzeige wurde abgebrochen.");
 
     if (status.status === "ready") {
-      setStatus("3D-Vorschau ist bereit. Modell wird geladen...");
+      report("3D-Vorschau ist bereit. Modell wird geladen...");
       return fetchModel(status.source_url || sourceUrl);
     }
 
@@ -575,11 +586,44 @@ async function prepareAndLoadModel(sourceUrl, prepareUrl, statusUrl, loadId) {
       throw new Error(status.message || "3D-Vorschau konnte nicht erzeugt werden.");
     }
 
-    setStatus(status.message || "3D-Vorschau wird erzeugt...");
-    await wait(1500);
+    if (!["queued", "running", "pending", "missing"].includes(status.status)) {
+      throw new Error("Unbekannter Vorschau-Status. Bitte erneut öffnen.");
+    }
+    report(`${status.message || "3D-Vorschau wird erzeugt..."} Du kannst das Fenster schließen und später wieder öffnen.`);
+    await wait(3000);
   }
+}
 
-  throw new Error("3D-Vorschau ist noch nicht fertig. Bitte spaeter erneut oeffnen.");
+async function refreshDisplayedModel(trigger, sourceUrl, loadId, format) {
+  const prepareUrl = trigger.dataset.modelViewerPrepare;
+  const statusUrl = trigger.dataset.modelViewerStatus;
+  if (!prepareUrl || !statusUrl) {
+    formatElement.textContent = `${format.toUpperCase()} · bisherige Vorschau`;
+    return;
+  }
+  try {
+    const loaded = await waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, () => {
+      formatElement.textContent = `${format.toUpperCase()} · bisherige Vorschau; Farben werden aktualisiert …`;
+    });
+    if (loadId !== activeLoadId || dialog.hidden) return;
+    // Geometry is from the same immutable revision; keep the user's camera.
+    const position = camera.position.clone();
+    const target = controls.target.clone();
+    const replacement = parseModel(loaded.buffer, loaded.format || format, loaded.cadCoordinates);
+    clearModel();
+    currentObject = replacement;
+    scene.add(currentObject);
+    setWireframe(wireframe);
+    setFeatureEdges(featureEdges);
+    camera.position.copy(position);
+    controls.target.copy(target);
+    await loadViewerAnnotations();
+    if (loadId === activeLoadId) formatElement.textContent = format.toUpperCase();
+  } catch (error) {
+    if (loadId === activeLoadId && !dialog.hidden) {
+      formatElement.textContent = `${format.toUpperCase()} · bisherige Vorschau; Aktualisierung fehlgeschlagen: ${error.message}`;
+    }
+  }
 }
 
 document.addEventListener("click", (event) => {

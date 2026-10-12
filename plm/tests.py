@@ -1824,6 +1824,27 @@ class RevisionUploadViewTests(TestCase):
             reverse("plm:revision_viewer_source", args=[revision.id]),
         )
 
+    def test_previous_viewer_preview_is_served_while_current_is_queued(self):
+        self.client.force_login(self.user)
+        revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
+        self.create_viewer_3mf_artifact(revision)
+        artifact = revision.artifacts.get(view_name="viewer-preview")
+        artifact.metadata["preview_generator_version"] = 4
+        artifact.save(update_fields=["metadata"])
+        response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-PLM-Viewer-Refresh-Required"], "1")
+        response.close()
+        with override_settings(PROCESS_EXPORT_JOBS_INLINE=False):
+            queued = self.client.post(reverse("plm:create_revision_viewer_preview", args=[revision.id]), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(queued.json()["status"], "queued")
+        artifact.metadata["preview_generator_version"] = PREVIEW_GENERATOR_VERSION
+        artifact.save(update_fields=["metadata"])
+        response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("X-PLM-Viewer-Refresh-Required", response)
+        response.close()
+
     def test_revision_viewer_source_requires_login(self):
         revision = create_revision_from_upload(self.part, make_zip_upload(), self.user)
         self.create_viewer_3mf_artifact(revision)
@@ -5224,10 +5245,14 @@ class AddonApiWorkflowTests(TestCase):
                 revision.save(update_fields=["extracted_metadata"])
                 checkout_id = self.post_json(reverse("plm:api_revision_checkout", args=[revision.id]), {}).json()["checkout"]["id"]
                 blue = colored_fcstd_bytes(source, 0x0000ffff, modern=modern)
-                response = self.client.post(reverse("plm:api_checkout_checkin", args=[checkout_id]), {
-                    "file": SimpleUploadedFile("part.FCStd", fcstd_with_plm_revision(blue, "R0002")),
-                    "change_summary": "Nur Farbe geändert.",
-                })
+                from .cad_files import validate_project_file_upload
+                with patch("plm.services.checkouts.validate_project_file_upload", wraps=validate_project_file_upload) as validate, patch("plm.services.revisions.validate_project_file_upload", wraps=validate_project_file_upload) as revalidate:
+                    response = self.client.post(reverse("plm:api_checkout_checkin", args=[checkout_id]), {
+                        "file": SimpleUploadedFile("part.FCStd", fcstd_with_plm_revision(blue, "R0002")),
+                        "change_summary": "Nur Farbe geändert.",
+                    })
+                self.assertEqual(validate.call_count, 1)
+                self.assertEqual(revalidate.call_count, 0)
                 self.assertEqual(response.status_code, 201, response.content)
                 self.assertEqual(part.revisions.count(), 2)
                 checkout = Checkout.objects.get(id=checkout_id)

@@ -15,6 +15,7 @@ from .common import (
     VIEWER_SUPPORTED_MANUFACTURING_TYPES,
     missing_viewer_preview_response,
     revision_viewer_artifact,
+    viewer_preview_response,
     viewer_file_format,
     viewer_file_response,
 )
@@ -123,10 +124,10 @@ def manufacturing_file_viewer_source(request, manufacturing_file_id):
             file_format,
         )
 
-    preview = revision_viewer_artifact(manufacturing_file.revision)
+    preview = revision_viewer_artifact(manufacturing_file.revision, allow_previous=True)
     if not preview:
         return missing_viewer_preview_response()
-    return viewer_file_response(preview.file, preview.original_filename, preview.artifact_type, cad_coordinates=True)
+    return viewer_preview_response(preview)
 
 
 @login_required
