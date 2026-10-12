@@ -181,7 +181,7 @@ def remove_checkout_file(checkout, path, actor):
     return entry
 
 
-def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
+def complete_checkout(checkout, actor, completed_revision=None, revisions=None, change_summary=""):
     revisions = revisions or []
     checkout.status = Checkout.Status.COMPLETED
     checkout.completed_revision = completed_revision
@@ -206,6 +206,7 @@ def complete_checkout(checkout, actor, completed_revision=None, revisions=None):
         metadata={
             "checkout_id": checkout.id,
             "part_id": checkout.part_id,
+            "change_summary": change_summary,
             "base_revision_id": checkout.base_revision_id,
             "completed_revision_id": completed_revision.id if completed_revision else None,
             "completed_revision_code": (
@@ -257,6 +258,7 @@ def checkin_checkout(checkout, uploaded_file, actor, notes=""):
         checkout,
         actor,
         completed_revision=revision,
+        change_summary=notes,
         revisions=[
             {
                 "path": checkout.base_revision.original_filename,
@@ -350,6 +352,7 @@ def checkin_checkout_files(checkout, files_metadata, uploaded_files, actor, note
             actor,
             completed_revision=root_revision,
             revisions=revisions,
+            change_summary=notes,
         )
         prepare_revision_derivatives(
             [entry["revision"] for entry in revisions],

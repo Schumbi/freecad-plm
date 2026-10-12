@@ -92,6 +92,10 @@
                 {% if revision.notes %}
                   <p class="notes-text">{{ revision.notes|truncatechars:180 }}</p>
                 {% endif %}
+                {% for checkin in revision.reference_checkins %}
+                  <p class="meta-line">Verknüpfte Teile eingecheckt · {{ checkin.timestamp|date:"d.m.Y H:i" }} · {{ checkin.actor }}</p>
+                  <p class="notes-text">{{ checkin.summary|linebreaksbr }}</p>
+                {% endfor %}
                 <div class="pill-row">
                   {% for artifact in revision.artifacts.all %}
                     <span class="artifact-pill">{{ artifact.artifact_type|upper }}{% if artifact.view_name %} {{ artifact.view_name }}{% endif %}</span>

@@ -33,7 +33,31 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 5
+PREVIEW_GENERATOR_VERSION = 6
+
+
+def preview_source_context(revision):
+    """Identify and pin the same dependency set that the manifest exposes."""
+    from .services.manifests import manifest_entries_for_revision
+    from .services.snapshots import snapshot_entry_for_revision
+
+    entry = snapshot_entry_for_revision(revision)
+    if entry is None:
+        return {}
+    entries = manifest_entries_for_revision(revision, snapshot=entry.snapshot)
+    sources = sorted((item["path"], item["revision"].sha256) for item in entries)
+    return {
+        "preview_snapshot_id": entry.snapshot_id,
+        "preview_sources_sha256": sha256(json.dumps(sources).encode()).hexdigest(),
+    }
+
+
+def filter_preview_context(queryset, revision, *, artifacts=False):
+    context = preview_source_context(revision)
+    if context:
+        prefix = "metadata__parameters" if artifacts else "parameters"
+        queryset = queryset.filter(**{prefix + "__preview_sources_sha256": context["preview_sources_sha256"]})
+    return queryset
 
 
 FREECADCMD_SCRIPT = r'''
@@ -202,15 +226,60 @@ def same_viewer_solid(solid, candidate):
         for key in ("XMin", "YMin", "ZMin", "XMax", "YMax", "ZMax"):
             if abs(float(getattr(a, key)) - float(getattr(b, key))) > 1e-7:
                 return False
+        if getattr(solid, "isPartner", lambda other: False)(candidate) is True:
+            return True
+        # Identical BREP copies need no expensive boolean intersection. This
+        # matters for text inlays with thousands of faces and lost identity.
+        serialize = getattr(solid, "exportBrepToString", None)
+        other_serialize = getattr(candidate, "exportBrepToString", None)
+        if callable(serialize) and callable(other_serialize):
+            representation = serialize()
+            if isinstance(representation, str) and representation == other_serialize():
+                return True
         return abs(float(solid.common(candidate).Volume) - volume) <= tolerance
     except (AttributeError, TypeError, ValueError, RuntimeError):
         return False
 
 
-def solid_viewer_color(obj, solid, colors, fallback="#8193A1"):
+def linked_solid_color(root, solid, document_colors, fallback, path="", visited=None):
+    # getSubObject applies all assembly/link placements, so compare geometry
+    # in the root object's coordinates even across documents.
+    visited = set() if visited is None else visited
+    obj = root if not path else root.getSubObject(path, 1)
+    if obj is None or (obj.Document.Name, obj.Name) in visited:
+        return None
+    visited = visited | {(obj.Document.Name, obj.Name)}
+    colors = document_colors.get(str(Path(obj.Document.FileName).resolve()), {})
+    color = colors.get(obj.Name, fallback)
+    if getattr(obj, "TypeId", "") == "App::Link":
+        linked = obj.getLinkedObject()
+        linked_colors = document_colors.get(str(Path(linked.Document.FileName).resolve()), {})
+        color = linked_colors.get(linked.Name, color)
+    container = getattr(obj, "TypeId", "") in {
+        "App::Link", "App::Part", "App::DocumentObjectGroup",
+        "Assembly::AssemblyObject", "Part::Compound",
+    }
+    for sub in obj.getSubObjects() if container else []:
+        child_path = path + sub
+        found = linked_solid_color(root, solid, document_colors, color, child_path, visited)
+        if found is not None:
+            return found
+    shape = getattr(obj, "Shape", None) if not path else root.getSubObject(path)
+    if shape is not None:
+        for candidate in getattr(shape, "Solids", []):
+            if same_viewer_solid(solid, candidate):
+                return color
+    return None
+
+
+def solid_viewer_color(obj, solid, colors, fallback="#8193A1", document_colors=None):
     # Compounds may contain separately coloured child objects. Keep their
     # identities where OpenCascade can match the constituent solids.
     color = colors.get(obj.Name, fallback)
+    if document_colors and hasattr(obj, "getSubObject"):
+        found = linked_solid_color(obj, solid, document_colors, color)
+        if found is not None:
+            return found
     if getattr(obj, "TypeId", "") == "Part::Compound":
         for child in getattr(obj, "OutList", []):
             for child_solid in getattr(getattr(child, "Shape", None), "Solids", []):
@@ -219,7 +288,7 @@ def solid_viewer_color(obj, solid, colors, fallback="#8193A1"):
     return color
 
 
-def export_viewer_preview(objects, path, colors=None):
+def export_viewer_preview(objects, path, colors=None, document_colors=None):
     # Keep solids separate, including flush inlays inside assembly compounds.
     # A temporary document avoids modifying the source or its feature history.
     import MeshPart
@@ -237,7 +306,7 @@ def export_viewer_preview(objects, path, colors=None):
                     AngularDeflection=0.1, Relative=False,
                 )
                 meshes.append(mesh)
-                mesh_colors.append(solid_viewer_color(obj, solid, colors or {}))
+                mesh_colors.append(solid_viewer_color(obj, solid, colors or {}, document_colors=document_colors))
         if not meshes:
             raise RuntimeError("Keine Volumenkoerper fuer die 3D-Vorschau gefunden.")
         write_viewer_3mf(meshes, mesh_colors, path)
@@ -256,7 +325,7 @@ def create_preview_sources(doc, spec, output_dir):
     Import.export(objects, str(step_path))
     Mesh.export(objects, str(stl_path))
     viewer_path = output_dir / f"{spec['revision_code']}-viewer.3mf"
-    export_viewer_preview(objects, viewer_path, spec.get("viewer_colors", {}))
+    export_viewer_preview(objects, viewer_path, spec.get("viewer_colors", {}), spec.get("viewer_document_colors", {}))
     return {
         "artifacts": [
             {"path": str(step_path), "artifact_type": "step", "view_name": "preview"},
@@ -308,6 +377,9 @@ def create_export_job(
     selected_objects=None,
     parameters=None,
 ):
+    parameters = dict(parameters or {})
+    if job_type == ExportJob.JobType.PNG_VIEWS:
+        parameters.update(preview_source_context(revision))
     job = ExportJob.objects.create(
         revision=revision,
         job_type=job_type,
@@ -469,6 +541,11 @@ def run_freecadcmd_job(job):
                     "viewer_colors": fcstd_viewer_colors(fcstd_path)
                     if job.revision.file_format == Revision.FileFormat.FCSTD
                     and job.job_type == ExportJob.JobType.PNG_VIEWS else {},
+                    "viewer_document_colors": {
+                        str(path.resolve()): fcstd_viewer_colors(path)
+                        for path in workdir.rglob("*")
+                        if path.suffix.lower() == ".fcstd"
+                    } if job.job_type == ExportJob.JobType.PNG_VIEWS else {},
                 }
             ),
             encoding="utf-8",
@@ -541,11 +618,14 @@ def stage_revision_inputs(job, workdir):
     from .services.manifests import manifest_entries_for_revision
 
     root_revision = job.revision
-    root_entry = (
+    root_entries = (
         root_revision.snapshot_entries.select_related("snapshot")
-        .order_by("snapshot__created_at", "id")
-        .first()
     )
+    snapshot_id = job.parameters.get("preview_snapshot_id")
+    root_entry = (root_entries.filter(snapshot_id=snapshot_id).first() if snapshot_id
+                  else root_entries.order_by("-snapshot__created_at", "path").first())
+    if snapshot_id and root_entry is None:
+        raise RuntimeError("Der Projektstand des Vorschau-Jobs ist nicht mehr verfügbar.")
     snapshot = root_entry.snapshot if root_entry else None
     entries = manifest_entries_for_revision(root_revision, snapshot=snapshot)
     root_path = None

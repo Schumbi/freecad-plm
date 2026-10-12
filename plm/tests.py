@@ -3608,6 +3608,29 @@ class FreeCADCmdJobTests(TestCase):
         self.assertEqual(namespace["solid_viewer_color"](compound, solid, {"Child": "#FF0000", "Assembly": "#FFFFFF"}), "#FF0000")
         self.assertEqual(namespace["solid_viewer_color"](compound, solid, {"Assembly": "#FFFFFF"}), "#FFFFFF")
 
+    def test_linked_preview_uses_source_document_color_and_transformed_geometry(self):
+        namespace = self.freecadcmd_script_namespace()
+        root_doc = types.SimpleNamespace(Name="Root", FileName="/tmp/Root.FCStd")
+        part_doc = types.SimpleNamespace(Name="Deckel", FileName="/tmp/Deckel.FCStd")
+        solid = Mock()
+        transformed = object()
+        solid.isSame.side_effect = lambda other: other is transformed
+        body = types.SimpleNamespace(Name="Body", TypeId="PartDesign::Body", Document=part_doc,
+                                     Shape=types.SimpleNamespace(Solids=[object()]))
+        part = types.SimpleNamespace(Name="Part", Document=part_doc)
+        link = types.SimpleNamespace(Name="Deckel", TypeId="App::Link", Document=root_doc,
+                                     getSubObjects=lambda: ["Body."], getLinkedObject=lambda: part)
+        shapes = {"Deckel.": None, "Deckel.Body.": types.SimpleNamespace(Solids=[transformed])}
+        objects = {"Deckel.": link, "Deckel.Body.": body}
+        root = types.SimpleNamespace(Name="Assembly", TypeId="Assembly::AssemblyObject", Document=root_doc,
+                                     getSubObjects=lambda: ["Deckel."],
+                                     getSubObject=lambda path, *args: objects[path] if args else shapes[path])
+        self.assertEqual(namespace["solid_viewer_color"](
+            root, solid, {"Body": "#FF0000"}, document_colors={
+                "/tmp/Root.FCStd": {"Body": "#FF0000"},
+                "/tmp/Deckel.FCStd": {"Body": "#F8E45C"},
+            }), "#F8E45C")
+
     def test_copied_compound_solid_requires_coincident_geometry(self):
         namespace = self.freecadcmd_script_namespace()
         bounds = types.SimpleNamespace(XMin=0, YMin=0, ZMin=0, XMax=1, YMax=1, ZMax=1)
@@ -3921,7 +3944,7 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
             7,
         )
 
-    def test_job_stages_dependencies_from_first_snapshot_containing_revision(self):
+    def test_preview_job_pins_latest_dependencies_and_invalidates_stale_cache(self):
         root_bytes = make_fcstd_bytes(
             "Druck",
             object_type="Assembly::AssemblyObject",
@@ -3965,10 +3988,47 @@ Path(sys.argv[-1]).write_text(json.dumps(result))
             created_by=self.user,
         )
 
+        self.assertEqual(job.parameters["preview_snapshot_id"], second.id)
+        artifact = RevisionArtifact.objects.create(
+            revision=root_revision, artifact_type="3mf", view_name="viewer-preview",
+            original_filename="preview.3mf", sha256="c" * 64, size_bytes=1,
+            file=ContentFile(b"x", name="preview.3mf"),
+            metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION, "parameters": job.parameters},
+        )
+        from .views.common import revision_viewer_artifact, viewer_preview_response
+        self.assertEqual(revision_viewer_artifact(root_revision), artifact)
+        third = import_project_snapshot(
+            self.project,
+            make_project_zip_upload(name="third.zip", members={
+                "Box.FCStd": make_fcstd_bytes("Box danach"), "Druck.FCStd": root_bytes,
+            }), self.user, name="Dritter Stand",
+        )
+        self.assertIsNone(revision_viewer_artifact(root_revision))
+        self.assertEqual(revision_viewer_artifact(root_revision, allow_previous=True), artifact)
+        response = viewer_preview_response(artifact)
+        self.assertEqual(response["X-PLM-Viewer-Refresh-Required"], "1")
+        response.close()
+        from .derivatives import revision_has_pending_png_job
+        self.assertFalse(revision_has_pending_png_job(root_revision))
+        new_dependency.notes = "Änderung der Farbe im Modell"
+        new_dependency.save(update_fields=["notes"])
+        AuditEvent.objects.create(actor=self.user, action=AuditEvent.Action.CHECKOUT_COMPLETED,
+                                  object_repr="Checkout", metadata={
+            "part_id": root_revision.part_id, "base_revision_id": root_revision.id,
+            "completed_revision_id": None, "revisions": [{"revision_id": new_dependency.id}],
+        })
+        self.client.force_login(self.user)
+        page = self.client.get(reverse("plm:part_detail", args=[root_revision.part_id]))
+        self.assertContains(page, "Änderung der Farbe im Modell")
+        self.assertContains(page, "Verknüpfte Teile eingecheckt")
+        root_revision.refresh_from_db()
+        self.assertEqual(root_revision.notes, "")
+
         with TemporaryDirectory() as temp_dir:
             root_path = stage_revision_inputs(job, Path(temp_dir))
             staged_dependency = root_path.parent / "Box.FCStd"
-            with old_dependency.file.open("rb") as source:
+            # The queued job keeps its pinned inputs even after another check-in.
+            with new_dependency.file.open("rb") as source:
                 self.assertEqual(staged_dependency.read_bytes(), source.read())
 
     def test_missing_freecadcmd_marks_job_failed(self):

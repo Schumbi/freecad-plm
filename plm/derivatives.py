@@ -5,6 +5,7 @@ from .freecadcmd import (
     PREVIEW_GENERATOR_VERSION,
     create_export_job,
     process_export_job,
+    filter_preview_context,
 )
 from .models import ExportJob, Revision, RevisionArtifact
 
@@ -16,11 +17,11 @@ JOB_ACTIVE_STATUSES = (
 
 def revision_png_view_names(revision):
     return set(
-        revision.artifacts.filter(
+        filter_preview_context(revision.artifacts.filter(
             artifact_type=RevisionArtifact.ArtifactType.PNG,
             view_name__in=PNG_VIEW_NAMES,
             metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
-        ).values_list("view_name", flat=True)
+        ), revision, artifacts=True).values_list("view_name", flat=True)
     )
 
 
@@ -29,10 +30,10 @@ def revision_has_complete_png_views(revision):
 
 
 def revision_has_pending_png_job(revision):
-    return revision.export_jobs.filter(
+    return filter_preview_context(revision.export_jobs.filter(
         job_type=ExportJob.JobType.PNG_VIEWS,
         status__in=JOB_ACTIVE_STATUSES,
-    ).exists()
+    ), revision).exists()
 
 
 def revision_has_freecadcmd_metadata(revision):

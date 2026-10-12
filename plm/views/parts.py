@@ -17,6 +17,7 @@ from ..services import (
     next_part_number,
     part_lifecycle_events,
 )
+from ..services.ux import reference_checkins_for_part
 
 
 @login_required
@@ -110,6 +111,10 @@ def part_detail(request, part_id):
     if selected_revision_id:
         selected_revision = revisions.filter(id=selected_revision_id).first()
     latest_revision = revisions.first()
+    reference_checkins = reference_checkins_for_part(part)
+    revisions = list(revisions)
+    for revision in revisions:
+        revision.reference_checkins = reference_checkins.get(revision.id, [])
     return render(
         request,
         "plm/part_detail.html",

@@ -899,3 +899,11 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Die Statusabfrage läuft über lange Warteschlangen weiter und endet bei Fertigstellung, Fehler oder Schließen des Viewers; kein Abbruch nach drei Minuten. Rendering pausiert bei geschlossenem Fenster.
 - Messung mit Checkout 192: kompletter Dateivergleich etwa 0,32 s statt 1,21 s, außerdem entfällt der zweite Vergleich. Große FCStd-Exporte benötigen weiterhin ihre tatsächliche Rechenzeit im Worker.
 - Validierung: 357 Servertests (1 PostgreSQL-Skip), Add-on-Regressionen zu Upload-Kopien und parallelen Änderungen, echte FreeCAD-Qt-Ereignisschleife und Fehlerweitergabe; Chromium-Szenarien für Übergangsvorschau, mehr als 120 Statusabfragen, fehlende Vorschau, Fehler und Schließen erfolgreich.
+
+### 2026-10-12 – Baugruppenfarben und Projektstand der Vorschau
+
+- Vorschau-Jobs verwenden den neuesten zugehörigen Projektstand und pinnen ihn beim Anlegen. Ein Hash aller Manifestpfade und Quelldateien verhindert, dass Vorschauen oder wartende Jobs einer unveränderten Hauptrevision nach einem Referenz-Check-in als aktuell gelten.
+- Farben werden aus allen bereitgestellten FCStd-Dateien gelesen. Die Zuordnung durchläuft Assembly-, Part- und Link-Container mit den transformierten Unterobjekt-Geometrien; gleichnamige Bodies aus anderen Dokumenten werden getrennt behandelt. Body-Farben haben Vorrang vor Farben ausgeblendeter Zwischenfeatures.
+- Referenz-Check-ins zeigen ihren Kommentar an der unveränderten Hauptrevision. Vorhandene Kommentare werden aus den betroffenen Teilrevisionen gelesen; neue Check-ins speichern den vollständigen Kommentar zusätzlich im Audit-Ereignis. Historische Revisionsnotizen werden nicht überschrieben.
+- Validierung: 358 Servertests erfolgreich, ein bestehender PostgreSQL-Skip. Regressionen prüfen transformierte verlinkte Farben, neue Referenzstände, gepinnte Jobs, veraltete Vorschauen und Kommentare an der Hauptrevision.
+- Echter Export von RODELN A-001 R0008 mit Deckel R0013 (Projektstand 73) erfolgreich: 26 getrennte Volumenkörper, darunter das gespeicherte Gelb #F8E45C sowie Weiß, Rot und Grau. Native gemeinsam genutzte Topologie und identische BREP-Kopien vermeiden unnötige boolesche Schnittberechnungen bei der Farbzuordnung.

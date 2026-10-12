@@ -1,11 +1,36 @@
 from pathlib import PurePosixPath
 
-from ..models import ManufacturingFile
+from ..models import ManufacturingFile, AuditEvent, Revision
 from .snapshots import (
     resolve_reference_path,
     revision_reference_files,
     unique_entries_by_filename,
 )
+
+
+def reference_checkins_for_part(part):
+    """Show dependency-only check-ins without rewriting historical root notes."""
+    events = list(AuditEvent.objects.filter(
+        action=AuditEvent.Action.CHECKOUT_COMPLETED,
+        metadata__part_id=part.id,
+        metadata__completed_revision_id=None,
+    ).select_related("actor").order_by("-created_at", "-id"))
+    revision_ids = {
+        item["revision_id"] for event in events
+        for item in event.metadata.get("revisions", []) if item.get("revision_id")
+    }
+    notes = dict(Revision.objects.filter(id__in=revision_ids).values_list("id", "notes"))
+    result = {}
+    for event in events:
+        comments = list(dict.fromkeys(
+            notes.get(item.get("revision_id"), "") for item in event.metadata.get("revisions", [])
+            if notes.get(item.get("revision_id"), "")
+        ))
+        summary = event.metadata.get("change_summary") or "\n".join(comments)
+        result.setdefault(event.metadata.get("base_revision_id"), []).append({
+            "timestamp": event.created_at, "actor": event.actor, "summary": summary,
+        })
+    return result
 
 
 def part_lifecycle_events(part):

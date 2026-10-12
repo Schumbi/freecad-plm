@@ -10,7 +10,7 @@ from django.http import FileResponse, HttpResponseForbidden, HttpResponseNotFoun
 from django.urls import reverse
 from ..derivatives import revision_has_complete_png_views, revision_has_pending_png_job, revision_png_view_names
 from ..forms import user_role
-from ..freecadcmd import PREVIEW_GENERATOR_VERSION, create_export_job, process_export_job
+from ..freecadcmd import PREVIEW_GENERATOR_VERSION, create_export_job, process_export_job, filter_preview_context, preview_source_context
 from ..models import ExportJob, ManufacturingFile, Revision, RevisionArtifact
 from ..permissions import ROLE_ADMIN, is_plm_admin
 from ..services import revision_reference_files, snapshot_entries_with_references
@@ -168,14 +168,14 @@ def revision_viewer_artifact(revision, *, allow_previous=False):
         artifact_type=RevisionArtifact.ArtifactType.THREEMF,
         view_name=VIEWER_PREVIEW_VIEW_NAME,
     )
-    current = artifacts.filter(
+    current = filter_preview_context(artifacts.filter(
         metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
-    ).order_by("-created_at", "-id").first()
+    ), revision, artifacts=True).order_by("-created_at", "-id").first()
     if current or not allow_previous:
         return current
     # Version 4 has the same solid separation and CAD coordinates as version 5.
     # It is suitable as an interim view while current materials are generated.
-    return artifacts.filter(metadata__preview_generator_version=4).order_by("-created_at", "-id").first()
+    return artifacts.filter(metadata__preview_generator_version__in=[4, 5, 6]).order_by("-created_at", "-id").first()
 
 
 def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=False, refresh_required=False):
@@ -200,10 +200,12 @@ def missing_viewer_preview_response():
 
 
 def viewer_preview_response(artifact):
+    context = preview_source_context(artifact.revision)
+    stale_sources = bool(context) and artifact.metadata.get("parameters", {}).get("preview_sources_sha256") != context["preview_sources_sha256"]
     return viewer_file_response(
         artifact.file, artifact.original_filename, artifact.artifact_type,
         cad_coordinates=True,
-        refresh_required=artifact.metadata.get("preview_generator_version") != PREVIEW_GENERATOR_VERSION,
+        refresh_required=stale_sources or artifact.metadata.get("preview_generator_version") != PREVIEW_GENERATOR_VERSION,
     )
 
 
@@ -222,10 +224,10 @@ def viewer_status_payload(revision):
             "source_url": reverse("plm:revision_viewer_source", args=[revision.id]),
         }
 
-    pending_job = revision.export_jobs.filter(
+    pending_job = filter_preview_context(revision.export_jobs.filter(
         job_type=ExportJob.JobType.PNG_VIEWS,
         status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING],
-    ).order_by("-created_at").first()
+    ), revision).order_by("-created_at").first()
     if pending_job:
         label = "laeuft" if pending_job.status == ExportJob.Status.RUNNING else "wartet"
         return {
@@ -234,10 +236,10 @@ def viewer_status_payload(revision):
             "job_id": pending_job.id,
         }
 
-    failed_job = revision.export_jobs.filter(
+    failed_job = filter_preview_context(revision.export_jobs.filter(
         job_type=ExportJob.JobType.PNG_VIEWS,
         status=ExportJob.Status.FAILED,
-    ).order_by("-created_at").first()
+    ), revision).order_by("-created_at").first()
     if failed_job:
         return {
             "status": "failed",
