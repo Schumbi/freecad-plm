@@ -22,75 +22,79 @@
     {% endif %}
   </div>
 
-  <div class="project-tag-layout">
-    <aside class="data-card project-tag-sidebar" aria-label="Projektfilter">
-      <h2>Tags</h2>
-      <a href="?{{ presentation_query }}">Alle Projekte</a> ·
-      <a href="?{{ untagged_query }}">Ohne Tags</a>
-      <form method="get" id="project-filters" data-project-preferences>
-        <label for="project-query">Projekte suchen</label>
-        <input id="project-query" type="search" name="q" value="{{ query }}" placeholder="Name, Code oder Tag …">
-        <label for="tag-mode">Tags kombinieren</label>
-        <select name="mode" id="tag-mode">
-          <option value="all" {% if tag_mode != 'any' %}selected{% endif %}>Alle ausgewählten</option>
-          <option value="any" {% if tag_mode == 'any' %}selected{% endif %}>Mindestens eines</option>
-        </select>
-        <label><input type="checkbox" name="untagged" value="1" {% if untagged %}checked{% endif %}> Nur ohne Tags (ignoriert Tag-Auswahl)</label>
-        <div class="project-tag-options">
-          {% for tag in tags %}
-            <label><input type="checkbox" name="tag" value="{{ tag.id }}" {% if tag.id|stringformat:"s" in selected_tags %}checked{% endif %}>
-              {{ tag.name }} <span class="muted">({{ tag.project_count }})</span></label>
-          {% empty %}<p>Noch keine Tags. Beim Bearbeiten eines Projekts kannst Du welche anlegen.</p>{% endfor %}
-        </div>
-        <button type="submit">Filtern</button>
-      </form>
-      {% if can_create_project %}<a href="{% url 'plm:manage_project_tags' %}">Tags verwalten</a>{% endif %}
-    </aside>
-    <section aria-label="Projekte">
+  <section class="project-overview" aria-label="Projekte">
+    <form method="get" id="project-filters" data-project-preferences>
       <div class="project-list-toolbar">
         <p>{{ projects|length }} Projekte</p>
         <div>
           <label for="project-view">Ansicht</label>
-          <select id="project-view" name="view" form="project-filters">
+          <select id="project-view" name="view">
             {% for value, label in view_choices %}<option value="{{ value }}" {% if project_view == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
         </div>
+        <div class="project-tag-filter">
+          <label id="project-tags-label">Tags</label>
+          <details id="project-tags" class="project-tag-picker" {% if tags_open %}open{% endif %}>
+            <summary aria-labelledby="project-tags-label project-tags-summary"><span id="project-tags-summary">{% if untagged %}Ohne Tags{% elif selected_tag_names %}{{ selected_tag_names|join:", " }}{% else %}Alle Projekte{% endif %}</span></summary>
+            <div class="project-tag-popup">
+              <a href="?{{ presentation_query }}">Alle Projekte</a>
+              <label><input id="project-untagged" type="checkbox" name="untagged" value="1" {% if untagged %}checked{% endif %}> Nur ohne Tags</label>
+              <p class="muted">„Nur ohne Tags“ ignoriert die Tag-Auswahl.</p>
+              <div class="project-tag-options">
+                {% for tag in tags %}
+                  <label><input id="project-tag-{{ tag.id }}" type="checkbox" name="tag" value="{{ tag.id }}" {% if tag.id|stringformat:"s" in selected_tags %}checked{% endif %}>
+                    {{ tag.name }} <span class="muted">({{ tag.project_count }})</span></label>
+                {% empty %}<p>Noch keine Tags. Beim Bearbeiten eines Projekts kannst Du welche anlegen.</p>{% endfor %}
+              </div>
+              <label for="tag-mode">Tags kombinieren</label>
+              <select name="mode" id="tag-mode">
+                <option value="all" {% if tag_mode != 'any' %}selected{% endif %}>Alle ausgewählten</option>
+                <option value="any" {% if tag_mode == 'any' %}selected{% endif %}>Mindestens eines</option>
+              </select>
+              {% if can_create_project %}<a href="{% url 'plm:manage_project_tags' %}">Tags verwalten</a>{% endif %}
+            </div>
+          </details>
+          <input type="hidden" name="tag_picker" value="{% if tags_open %}1{% else %}0{% endif %}">
+        </div>
         <div>
           <label for="project-sort">Sortieren nach</label>
-          <select id="project-sort" name="sort" form="project-filters">
+          <select id="project-sort" name="sort">
             {% for value, label in sort_choices %}<option value="{{ value }}" {% if project_sort == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
         </div>
         <div>
           <label for="project-direction">Reihenfolge</label>
-          <select id="project-direction" name="direction" form="project-filters">
+          <select id="project-direction" name="direction">
             <option value="asc" {% if project_direction == 'asc' %}selected{% endif %}>Aufsteigend (A–Z / älteste zuerst)</option>
             <option value="desc" {% if project_direction == 'desc' %}selected{% endif %}>Absteigend (Z–A / neueste zuerst)</option>
           </select>
         </div>
-        <button type="submit" form="project-filters">Anwenden</button>
       </div>
+      <div class="project-search-bar">
+        <label for="project-query">Projekte suchen</label>
+        <input id="project-query" type="search" name="q" value="{{ query }}" placeholder="Name, Code oder Tag …">
+        <noscript><button type="submit">Filtern</button></noscript>
+      </div>
+    </form>
   {% if projects %}
     {% if project_view == 'details' %}
       <div class="table-wrap project-details">
         <table id="project-list">
           <caption>Projektdatum: einstellbares Datum des Projekts. Erstellungsdatum: Zeitpunkt des Anlegens im PLM.</caption>
           <thead><tr>
-            <th scope="col">Projektcode</th><th scope="col">Projektname / Beschreibung</th>
-            <th scope="col">Status</th><th scope="col">Tags</th>
-            <th scope="col">Teile</th><th scope="col">Projektstände</th>
-            <th scope="col">Projektdatum</th><th scope="col">Erstellungsdatum</th><th scope="col">Zuletzt geändert</th>
+            <th scope="col">Projekt</th><th scope="col">Status / Tags</th>
+            <th scope="col">Umfang</th><th scope="col">Datumsangaben</th>
           </tr></thead>
           <tbody>
             {% for project in projects %}<tr>
-              <td><span class="project-code">{{ project.code }}</span></td>
-              <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a><p class="project-detail-description">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p></td>
-              <td><span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span></td>
-              <td><div class="project-tag-chips">{% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% empty %}<span class="muted">Keine Tags</span>{% endfor %}</div></td>
-              <td>{{ project.part_count }}</td><td>{{ project.snapshot_count }}</td>
-              <td class="project-date">{{ project.project_date|date:"d.m.Y" }}</td>
-              <td class="project-date">{{ project.created_at|date:"d.m.Y H:i" }}</td>
-              <td class="project-date">{{ project.updated_at|date:"d.m.Y H:i" }}</td>
+              <td data-label="Projekt"><span class="project-code">{{ project.code }}</span><h2 class="project-card-title"><a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a></h2><p class="project-detail-description">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p></td>
+              <td data-label="Status / Tags"><span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span><div class="project-tag-chips">{% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% empty %}<span class="muted">Keine Tags</span>{% endfor %}</div></td>
+              <td data-label="Umfang">{{ project.part_count }} Teile<br>{{ project.snapshot_count }} Projektstände</td>
+              <td data-label="Datumsangaben"><dl class="project-detail-dates">
+                <dt>Projektdatum</dt><dd>{{ project.project_date|date:"d.m.Y" }}</dd>
+                <dt>Erstellungsdatum</dt><dd>{{ project.created_at|date:"d.m.Y H:i" }}</dd>
+                <dt>Zuletzt geändert</dt><dd>{{ project.updated_at|date:"d.m.Y H:i" }}</dd>
+              </dl></td>
             </tr>{% endfor %}
           </tbody>
         </table>
@@ -128,6 +132,5 @@
       Ändere die Filter oder lege ein Projekt an.
     </div>
   {% endif %}
-    </section>
-  </div>
+  </section>
 {% endblock %}

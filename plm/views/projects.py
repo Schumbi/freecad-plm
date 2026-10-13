@@ -102,8 +102,10 @@ def project_list(request):
     projects = projects.order_by(ordering, "pk")
     presentation = QueryDict(mutable=True)
     presentation.update({"view": view, "sort": sort, "direction": direction})
-    untagged_params = presentation.copy()
-    untagged_params["untagged"] = "1"
+    tags = list(ProjectTag.objects.annotate(
+        project_count=Count("projects", filter=Q(projects__is_archived=False)),
+    ))
+    selected_tags = request.GET.getlist("tag")
     return render(
         request,
         "plm/project_list.html",
@@ -115,10 +117,11 @@ def project_list(request):
             "sort_choices": sort_choices,
             "project_direction": direction,
             "presentation_query": presentation.urlencode(),
-            "untagged_query": untagged_params.urlencode(),
             "can_create_project": is_plm_admin(request.user),
-            "tags": ProjectTag.objects.annotate(project_count=Count("projects", filter=Q(projects__is_archived=False))),
-            "selected_tags": request.GET.getlist("tag"),
+            "tags": tags,
+            "selected_tags": selected_tags,
+            "selected_tag_names": [tag.name for tag in tags if str(tag.pk) in selected_tags],
+            "tags_open": request.GET.get("tag_picker") == "1",
             "query": request.GET.get("q", ""),
             "tag_mode": request.GET.get("mode", "all"),
             "untagged": request.GET.get("untagged") == "1",

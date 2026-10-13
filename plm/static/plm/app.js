@@ -492,11 +492,50 @@
       } catch (error) { /* Storage is optional. */ }
     }
     remember();
-    form.addEventListener("submit", remember);
-    keys.forEach(function (key) {
-      form.elements.namedItem(key).addEventListener("change", function () {
-        form.requestSubmit();
-      });
+    var searchTimer;
+    var focusKey = "plm.project-list.focus";
+    try {
+      var focus = JSON.parse(window.sessionStorage.getItem(focusKey));
+      window.sessionStorage.removeItem(focusKey);
+      var target = focus && document.getElementById(focus.id);
+      if (target && form.contains(target)) {
+        target.focus({ preventScroll: true });
+        if (target.type === "search" && Number.isInteger(focus.cursor)) {
+          target.setSelectionRange(focus.cursor, focus.cursor);
+        }
+      }
+    } catch (error) { /* Focus restoration is optional. */ }
+    form.addEventListener("submit", function () {
+      window.clearTimeout(searchTimer);
+      remember();
+      var active = document.activeElement;
+      try {
+        window.sessionStorage.setItem(focusKey, JSON.stringify({
+          id: active && active.id, cursor: active && active.selectionStart
+        }));
+      } catch (error) { /* Storage is optional. */ }
+    });
+    form.addEventListener("change", function (event) {
+      if (event.target.matches("select, input[type='checkbox']")) form.requestSubmit();
+    });
+    var search = form.elements.namedItem("q");
+    search.addEventListener("input", function (event) {
+      if (event.isComposing) return;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(function () { form.requestSubmit(); }, 500);
+    });
+    var picker = document.getElementById("project-tags");
+    picker.addEventListener("toggle", function () {
+      form.elements.namedItem("tag_picker").value = picker.open ? "1" : "0";
+    });
+    document.addEventListener("click", function (event) {
+      if (!picker.contains(event.target)) picker.open = false;
+    });
+    picker.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        picker.open = false;
+        picker.querySelector("summary").focus();
+      }
     });
   }
 
