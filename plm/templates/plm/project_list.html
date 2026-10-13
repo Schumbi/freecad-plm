@@ -25,9 +25,9 @@
   <div class="project-tag-layout">
     <aside class="data-card project-tag-sidebar" aria-label="Projektfilter">
       <h2>Tags</h2>
-      <a href="{% url 'plm:project_list' %}">Alle Projekte</a> ·
-      <a href="?untagged=1">Ohne Tags</a>
-      <form method="get">
+      <a href="?{{ presentation_query }}">Alle Projekte</a> ·
+      <a href="?{{ untagged_query }}">Ohne Tags</a>
+      <form method="get" id="project-filters" data-project-preferences>
         <label for="project-query">Projekte suchen</label>
         <input id="project-query" type="search" name="q" value="{{ query }}" placeholder="Name, Code oder Tag …">
         <label for="tag-mode">Tags kombinieren</label>
@@ -47,9 +47,56 @@
       {% if can_create_project %}<a href="{% url 'plm:manage_project_tags' %}">Tags verwalten</a>{% endif %}
     </aside>
     <section aria-label="Projekte">
-      <p>{{ projects|length }} Projekte</p>
+      <div class="project-list-toolbar">
+        <p>{{ projects|length }} Projekte</p>
+        <div>
+          <label for="project-view">Ansicht</label>
+          <select id="project-view" name="view" form="project-filters">
+            {% for value, label in view_choices %}<option value="{{ value }}" {% if project_view == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="project-sort">Sortieren nach</label>
+          <select id="project-sort" name="sort" form="project-filters">
+            {% for value, label in sort_choices %}<option value="{{ value }}" {% if project_sort == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="project-direction">Reihenfolge</label>
+          <select id="project-direction" name="direction" form="project-filters">
+            <option value="asc" {% if project_direction == 'asc' %}selected{% endif %}>Aufsteigend (A–Z / älteste zuerst)</option>
+            <option value="desc" {% if project_direction == 'desc' %}selected{% endif %}>Absteigend (Z–A / neueste zuerst)</option>
+          </select>
+        </div>
+        <button type="submit" form="project-filters">Anwenden</button>
+      </div>
   {% if projects %}
-    <div class="project-grid" id="project-list">
+    {% if project_view == 'details' %}
+      <div class="table-wrap project-details">
+        <table id="project-list">
+          <caption>Projektdatum: einstellbares Datum des Projekts. Erstellungsdatum: Zeitpunkt des Anlegens im PLM.</caption>
+          <thead><tr>
+            <th scope="col">Projektcode</th><th scope="col">Projektname / Beschreibung</th>
+            <th scope="col">Status</th><th scope="col">Tags</th>
+            <th scope="col">Teile</th><th scope="col">Projektstände</th>
+            <th scope="col">Projektdatum</th><th scope="col">Erstellungsdatum</th><th scope="col">Zuletzt geändert</th>
+          </tr></thead>
+          <tbody>
+            {% for project in projects %}<tr>
+              <td><span class="project-code">{{ project.code }}</span></td>
+              <td><a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a><p class="project-detail-description">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p></td>
+              <td><span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span></td>
+              <td><div class="project-tag-chips">{% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% empty %}<span class="muted">Keine Tags</span>{% endfor %}</div></td>
+              <td>{{ project.part_count }}</td><td>{{ project.snapshot_count }}</td>
+              <td class="project-date">{{ project.project_date|date:"d.m.Y" }}</td>
+              <td class="project-date">{{ project.created_at|date:"d.m.Y H:i" }}</td>
+              <td class="project-date">{{ project.updated_at|date:"d.m.Y H:i" }}</td>
+            </tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+    <div class="{% if project_view == 'list' %}project-compact-list{% else %}project-grid{% endif %}" id="project-list">
       {% for project in projects %}
         <article
           class="project-card"
@@ -64,16 +111,17 @@
           </h2>
           <p class="project-card-desc">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p>
           <div class="project-tag-chips">
-            {% for tag in project.tags.all %}<a class="project-tag-chip" href="?tag={{ tag.id }}">{{ tag.name }}</a>{% endfor %}
+            {% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% endfor %}
           </div>
           <div class="project-card-footer">
-            <span>{{ project.parts.count }} Teile</span>
-            <span>{{ project.snapshots.count }} Stände</span>
-            <span>{{ project.project_date|date:"d.m.Y" }}</span>
+            <span>{{ project.part_count }} Teile</span>
+            <span>{{ project.snapshot_count }} Stände</span>
+            <span>Projektdatum: {{ project.project_date|date:"d.m.Y" }}</span>
           </div>
         </article>
       {% endfor %}
     </div>
+    {% endif %}
   {% else %}
     <div class="empty-state">
       <strong>Keine Projekte gefunden</strong>

@@ -1,4 +1,5 @@
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
 from ..models import ProjectTag
 from ..services.project_tags import filter_projects
 from io import BytesIO
@@ -6,7 +7,7 @@ from zipfile import ZipFile
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import FileResponse, HttpResponseForbidden
+from django.http import FileResponse, HttpResponseForbidden, QueryDict
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
@@ -78,12 +79,43 @@ def global_search(request):
 
 @login_required
 def project_list(request):
-    projects = filter_projects(Project.objects.filter(is_archived=False).prefetch_related("tags").order_by("code"), request.GET)
+    view_choices = [("tiles", "Kacheln"), ("list", "Liste"), ("details", "Details")]
+    sort_choices = [("code", "Projektcode"), ("name", "Projektname"),
+                    ("created_at", "Erstellungsdatum"), ("updated_at", "Zuletzt geändert"),
+                    ("project_date", "Projektdatum")]
+    view = request.GET.get("view", "tiles")
+    if view not in dict(view_choices):
+        view = "tiles"
+    sort = request.GET.get("sort", "code")
+    if sort not in dict(sort_choices):
+        sort = "code"
+    direction = "desc" if request.GET.get("direction") == "desc" else "asc"
+    ordering = Lower(sort) if sort in {"code", "name"} else sort
+    projects = filter_projects(
+        Project.objects.filter(is_archived=False).prefetch_related("tags"), request.GET,
+    ).annotate(part_count=Count("parts", distinct=True),
+               snapshot_count=Count("snapshots", distinct=True))
+    if sort in {"code", "name"}:
+        ordering = ordering.desc() if direction == "desc" else ordering.asc()
+    elif direction == "desc":
+        ordering = "-" + ordering
+    projects = projects.order_by(ordering, "pk")
+    presentation = QueryDict(mutable=True)
+    presentation.update({"view": view, "sort": sort, "direction": direction})
+    untagged_params = presentation.copy()
+    untagged_params["untagged"] = "1"
     return render(
         request,
         "plm/project_list.html",
         {
             "projects": projects,
+            "project_view": view,
+            "view_choices": view_choices,
+            "project_sort": sort,
+            "sort_choices": sort_choices,
+            "project_direction": direction,
+            "presentation_query": presentation.urlencode(),
+            "untagged_query": untagged_params.urlencode(),
             "can_create_project": is_plm_admin(request.user),
             "tags": ProjectTag.objects.annotate(project_count=Count("projects", filter=Q(projects__is_archived=False))),
             "selected_tags": request.GET.getlist("tag"),

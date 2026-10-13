@@ -218,7 +218,7 @@ class ProjectForm(forms.ModelForm):
             "code": "Code",
             "name": "Name",
             "status": "Status",
-            "project_date": "Datum",
+            "project_date": "Projektdatum",
             "description": "Beschreibung",
         }
 

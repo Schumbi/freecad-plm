@@ -457,6 +457,50 @@
     });
   }
 
+  function setupProjectPreferences() {
+    var form = document.querySelector("[data-project-preferences]");
+    if (!form) return;
+    var keys = ["view", "sort", "direction"];
+    var storageKey = "plm.project-list.preferences";
+    var url = new URL(window.location.href);
+    var saved = {};
+    try {
+      saved = JSON.parse(window.localStorage.getItem(storageKey)) || {};
+    } catch (error) { /* The page also works with unavailable storage. */ }
+    var restore = false;
+    keys.forEach(function (key) {
+      var control = form.elements.namedItem(key);
+      var valid = Array.from(control.options).some(function (option) {
+        return option.value === saved[key];
+      });
+      if (!url.searchParams.has(key) && valid && control.value !== saved[key]) {
+        url.searchParams.set(key, saved[key]);
+        restore = true;
+      }
+    });
+    if (restore) {
+      window.location.replace(url.toString());
+      return;
+    }
+    function remember() {
+      var preferences = {};
+      keys.forEach(function (key) {
+        preferences[key] = form.elements.namedItem(key).value;
+      });
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(preferences));
+      } catch (error) { /* Storage is optional. */ }
+    }
+    remember();
+    form.addEventListener("submit", remember);
+    keys.forEach(function (key) {
+      form.elements.namedItem(key).addEventListener("change", function () {
+        form.requestSubmit();
+      });
+    });
+  }
+
+  setupProjectPreferences();
   setupDialogs();
   setupActionMenus();
   setupMessages();
