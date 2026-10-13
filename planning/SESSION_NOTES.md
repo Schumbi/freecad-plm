@@ -944,3 +944,8 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Konsistentes Vorher-Backup `/opt/freecad-plm/backups/20261013T090714Z-before-8bb5ea9` mit Datenbank, Storage, Konfiguration und bisherigen Image-Tags erstellt und per SHA-256, Restore-Liste und Tar-Inhaltsprüfung validiert. Kein vollständiger Restore-Test ausgeführt.
 - Für ausreichend Platz vor dem Image-Download wurde ausschließlich das älteste ungenutzte PLM-Imagepaar `c03e2354756120094419ed4c71911bd19eb303d4` entfernt. Die zuvor aktive Version `8073f9c6e3afa7230ff22e57125abb9914a066cd` bleibt als Rollback vorhanden; Daten und Backups bleiben erhalten. Nach dem Update sind etwa 1,8 GB frei.
 - Bestandszahlen unverändert: 15 Projekte, 39 Teile, 136 Revisionen, 56 Projektstände und 13 Druckprojekte. Produktionsprüfung rendert alle Ansichten und Sortierfelder sowie Tag-Filter erfolgreich; neue Tag-Auswahl, fehlender Anwenden-Button und gebündelte Datumsangaben nachgewiesen. HTTPS liefert nach Login-Redirect HTTP 200; ausgelieferte CSS-/JavaScript-Dateien stimmen per SHA-256 mit der getesteten Version überein. Startlogs ohne Tracebacks; Worker läuft in seinen regulären Verarbeitungsschleifen.
+
+### 2026-10-13 – Einheitliche Höhe der Projektfilter
+
+- Ansicht, Tag-Auswahl, Sortierung und Reihenfolge verwenden dieselbe Höhe von 2,75 rem, identische Zeilenhöhe und Box-Berechnung. Die Feldgruppen ordnen Label und Auswahl vertikal an, damit die Ober- und Unterkanten bündig liegen.
+- Chromium-Messung bei 1280 Pixeln: alle vier Felder exakt 44 Pixel hoch, identische Ober- und Unterkanten. Auf schmalem Bildschirm ebenfalls viermal 44 Pixel, kein horizontaler Seitenüberlauf. Diff-Prüfung erfolgreich; reine CSS-Anpassung.
