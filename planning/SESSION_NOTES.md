@@ -949,3 +949,7 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 
 - Ansicht, Tag-Auswahl, Sortierung und Reihenfolge verwenden dieselbe Höhe von 2,75 rem, identische Zeilenhöhe und Box-Berechnung. Die Feldgruppen ordnen Label und Auswahl vertikal an, damit die Ober- und Unterkanten bündig liegen.
 - Chromium-Messung bei 1280 Pixeln: alle vier Felder exakt 44 Pixel hoch, identische Ober- und Unterkanten. Auf schmalem Bildschirm ebenfalls viermal 44 Pixel, kein horizontaler Seitenüberlauf. Diff-Prüfung erfolgreich; reine CSS-Anpassung.
+
+- Produktionsdeployment der Höhenkorrektur: Release `8690d7eceac6a277f9b797aa8ad7f0342d979d5c`, Forgejo-Build 483 erfolgreich. Web/Worker verwenden denselben Commit-Tag, laufen ohne Neustartfehler; Systemcheck und Migrationscheck erfolgreich, Bestandszahlen unverändert.
+- Vorher-Backup `/opt/freecad-plm/backups/20261013T102251Z-before-8690d7e` mit Datenbank, Storage und Konfiguration per SHA-256, Restore-Liste und Tar-Inhaltsprüfung validiert. Für Platz wurde ausschließlich das älteste ungenutzte PLM-Imagepaar `c963425f30f1fb9199e4bef626a3634aa897ca24` entfernt; vorherige aktive Version `8bb5ea9f18423a4fdf135c360fb5ee9c005bc896` bleibt als Rollback erhalten. Nach dem Update etwa 1,5 GB frei.
+- HTTPS liefert nach Login-Redirect HTTP 200; die öffentlich ausgelieferte CSS-Datei stimmt per SHA-256 mit der im Chromium-Test vermessenen Datei überein. Aktuelle Startlogs ohne Tracebacks.
