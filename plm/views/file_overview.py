@@ -90,7 +90,13 @@ def project_files_overview(request, project_id):
         rows = [r for r in rows if query in (r["name"] + " " + r["type"] + " " + r["owner"]).casefold()]
     if request.GET.get("old") != "1":
         rows = [r for r in rows if r["current"] or r["in_snapshot"]]
-    rows.sort(key=lambda r: (not r["current"], r["type"], r["name"]))
+    sort_field = request.GET.get("sort", "")
+    sort_direction = request.GET.get("direction", "asc")
+    if sort_field in {"name", "type", "owner", "version", "in_snapshot"}:
+        rows.sort(key=lambda r: str(r[sort_field]).casefold(), reverse=sort_direction == "desc")
+    else:
+        sort_field = ""
+        rows.sort(key=lambda r: (not r["current"], r["type"], r["name"]))
     changed = []
     changed_dependencies = []
     if selected and compare:
@@ -115,6 +121,7 @@ def project_files_overview(request, project_id):
         "changed": changed,
         "changed_dependencies": changed_dependencies,
         "query": request.GET.get("q", ""), "show_old": request.GET.get("old") == "1",
+        "sort_field": sort_field, "sort_direction": sort_direction,
     })
 
 
