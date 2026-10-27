@@ -1,0 +1,3 @@
+<li data-folder-id="{{ node.folder.id }}"><details {% if node.folder.id in active_folders %}open{% endif %}><summary><a data-folder-link href="?folder={{ node.folder.id }}">{{ node.folder.name }}</a></summary>
+  {% if node.children %}<ul>{% for node in node.children %}{% include "plm/includes/project_folder_node.html" %}{% endfor %}</ul>{% endif %}
+</details></li>

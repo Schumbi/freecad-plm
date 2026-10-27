@@ -7,7 +7,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from ..auth import api_auth_required
-from ..models import ApiToken, AuditEvent, Project
+from ..models import ApiToken, AuditEvent, Project, ProjectFolder
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import import_project_snapshot
 
@@ -28,11 +28,18 @@ from .common import (
 def projects_api(request):
     if request.method == "GET":
         projects = filter_projects(Project.objects.filter(is_archived=False).prefetch_related("tags").order_by("code"), request.GET)
+        folder = request.GET.get("folder")
+        if folder == "none":
+            projects = projects.filter(folder__isnull=True)
+        elif folder:
+            projects = projects.filter(folder_id=int(folder)) if folder.isdecimal() and len(folder) <= 18 else projects.none()
         return JsonResponse({"projects": [project_payload(project) for project in projects]})
 
     if not is_plm_admin(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Anlegen von Projekten."}, status=403)
     data = json_body(request)
+    if data.get("folder_id") is not None and (not isinstance(data["folder_id"], int) or isinstance(data["folder_id"], bool) or not ProjectFolder.objects.filter(pk=data["folder_id"]).exists()):
+        return JsonResponse({"error": "Ordner nicht gefunden."}, status=400)
     try:
         names = tag_names(data["tags"]) if "tags" in data else None
     except ValidationError as exc:
@@ -40,6 +47,7 @@ def projects_api(request):
     project = Project.objects.create(
         code=data.get("code", "").strip().upper(),
         name=data.get("name", "").strip(),
+        folder_id=data.get("folder_id"),
         description=data.get("description", "").strip(),
         status=data.get("status", Project.Status.RUNNING),
         project_date=parse_date(data.get("project_date", "")) or timezone.localdate(),
@@ -66,11 +74,16 @@ def project_import_api(request):
     if uploaded_file is None:
         return JsonResponse({"error": "Projekt-ZIP fehlt."}, status=400)
 
+    folder_id = request.POST.get("folder_id") or None
+    if folder_id is not None and (not folder_id.isdecimal() or not ProjectFolder.objects.filter(pk=folder_id).exists()):
+        return JsonResponse({"error": "Ordner nicht gefunden."}, status=400)
+
     try:
         with transaction.atomic():
             project = Project.objects.create(
                 code=request.POST.get("code", "").strip().upper(),
                 name=request.POST.get("name", "").strip(),
+                folder_id=folder_id,
                 description=request.POST.get("description", "").strip(),
                 status=request.POST.get("status", Project.Status.RUNNING),
                 project_date=parse_date(request.POST.get("project_date", ""))
@@ -108,6 +121,11 @@ def project_api(request, project_id):
     if not is_plm_admin(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Bearbeiten von Projekten."}, status=403)
     data = json_body(request)
+    if "folder_id" in data:
+        folder_id = data["folder_id"]
+        if folder_id is not None and (not isinstance(folder_id, int) or isinstance(folder_id, bool) or not ProjectFolder.objects.filter(pk=folder_id).exists()):
+            return JsonResponse({"error": "Ordner nicht gefunden."}, status=400)
+        project.folder_id = folder_id
     try:
         names = tag_names(data["tags"]) if "tags" in data else None
     except ValidationError as exc:

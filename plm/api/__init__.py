@@ -25,6 +25,8 @@ from .projects import (
     project_snapshot_import_api,
     projects_api,
 )
+from .folders import folder_api, folders_api
+from .documents import project_documents_api, project_document_api, project_document_file_api
 from .parts import (
     create_fcstd_part_api,
     part_api,

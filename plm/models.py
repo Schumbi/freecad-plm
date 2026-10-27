@@ -29,6 +29,21 @@ class ProjectTag(models.Model):
         super().save(*args, **kwargs)
 
 
+class ProjectFolder(models.Model):
+    name = models.CharField(max_length=200)
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="children")
+
+    class Meta:
+        ordering = ["name", "pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["parent", "name"], name="unique_folder_name_per_parent"),
+            models.UniqueConstraint(fields=["name"], condition=models.Q(parent__isnull=True), name="unique_root_folder_name"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class Project(TimeStampedModel):
     class Status(models.TextChoices):
         RUNNING = "running", "Laufend"
@@ -37,6 +52,7 @@ class Project(TimeStampedModel):
         IMPORTANT = "important", "Wichtig"
         ORDER = "order", "Auftrag"
 
+    folder = models.ForeignKey(ProjectFolder, null=True, blank=True, on_delete=models.PROTECT, related_name="projects")
     tags = models.ManyToManyField(ProjectTag, blank=True, related_name="projects")
     code = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=200)
@@ -846,6 +862,48 @@ class ProjectSnapshotEntry(models.Model):
 
     def __str__(self):
         return f"{self.path} -> {self.revision}"
+
+
+def project_document_upload_path(instance, filename):
+    return f"projects/{instance.document.project_id}/documents/{instance.document_id}/{uuid4().hex}/{filename}"
+
+
+class ProjectDocument(TimeStampedModel):
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="documents")
+    path = models.CharField(max_length=500)
+    is_archived = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["path"]
+        constraints = [models.UniqueConstraint(fields=["project", "path"], name="unique_document_path_per_project")]
+
+    def __str__(self):
+        return self.path
+
+
+class ProjectDocumentVersion(models.Model):
+    document = models.ForeignKey(ProjectDocument, on_delete=models.CASCADE, related_name="versions")
+    number = models.PositiveIntegerField()
+    file = models.FileField(upload_to=project_document_upload_path, max_length=500)
+    filename = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    size = models.PositiveBigIntegerField()
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-number"]
+        constraints = [models.UniqueConstraint(fields=["document", "number"], name="unique_document_version_number")]
+
+
+class ProjectSnapshotDocument(models.Model):
+    snapshot = models.ForeignKey(ProjectSnapshot, on_delete=models.CASCADE, related_name="documents")
+    version = models.ForeignKey(ProjectDocumentVersion, on_delete=models.PROTECT, related_name="snapshot_links")
+    path = models.CharField(max_length=500)
+
+    class Meta:
+        ordering = ["path"]
+        constraints = [models.UniqueConstraint(fields=["snapshot", "path"], name="unique_snapshot_document_path")]
 
 
 class AuditEvent(models.Model):

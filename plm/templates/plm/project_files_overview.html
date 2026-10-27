@@ -1,0 +1,21 @@
+{% extends "plm/base.html" %}
+{% block content %}
+<h1>Dateien und Abhängigkeiten · {{ project.code }}</h1>
+<p><a href="{% url 'plm:project_documents' project.id %}">Projektdateien verwalten</a> · <a href="{% url 'plm:project_detail' project.id %}">Projekt öffnen</a></p>
+<form method="get">
+  <label>Projektstand <select name="snapshot"><option value="">Neuester Stand</option>{% for snapshot in snapshots %}<option value="{{ snapshot.id }}" {% if selected.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>{% endfor %}</select></label>
+  <label>Vergleichen mit <select name="compare"><option value="">Kein Vergleich</option>{% for snapshot in snapshots %}<option value="{{ snapshot.id }}" {% if compare.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>{% endfor %}</select></label>
+  <label>Suche <input name="q" type="search" value="{{ query }}"></label>
+  <label><input name="old" type="checkbox" value="1" {% if show_old %}checked{% endif %}> Ältere Versionen zeigen</label>
+  <button type="submit">Anzeigen</button>
+</form>
+<div class="table-wrap"><table><thead><tr><th>Pfad / Datei</th><th>Typ</th><th>Zugehörigkeit</th><th>Version / Revision</th><th>Projektstand</th><th>Öffnen</th></tr></thead><tbody>
+{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.type }}</td><td>{{ row.owner }}</td><td>{{ row.version }}</td><td>{% if row.in_snapshot %}Enthalten{% else %}Außerhalb{% endif %}</td><td><a href="{{ row.url }}">Herunterladen</a></td></tr>{% empty %}<tr><td colspan="6">Keine Dateien gefunden.</td></tr>{% endfor %}
+</tbody></table></div>
+<details><summary>Abhängigkeiten im gewählten Projektstand ({{ dependencies|length }})</summary>
+  {% for node in dependency_tree %}<details><summary>{{ node.source }}</summary><ul>{% for dependency in node.links %}<li>→ {{ dependency.target }} ({{ dependency.state }})</li>{% endfor %}</ul></details>
+  {% empty %}<p>Keine erkannten Abhängigkeiten.</p>{% endfor %}
+</details>
+{% if compare %}<h2>Unterschiede zwischen Projektständen</h2><ul>{% for item in changed %}<li>{{ item.path }}: {{ item.state }}</li>{% empty %}<li>Keine Dateiunterschiede.</li>{% endfor %}</ul>
+<h3>Abhängigkeiten</h3><ul>{% for item in changed_dependencies %}<li>{{ item.source }} → {{ item.target }}: {{ item.state }}</li>{% empty %}<li>Keine Unterschiede.</li>{% endfor %}</ul>{% endif %}
+{% endblock %}

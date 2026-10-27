@@ -85,6 +85,11 @@ def create_variant_checkout(*, source_revision, uploaded_file, name, number, act
         with transaction.atomic():
             project = Project.objects.select_for_update().get(pk=source_revision.part.project_id)
             variant_snapshot = ProjectSnapshot.objects.create(project=project, name=name, created_by=actor)
+            from .documents import copy_snapshot_documents, capture_current_documents
+            if snapshot:
+                copy_snapshot_documents(snapshot, variant_snapshot)
+            else:
+                capture_current_documents(variant_snapshot)
             root_revision = None
             for entry in sorted(entries, key=lambda item: not item["is_root"]):
                 source_part = Part.objects.select_for_update().get(pk=entry["revision"].part_id)

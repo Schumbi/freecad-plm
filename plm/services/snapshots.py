@@ -28,6 +28,9 @@ from ..models import (
     ManufacturingRunAttachment,
     ProjectSnapshot,
     ProjectSnapshotEntry,
+    ProjectDocument,
+    ProjectDocumentVersion,
+    ProjectSnapshotDocument,
     PrintProject,
     PrintProjectPlate,
     PrintProjectSnapshot,
@@ -37,6 +40,7 @@ from ..models import (
 )
 from .common import ProjectZipMember, safe_snapshot_path
 from .revisions import create_or_reuse_revision, part_identity_from_metadata
+from .documents import upload_document, capture_current_documents, copy_snapshot_documents, clean_document_path
 
 
 SNAPSHOT_VERSION_SUFFIX_RE = re.compile(r" - (?:Checkout \d+|V\d+)$")
@@ -77,8 +81,6 @@ def iter_project_zip_members(uploaded_zip):
                 if info.is_dir():
                     continue
                 path = safe_snapshot_path(info.filename)
-                if PurePosixPath(path).suffix.lower() not in PROJECT_FILE_EXTENSIONS:
-                    continue
                 yield ProjectZipMember(path=path, data=archive.read(info))
     except BadZipFile as exc:
         raise ValidationError("Die Projektdatei muss ein gueltiges ZIP-Archiv sein.") from exc
@@ -88,10 +90,18 @@ def iter_project_zip_members(uploaded_zip):
 def import_project_snapshot(project, uploaded_zip, created_by, name="", dependency_root_path="", dependency_revision_id=None):
     members = list(iter_project_zip_members(uploaded_zip))
     if not members:
-        raise ValidationError("Das ZIP enthält keine FreeCAD-, STEP- oder STL-Dateien.")
+        raise ValidationError("Das ZIP enthält keine Dateien.")
 
-    fcstd_paths = [m.path for m in members if PurePosixPath(m.path).suffix.lower() == ".fcstd"]
-    external_paths = [m.path for m in members if PurePosixPath(m.path).suffix.lower() in {".step", ".stp", ".stl"}]
+    cad_members = [m for m in members if PurePosixPath(m.path).suffix.lower() in PROJECT_FILE_EXTENSIONS]
+    document_members = [m for m in members if m not in cad_members]
+    document_limit = setting_int("PLM_MAX_PROJECT_DOCUMENT_BYTES", 200 * 1024 * 1024)
+    for member in document_members:
+        clean_document_path(member.path)
+        if len(member.data) > document_limit:
+            raise ValidationError(f"Die Projektdatei darf höchstens {document_limit} Bytes groß sein.")
+
+    fcstd_paths = [m.path for m in cad_members if PurePosixPath(m.path).suffix.lower() == ".fcstd"]
+    external_paths = [m.path for m in cad_members if PurePosixPath(m.path).suffix.lower() in {".step", ".stp", ".stl"}]
     root_revision = None
     if external_paths:
         if fcstd_paths:
@@ -133,7 +143,7 @@ def import_project_snapshot(project, uploaded_zip, created_by, name="", dependen
         "files": [],
     }
 
-    for member in members:
+    for member in cad_members:
         metadata = validate_project_file_upload(
             SimpleUploadedFile(PurePosixPath(member.path).name, member.data)
         )
@@ -198,6 +208,13 @@ def import_project_snapshot(project, uploaded_zip, created_by, name="", dependen
             dependency_root_path=dependency_root_path if member.path in external_paths else "",
         )
 
+    for member in document_members:
+        version, created = upload_document(project, member.path,
+            SimpleUploadedFile(PurePosixPath(member.path).name, member.data), created_by)
+        import_summary["files"].append({"path": member.path, "document_id": version.document_id,
+                                        "version_id": version.pk, "created_version": created})
+    capture_current_documents(snapshot)
+
     AuditEvent.objects.create(
         actor=created_by,
         action=AuditEvent.Action.PROJECT_SNAPSHOT_CREATED,
@@ -236,6 +253,7 @@ def delete_project_tree(project, actor):
         ).count(),
         "print_projects": PrintProject.objects.filter(project=project).count(),
         "snapshots": project.snapshots.count(),
+        "documents": project.documents.count(),
         "annotations": project.annotations.count(),
         "checkouts": Checkout.objects.filter(part__project=project).count(),
     }
@@ -243,6 +261,7 @@ def delete_project_tree(project, actor):
 
     revisions = Revision.objects.filter(part__project=project)
     revision_files = [revision.file for revision in revisions if revision.file]
+    document_files = [version.file for version in ProjectDocumentVersion.objects.filter(document__project=project) if version.file]
     artifact_files = [
         artifact.file
         for artifact in RevisionArtifact.objects.filter(revision__part__project=project)
@@ -296,7 +315,10 @@ def delete_project_tree(project, actor):
     Annotation.objects.filter(project=project).delete()
     Checkout.objects.filter(part__project=project).delete()
     ProjectSnapshotEntry.objects.filter(snapshot__project=project).delete()
+    ProjectSnapshotDocument.objects.filter(snapshot__project=project).delete()
     ProjectSnapshot.objects.filter(project=project).delete()
+    ProjectDocumentVersion.objects.filter(document__project=project).delete()
+    ProjectDocument.objects.filter(project=project).delete()
     ManufacturingRunAttachment.objects.filter(
         run__manufacturing_file__revision__part__project=project
     ).delete()
@@ -328,6 +350,7 @@ def delete_project_tree(project, actor):
             *manufacturing_files,
             *artifact_files,
             *revision_files,
+            *document_files,
         ]
         if field_file and field_file.name
     ]
@@ -467,6 +490,7 @@ def create_snapshot_with_replaced_external_revision(
         name=f"{snapshot_base_name(source_snapshot.name)} - {revision.revision_code}",
         created_by=actor,
     )
+    copy_snapshot_documents(source_snapshot, snapshot)
     for entry in entries:
         replacement_path = replacement_paths.get(entry.id)
         ProjectSnapshotEntry.objects.create(
@@ -510,6 +534,7 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
         name=checkout_snapshot_name(checkout.snapshot.name, checkout.id),
         created_by=actor,
     )
+    copy_snapshot_documents(checkout.snapshot, snapshot)
     copied_paths = set()
     for entry in checkout.snapshot.entries.select_related("revision").order_by("path"):
         if entry.path in removed_paths:

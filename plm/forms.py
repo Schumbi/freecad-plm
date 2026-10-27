@@ -13,6 +13,7 @@ from .models import (
     ManufacturingMachine,
     Part,
     Project,
+    ProjectFolder,
     ProjectSnapshot,
     Revision,
 )
@@ -181,6 +182,18 @@ class ProjectForm(forms.ModelForm):
     new_tags = forms.CharField(label="Neue Tags", required=False,
         help_text="Mehrere Namen durch Kommas trennen. Vorhandene Tags oben auswählen.")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        folders = {folder.pk: folder for folder in ProjectFolder.objects.all()}
+        def folder_label(folder):
+            names, seen = [], set()
+            while folder and folder.pk not in seen:
+                seen.add(folder.pk)
+                names.append(folder.name)
+                folder = folders.get(folder.parent_id)
+            return " / ".join(reversed(names))
+        self.fields["folder"].label_from_instance = folder_label
+
     def clean_new_tags(self):
         from .services.project_tags import tag_names
         return tag_names(self.cleaned_data.get("new_tags", ""))
@@ -204,7 +217,7 @@ class ProjectForm(forms.ModelForm):
 
     class Meta:
         model = Project
-        fields = ["code", "name", "status", "project_date", "description", "tags", "new_tags"]
+        fields = ["code", "name", "folder", "status", "project_date", "description", "tags", "new_tags"]
         widgets = {
             "tags": forms.CheckboxSelectMultiple(),
             "project_date": forms.DateInput(
@@ -214,6 +227,7 @@ class ProjectForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 4}),
         }
         labels = {
+            "folder": "Projektordner",
             "tags": "Tags",
             "code": "Code",
             "name": "Name",

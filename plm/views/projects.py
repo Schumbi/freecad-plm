@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import PrintProjectReassignForm, ProjectForm, ProjectSnapshotUploadForm
-from ..models import AuditEvent, Part, PrintProject, PrintProjectPlate, PrintProjectSource, Project, ProjectSnapshot, Revision
+from ..models import AuditEvent, Part, PrintProject, PrintProjectPlate, PrintProjectSource, Project, ProjectFolder, ProjectSnapshot, Revision
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
 from ..services.snapshots import iter_project_zip_members
@@ -95,10 +95,15 @@ def project_list(request):
         sort = "code"
     direction = "desc" if request.GET.get("direction") == "desc" else "asc"
     ordering = Lower(sort) if sort in {"code", "name"} else sort
+    selected_folder = request.GET.get("folder", "all")
     projects = filter_projects(
         Project.objects.filter(is_archived=False).prefetch_related("tags"), request.GET,
     ).annotate(part_count=Count("parts", distinct=True),
                snapshot_count=Count("snapshots", distinct=True))
+    if selected_folder == "none":
+        projects = projects.filter(folder__isnull=True)
+    elif selected_folder != "all":
+        projects = projects.filter(folder_id=selected_folder) if selected_folder.isdecimal() and len(selected_folder) <= 18 else projects.none()
     if sort in {"code", "name"}:
         ordering = ordering.desc() if direction == "desc" else ordering.asc()
     elif direction == "desc":
@@ -106,15 +111,30 @@ def project_list(request):
     projects = projects.order_by(ordering, "pk")
     presentation = QueryDict(mutable=True)
     presentation.update({"view": view, "sort": sort, "direction": direction})
+    if selected_folder != "all":
+        presentation["folder"] = selected_folder
     tags = list(ProjectTag.objects.annotate(
         project_count=Count("projects", filter=Q(projects__is_archived=False)),
     ))
     selected_tags = request.GET.getlist("tag")
+    folders = list(ProjectFolder.objects.order_by("name", "pk"))
+    by_id = {folder.pk: folder for folder in folders}
+    active_folders = set()
+    cursor = int(selected_folder) if selected_folder.isdecimal() and len(selected_folder) <= 18 else None
+    while cursor in by_id and cursor not in active_folders:
+        active_folders.add(cursor)
+        cursor = by_id[cursor].parent_id
+    def children(parent_id, ancestors=frozenset()):
+        return [{"folder": folder, "children": children(folder.pk, ancestors | {folder.pk})}
+                for folder in folders if folder.parent_id == parent_id and folder.pk not in ancestors]
     return render(
         request,
         "plm/project_list.html",
         {
             "projects": projects,
+            "folder_tree": children(None),
+            "active_folders": active_folders,
+            "selected_folder": selected_folder,
             "project_view": view,
             "view_choices": view_choices,
             "project_sort": sort,
@@ -244,7 +264,7 @@ def project_detail(request, project_id):
     parts = project.parts.filter(is_archived=False).order_by("number")
     snapshots = (
         project.snapshots.select_related("created_by")
-        .prefetch_related("entries__revision__part")
+        .prefetch_related("entries__revision__part", "documents__version")
         .order_by("-created_at")
     )
     print_projects = project.print_projects.select_related("primary_revision__part").prefetch_related("sources", "plates", "snapshots")
@@ -437,7 +457,7 @@ def upload_project_snapshot(request, project_id):
     parts = project.parts.filter(is_archived=False).order_by("number")
     snapshots = (
         project.snapshots.select_related("created_by")
-        .prefetch_related("entries__revision__part")
+        .prefetch_related("entries__revision__part", "documents__version")
         .order_by("-created_at")
     )
     return render(
@@ -466,6 +486,9 @@ def download_project_snapshot(request, snapshot_id):
         for entry in snapshot.entries.select_related("revision").order_by("path"):
             with entry.revision.file.open("rb") as fh:
                 archive.writestr(entry.path, fh.read())
+        for entry in snapshot.documents.select_related("version").order_by("path"):
+            with entry.version.file.open("rb") as fh:
+                archive.writestr("Dokumente/" + entry.path, fh.read())
     buffer.seek(0)
     return FileResponse(
         buffer,

@@ -19,6 +19,7 @@ def validation_error_response(exc, status=400):
 def project_payload(project):
     return {
         "id": project.id,
+        "folder_id": project.folder_id,
         "code": project.code,
         "name": project.name,
         "description": project.description,
@@ -166,6 +167,11 @@ def snapshot_payload(snapshot):
                 "file_format": entry.revision.file_format,
             }
             for entry in snapshot.entries.select_related("revision", "revision__part").order_by("path")
+        ],
+        "documents": [
+            {"path": entry.path, "version_id": entry.version_id,
+             "version": entry.version.number, "sha256": entry.version.sha256}
+            for entry in snapshot.documents.select_related("version").order_by("path")
         ],
     }
 

@@ -1,0 +1,26 @@
+{% extends "plm/base.html" %}
+{% block content %}
+<div class="page-header"><h1>Projektordner verwalten</h1></div>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<h2>Ordner anlegen</h2>
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="create">
+  <label>Name <input name="name" required maxlength="200"></label>
+  <label>Übergeordnet <select name="parent_id"><option value="">Oberste Ebene</option>{% for folder in folders %}<option value="{{ folder.id }}">{{ folder.display_path }}</option>{% endfor %}</select></label>
+  <button type="submit">Anlegen</button>
+</form>
+<h2>Ordner</h2>
+{% for folder in folders %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="folder_id" value="{{ folder.id }}">
+    <label>Name <input name="name" value="{{ folder.name }}" required maxlength="200"></label>
+    <label>Übergeordnet <select name="parent_id"><option value="">Oberste Ebene</option>{% for candidate in folders %}<option value="{{ candidate.id }}" {% if candidate.id == folder.parent_id %}selected{% endif %}>{{ candidate.display_path }}</option>{% endfor %}</select></label>
+    <button name="action" value="update">Speichern</button><button name="action" value="delete">Löschen</button>
+  </form>
+{% endfor %}
+<h2>Projekte verschieben</h2>
+{% for project in projects %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="move_project"><input type="hidden" name="project_id" value="{{ project.id }}">
+    <label>{{ project.code }} · {{ project.name }} <select name="parent_id"><option value="">Ohne Ordner</option>{% for folder in folders %}<option value="{{ folder.id }}" {% if folder.id == project.folder_id %}selected{% endif %}>{{ folder.display_path }}</option>{% endfor %}</select></label>
+    <button type="submit">Verschieben</button>
+  </form>
+{% endfor %}
+{% endblock %}

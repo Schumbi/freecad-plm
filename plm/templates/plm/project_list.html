@@ -22,8 +22,16 @@
     {% endif %}
   </div>
 
-  <section class="project-overview" aria-label="Projekte">
+  <section class="project-overview" aria-label="Projekte" style="display:grid;grid-template-columns:minmax(12rem,18rem) minmax(0,1fr);gap:1rem">
+    <nav aria-label="Projektordner" class="project-folder-tree" style="grid-row:1 / span 3"><strong>Projektordner</strong>
+      <ul><li><a data-folder-link href="?folder=all">Alle Projekte</a></li><li data-folder-id=""><a data-folder-link href="?folder=none">Ohne Ordner</a></li>
+        {% for node in folder_tree %}{% include "plm/includes/project_folder_node.html" %}{% endfor %}
+      </ul>
+      {% if can_create_project %}<a href="{% url 'plm:manage_project_folders' %}">Ordner verwalten</a>{% endif %}
+    </nav>
+    {% if can_create_project %}<form id="folder-drop-form" method="post" action="{% url 'plm:manage_project_folders' %}" hidden>{% csrf_token %}</form>{% endif %}
     <form method="get" id="project-filters" data-project-preferences>
+      <input type="hidden" name="folder" value="{{ selected_folder }}">
       <div class="project-list-toolbar">
         <p>{{ projects|length }} Projekte</p>
         <div>
@@ -86,7 +94,7 @@
             <th scope="col">Umfang</th><th scope="col">Datumsangaben</th>
           </tr></thead>
           <tbody>
-            {% for project in projects %}<tr>
+            {% for project in projects %}<tr draggable="{{ can_create_project|yesno:'true,false' }}" data-project-id="{{ project.id }}">
               <td data-label="Projekt"><span class="project-code">{{ project.code }}</span><h2 class="project-card-title"><a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a></h2><p class="project-detail-description">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p></td>
               <td data-label="Status / Tags"><span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span><div class="project-tag-chips">{% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% empty %}<span class="muted">Keine Tags</span>{% endfor %}</div></td>
               <td data-label="Umfang">{{ project.part_count }} Teile<br>{{ project.snapshot_count }} Projektstände</td>
@@ -104,6 +112,7 @@
       {% for project in projects %}
         <article
           class="project-card"
+          draggable="{{ can_create_project|yesno:'true,false' }}" data-project-id="{{ project.id }}"
           data-filter-item
           data-filter-text="{{ project.code }} {{ project.name }} {{ project.description }} {{ project.get_status_display }}">
           <div class="project-card-top">
@@ -133,4 +142,31 @@
     </div>
   {% endif %}
   </section>
+  <script>
+  document.querySelectorAll('[data-folder-link]').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    const params = new URLSearchParams(new FormData(document.querySelector('#project-filters')));
+    params.set('folder', new URL(link.href).searchParams.get('folder'));
+    location.search = params.toString();
+  }));
+  const dropForm = document.querySelector('#folder-drop-form');
+  if (dropForm) {
+    document.querySelectorAll('[data-project-id]').forEach(item => item.addEventListener('dragstart', event => {
+      event.dataTransfer.setData('text/plain', item.dataset.projectId);
+    }));
+    document.querySelectorAll('[data-folder-id]').forEach(target => {
+      target.addEventListener('dragover', event => event.preventDefault());
+      target.addEventListener('drop', async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const data = new FormData(dropForm);
+        data.set('action', 'move_project');
+        data.set('project_id', event.dataTransfer.getData('text/plain'));
+        data.set('parent_id', target.dataset.folderId);
+        const response = await fetch(dropForm.action, {method: 'POST', body: data});
+        if (response.ok) location.reload();
+      });
+    });
+  }
+  </script>
 {% endblock %}

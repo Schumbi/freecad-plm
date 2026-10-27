@@ -28,6 +28,26 @@ from freecad_plm_addon.workspace import sha256_file
 
 
 class AddonServerContracts(PrintProjectFixture, LiveServerTestCase):
+    def test_project_folders_and_document_roundtrip(self):
+        from django.contrib.auth.models import Group
+        from plm.permissions import ROLE_ADMIN
+        from plm.models import ProjectFolder
+        self.user.groups.add(Group.objects.get_or_create(name=ROLE_ADMIN)[0])
+        self.token.scopes.append(ApiToken.Scope.ADMIN)
+        self.token.save()
+        folder = ProjectFolder.objects.create(name="Specs")
+        self.api.update_project(self.project.pk, {"folder_id": folder.pk})
+        self.assertEqual(self.api.get_project(self.project.pk)["folder_id"], folder.pk)
+        self.assertEqual(self.api.get_folders()[0]["name"], "Specs")
+        source = self.local / "requirements.pdf"
+        source.write_bytes(b"%PDF-1.4 contract")
+        uploaded = self.api.upload_project_document(self.project.pk, source, "Specs/requirements.pdf")
+        version = uploaded["version"]
+        self.assertEqual(self.api.get_project_documents(self.project.pk)[0]["path"], "Specs/requirements.pdf")
+        target = self.local / "downloaded.pdf"
+        self.api.download_project_document(version["id"], target, version["sha256"])
+        self.assertEqual(target.read_bytes(), source.read_bytes())
+
     def test_variant_bundle_and_independent_reusable_slicer_project(self):
         from zipfile import ZipFile
         from plm.services import import_project_snapshot

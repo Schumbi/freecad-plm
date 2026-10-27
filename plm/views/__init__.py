@@ -46,6 +46,9 @@ from .users import (
     user_management_list,
 )
 from .tags import manage_project_tags
+from .folders import manage_project_folders
+from .documents import project_documents, project_document_state, project_document_download
+from .file_overview import project_files_overview, project_misc_file
 from .projects import (
     create_project,
     delete_print_project_view,

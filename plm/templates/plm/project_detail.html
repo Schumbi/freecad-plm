@@ -20,6 +20,7 @@
         <div class="page-header-main">
           <span class="page-kicker">Projekt</span>
           <h1>{{ project.code }} · {{ project.name }}</h1>
+          <p><a href="{% url 'plm:project_documents' project.id %}">Projektdateien</a> · <a href="{% url 'plm:project_files_overview' project.id %}">Dateien und Abhängigkeiten</a></p>
           <p class="object-subtitle">{{ project.description|default:"Kein Beschreibungstext hinterlegt." }}</p>
         </div>
         <div class="page-header-actions">
@@ -169,7 +170,7 @@
         <article class="snapshot-card">
           <div class="snapshot-card-main">
             <h3>{{ snapshot.name }}</h3>
-            <p class="snapshot-card-meta">{{ snapshot.entries.count }} Dateien · {{ snapshot.created_by }} · {{ snapshot.created_at|date:"d.m.Y H:i" }}</p>
+            <p class="snapshot-card-meta">{{ snapshot.entries.count }} CAD-Dateien · {{ snapshot.documents.count }} Dokumente · {{ snapshot.created_by }} · {{ snapshot.created_at|date:"d.m.Y H:i" }}</p>
           </div>
           <div class="section-actions">
             <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#snapshot-{{ snapshot.id }}">Dateien</button>
@@ -199,6 +200,9 @@
                         <td>{{ entry.revision.part.number }} {{ entry.revision.part.name }}</td>
                         <td>{{ entry.revision.revision_code }}</td>
                       </tr>
+                    {% endfor %}
+                    {% for entry in snapshot.documents.all %}
+                      <tr><td>Dokumente/{{ entry.path }}</td><td>Projektdokument</td><td>V{{ entry.version.number }}</td></tr>
                     {% endfor %}
                   </tbody>
                 </table>
