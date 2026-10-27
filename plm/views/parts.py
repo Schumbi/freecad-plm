@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core import signing
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -10,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ManufacturingFileUploadForm, PartForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
-from ..models import Annotation, AuditEvent, Checkout, ExportJob, Part, PrintProject, Project, Revision, RevisionArtifact
+from ..models import Annotation, AuditEvent, Checkout, ExportJob, Part, PrintProject, Project, ProjectSnapshotEntry, Revision, RevisionArtifact
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision, is_plm_admin
 from ..services import (
     assembly_bom_tree,
@@ -219,6 +220,18 @@ def remove_part(request, part_id):
                     else:
                         if ExportJob.objects.filter(revision__part=part, status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING]).exists():
                             raise ValidationError("Laufende oder wartende Exportjobs müssen zuerst abgeschlossen werden.")
+                        snapshot_entries = ProjectSnapshotEntry.objects.filter(revision__part=part).select_related("snapshot").order_by("id")
+                        current_plan = {"part_id": part.id, "revisions": list(revisions.order_by("id").values_list("id", flat=True)), "entries": [list(row) for row in snapshot_entries.values_list("id", "snapshot_id", "path")]}
+                        try:
+                            confirmed_plan = signing.loads(request.POST.get("delete_plan", ""), salt="plm.remove_part", max_age=3600)
+                        except signing.BadSignature:
+                            raise ValidationError("Die Bestätigung ist abgelaufen. Bitte die betroffenen Projektstände erneut prüfen.")
+                        if current_plan != confirmed_plan:
+                            raise ValidationError("Die Revisionen oder Projektstände haben sich geändert. Bitte die Auswirkungen erneut prüfen.")
+                        if Checkout.objects.filter(snapshot_id__in=snapshot_entries.values("snapshot_id"), status=Checkout.Status.ACTIVE).exists():
+                            raise ValidationError("Ein betroffener Projektstand wird gerade in einem aktiven Checkout verwendet. Bitte den Checkout zuerst abschließen oder abbrechen.")
+                        metadata["snapshot_entries"] = list(snapshot_entries.values("snapshot_id", "snapshot__name", "path"))
+                        snapshot_entries.delete()
                         files = [(f.storage, f.name) for f in [*[r.file for r in revisions], *[a.file for a in RevisionArtifact.objects.filter(revision__part=part)]] if f and f.name]
                         part.annotations.all().delete()
                         RevisionArtifact.objects.filter(revision__part=part).delete()
@@ -235,4 +248,6 @@ def remove_part(request, part_id):
             else:
                 messages.success(request, f"{number} wurde {'wiederhergestellt' if action == AuditEvent.Action.PART_RESTORED else 'archiviert' if action == AuditEvent.Action.PART_ARCHIVED else 'dauerhaft gelöscht'}.")
                 return redirect("plm:project_detail", project_id=project_id)
-    return render(request, "plm/part_confirm_remove.html", {"part": part, "archive": archive}, status=400 if request.method == "POST" else 200)
+    snapshot_entries = list(ProjectSnapshotEntry.objects.filter(revision__part=part).select_related("snapshot").order_by("snapshot__name", "path")) if not archive else []
+    delete_plan = signing.dumps({"part_id": part.id, "revisions": list(part.revisions.order_by("id").values_list("id", flat=True)), "entries": [[entry.id, entry.snapshot_id, entry.path] for entry in sorted(snapshot_entries, key=lambda item: item.id)]}, salt="plm.remove_part") if not archive else ""
+    return render(request, "plm/part_confirm_remove.html", {"part": part, "archive": archive, "snapshot_entries": snapshot_entries, "delete_plan": delete_plan}, status=400 if request.method == "POST" else 200)

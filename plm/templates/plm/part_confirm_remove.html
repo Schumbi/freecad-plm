@@ -2,8 +2,10 @@
 {% block content %}
 <div class="page-header"><div><h1>{{ part.number }} · {{ part.name }}</h1>
 {% if part.is_archived %}<p>Dieses Teil wird wieder in der Projektliste angezeigt.</p>{% elif archive %}<p>Dieses Teil wird archiviert. Revisionen und Dateien bleiben erhalten. Es kann über diese Seite wiederhergestellt werden.</p>{% else %}<p>Dieses Teil und seine Revisionen, Dateien und Anmerkungen werden dauerhaft gelöscht. Verknüpfte Daten können die Löschung verhindern.</p>{% endif %}
+{% if snapshot_entries %}<p>Die folgenden Einträge werden aus den jeweiligen Projektständen entfernt. Dadurch ändern sich diese historischen Projektstände:</p><ul>{% for entry in snapshot_entries %}<li>{{ entry.snapshot.name }} · {{ entry.path }}</li>{% endfor %}</ul>{% endif %}
 </div></div>
 <form method="post">{% csrf_token %}
+<input type="hidden" name="delete_plan" value="{{ delete_plan }}">
 <input type="hidden" name="action" value="{% if part.is_archived %}restore{% elif archive %}archive{% else %}delete{% endif %}">
 <label for="confirmation">Zur Bestätigung die Teilenummer {{ part.number }} eingeben:</label>
 <input id="confirmation" name="confirmation" required>

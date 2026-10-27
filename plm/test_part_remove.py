@@ -28,7 +28,8 @@ class RemovePartTests(TestCase):
     def post(self):
         self.part.refresh_from_db()
         action = "restore" if self.part.is_archived else "archive" if self.part.revisions.filter(file_format="fcstd").exists() else "delete"
-        return self.client.post(self.url, {"confirmation": "P-002", "action": action})
+        page = self.client.get(self.url)
+        return self.client.post(self.url, {"confirmation": "P-002", "action": action, "delete_plan": page.context["delete_plan"] if page.status_code == 200 else ""})
 
     def test_fcstd_archives_and_restores(self):
         revision = self.revision("fcstd")
@@ -64,12 +65,32 @@ class RemovePartTests(TestCase):
                 self.assertFalse(Part.objects.filter(pk=self.part.pk).exists())
                 self.assertFalse(__import__("os").path.exists(path))
 
-    def test_snapshot_blocks_deletion_without_losing_data(self):
+    def test_snapshot_entry_is_shown_and_removed(self):
         revision = self.revision("stl")
         snapshot = ProjectSnapshot.objects.create(project=self.project, name="Stand", created_by=self.admin)
         ProjectSnapshotEntry.objects.create(snapshot=snapshot, path="file.stl", revision=revision)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Stand")
+        self.assertContains(response, "file.stl")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.post().status_code, 302)
+        self.assertFalse(Revision.objects.filter(pk=revision.pk).exists())
+        self.assertTrue(ProjectSnapshot.objects.filter(pk=snapshot.pk).exists())
+        self.assertFalse(snapshot.entries.exists())
+        event = AuditEvent.objects.get(action=AuditEvent.Action.PART_DELETED)
+        self.assertEqual(event.metadata["snapshot_entries"][0]["path"], "file.stl")
+
+    def test_active_checkout_using_snapshot_blocks_deletion(self):
+        from .models import Checkout
+        revision = self.revision("stl")
+        snapshot = ProjectSnapshot.objects.create(project=self.project, name="Stand", created_by=self.admin)
+        ProjectSnapshotEntry.objects.create(snapshot=snapshot, path="file.stl", revision=revision)
+        root = Part.objects.create(project=self.project, number="P-001", name="Root")
+        base = Revision.objects.create(part=root, revision_code="R0001", file_format="fcstd", file=ContentFile(b"root", name="root.FCStd"), original_filename="root.FCStd", sha256="b" * 64, size_bytes=4, created_by=self.admin)
+        Checkout.objects.create(part=root, base_revision=base, snapshot=snapshot, checked_out_by=self.admin)
         self.assertEqual(self.post().status_code, 400)
         self.assertTrue(Revision.objects.filter(pk=revision.pk).exists())
+        self.assertTrue(snapshot.entries.exists())
 
     def test_permissions_and_confirmation(self):
         self.revision("step")
@@ -77,3 +98,13 @@ class RemovePartTests(TestCase):
         self.client.force_login(self.reader)
         self.assertEqual(self.post().status_code, 403)
         self.assertTrue(Part.objects.filter(pk=self.part.pk).exists())
+
+    def test_changed_snapshot_requires_new_confirmation(self):
+        revision = self.revision("stl")
+        page = self.client.get(self.url)
+        snapshot = ProjectSnapshot.objects.create(project=self.project, name="Neu", created_by=self.admin)
+        ProjectSnapshotEntry.objects.create(snapshot=snapshot, path="new.stl", revision=revision)
+        response = self.client.post(self.url, {"confirmation": "P-002", "action": "delete", "delete_plan": page.context["delete_plan"]})
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Revision.objects.filter(pk=revision.pk).exists())
+        self.assertTrue(snapshot.entries.exists())
