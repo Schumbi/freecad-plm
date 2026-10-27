@@ -10,14 +10,16 @@
   {% if sort_field %}<input type="hidden" name="sort" value="{{ sort_field }}"><input type="hidden" name="direction" value="{{ sort_direction }}">{% endif %}
   <button type="submit">Anzeigen</button>
 </form>
-<details><summary>Abhängigkeiten im gewählten Projektstand ({{ dependencies|length }})</summary>
+<section class="files-section dependency-section"><details open><summary class="files-section-title">Abhängigkeiten <span class="files-count">{{ dependencies|length }} Beziehungen</span></summary>
+  <p class="dependency-hint">Verbindungen zeigen, welche Dateien eine Datei benötigt. Zweige und Dateidetails lassen sich aufklappen.</p>
+  <div class="dependency-tree">
   {% for node in dependency_tree %}{% include "plm/dependency_node.html" with node=node only %}
   {% empty %}<p>Keine erkannten Abhängigkeiten.</p>{% endfor %}
-</details>
+</div></details>
 {% if compare %}<h2>Unterschiede zwischen Projektständen</h2><ul>{% for item in changed %}<li>{{ item.path }}: {{ item.state }}</li>{% empty %}<li>Keine Dateiunterschiede.</li>{% endfor %}</ul>
-<h3>Abhängigkeiten</h3><ul>{% for item in changed_dependencies %}<li>{{ item.source }} → {{ item.target }}: {{ item.state }}</li>{% empty %}<li>Keine Unterschiede.</li>{% endfor %}</ul>{% endif %}
-<details open><summary>Dateiübersicht ({{ rows|length }})</summary>
+<h3>Abhängigkeiten</h3><ul>{% for item in changed_dependencies %}<li>{{ item.source }} → {{ item.target }}: {{ item.state }}</li>{% empty %}<li>Keine Unterschiede.</li>{% endfor %}</ul>{% endif %}</section>
+<section class="files-section file-list-section"><details open><summary class="files-section-title">Dateiübersicht <span class="files-count">{{ rows|length }} Dateien</span></summary>
 <div class="table-wrap"><table><thead><tr>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{{ header.direction }}"{% endif %}><a href="{{ header.url }}">{{ header.label }}{% if header.active %} {% if header.direction == 'descending' %}↓{% else %}↑{% endif %}{% endif %}</a></th>{% endfor %}<th scope="col">Öffnen</th></tr></thead><tbody>
 {% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.type }}</td><td>{{ row.owner }}</td><td>{{ row.version }}</td><td>{% if row.in_snapshot %}Enthalten{% else %}Außerhalb{% endif %}</td><td><a href="{{ row.url }}">Herunterladen</a></td></tr>{% empty %}<tr><td colspan="6">Keine Dateien gefunden.</td></tr>{% endfor %}
-</tbody></table></div></details>
+</tbody></table></div></details></section>
 {% endblock %}

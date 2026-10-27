@@ -1,5 +1,6 @@
-<details><summary title="{{ node.path }}">{{ node.name }}{% if node.state and node.state != 'Eindeutig' %} — {{ node.state }}{% endif %}{% if node.cycle %} — Zyklus{% endif %}{% if node.change %} — {{ node.change }}{% endif %}</summary>
-  <p>{{ node.path }}{% if node.url %} · <a href="{{ node.url }}">Herunterladen</a>{% endif %}</p>
-  {% if node.used_by %}<p>Wird verwendet von: {% for source in node.used_by %}{{ source }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-  {% for child in node.children %}{% include "plm/dependency_node.html" with node=child only %}{% endfor %}
+<details class="dependency-node" {% if node.children %}open{% endif %}>
+  <summary title="{{ node.path }}"><span class="dependency-name">{{ node.name }}</span>{% if node.state and node.state != 'Eindeutig' %} <span class="dependency-badge problem">{{ node.state }}</span>{% endif %}{% if node.cycle %} <span class="dependency-badge problem">Zyklus</span>{% endif %}{% if node.change %} <span class="dependency-badge">{{ node.change }}</span>{% endif %}</summary>
+  <div class="dependency-info"><span>{{ node.path }}</span>{% if node.url %} · <a href="{{ node.url }}">Herunterladen</a>{% endif %}
+  {% if node.used_by %}<div>Wird verwendet von: {% for source in node.used_by %}{{ source }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}</div>
+  {% if node.children %}<div class="dependency-children">{% for child in node.children %}{% include "plm/dependency_node.html" with node=child only %}{% endfor %}</div>{% endif %}
 </details>
