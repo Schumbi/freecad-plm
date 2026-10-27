@@ -7,6 +7,9 @@ from zipfile import ZipFile
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from pathlib import PurePosixPath
+from uuid import uuid4
 from django.http import FileResponse, HttpResponseForbidden, QueryDict
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -15,6 +18,7 @@ from ..forms import PrintProjectReassignForm, ProjectForm, ProjectSnapshotUpload
 from ..models import AuditEvent, Part, PrintProject, PrintProjectPlate, PrintProjectSource, Project, ProjectSnapshot, Revision
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import delete_project_tree, import_project_snapshot, search_plm
+from ..services.snapshots import iter_project_zip_members
 from ..services.manufacturing import inspect_manufacturing_upload
 from ..services.print_projects import delete_print_project, reassign_print_project
 
@@ -250,6 +254,7 @@ def project_detail(request, project_id):
         {
             "project": project,
             "parts": parts,
+            "archived_parts": project.parts.filter(is_archived=True).order_by("number") if is_plm_admin(request.user) else [],
             "snapshots": snapshots,
             "print_projects": print_projects,
             "snapshot_form": ProjectSnapshotUploadForm(),
@@ -370,36 +375,64 @@ def upload_project_snapshot(request, project_id):
     if request.method != "POST":
         return redirect("plm:project_detail", project_id=project.id)
 
+    pending = request.session.get("pending_project_import")
+    stage = request.POST.get("stage", "")
     form = ProjectSnapshotUploadForm(request.POST, request.FILES)
-    if form.is_valid():
+    if stage and pending and pending.get("project_id") == project.id:
+        storage_name = pending["storage_name"]
+        if stage == "cancel":
+            default_storage.delete(storage_name)
+            request.session.pop("pending_project_import", None)
+            return redirect("plm:project_detail", project_id=project.id)
+        if not default_storage.exists(storage_name):
+            request.session.pop("pending_project_import", None)
+            messages.error(request, "Die vorbereitete Importdatei ist nicht mehr vorhanden.")
+            return redirect("plm:project_detail", project_id=project.id)
+        selected_project = project
+        if not pending["fcstd_paths"]:
+            selected_project = get_object_or_404(Project, pk=request.POST.get("target_project", project.id), is_archived=False)
+            revisions = []
+            for part in selected_project.parts.filter(is_archived=False).order_by("number"):
+                revision = part.revisions.filter(file_format=Revision.FileFormat.FCSTD).order_by("-created_at", "-id").first()
+                if revision:
+                    revisions.append(revision)
+            if stage == "project" or not request.POST.get("dependency_revision_id"):
+                return render(request, "plm/project_import_select.html", {"project": project, "pending": pending, "projects": Project.objects.filter(is_archived=False).order_by("code"), "selected_project": selected_project, "revisions": revisions})
+        with default_storage.open(storage_name, "rb") as uploaded:
+            uploaded.name = pending["filename"]
+            try:
+                snapshot = import_project_snapshot(selected_project, uploaded, request.user, name=pending["name"], dependency_root_path=request.POST.get("dependency_root_path", ""), dependency_revision_id=request.POST.get("dependency_revision_id") or None)
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+                return render(request, "plm/project_import_select.html", {"project": project, "pending": pending, "projects": Project.objects.filter(is_archived=False).order_by("code"), "selected_project": selected_project, "revisions": revisions if not pending["fcstd_paths"] else []}, status=400)
+        default_storage.delete(storage_name)
+        request.session.pop("pending_project_import", None)
+    elif form.is_valid():
+        uploaded = form.cleaned_data["file"]
         try:
-            snapshot = import_project_snapshot(
-                project=project,
-                uploaded_zip=form.cleaned_data["file"],
-                created_by=request.user,
-                name=form.cleaned_data["name"],
-            )
+            members = list(iter_project_zip_members(uploaded))
+            uploaded.seek(0)
+            fcstd_paths = [m.path for m in members if PurePosixPath(m.path).suffix.lower() == ".fcstd"]
+            external = [m for m in members if PurePosixPath(m.path).suffix.lower() in {".step", ".stp", ".stl"}]
+            if external and len(fcstd_paths) != 1:
+                if pending and default_storage.exists(pending.get("storage_name", "")):
+                    default_storage.delete(pending["storage_name"])
+                storage_name = default_storage.save("pending-imports/" + uuid4().hex + ".zip", uploaded)
+                pending = {"storage_name": storage_name, "project_id": project.id, "filename": uploaded.name, "name": form.cleaned_data["name"], "fcstd_paths": fcstd_paths}
+                request.session["pending_project_import"] = pending
+                return render(request, "plm/project_import_select.html", {"project": project, "pending": pending, "projects": Project.objects.filter(is_archived=False).order_by("code"), "selected_project": project})
+            snapshot = import_project_snapshot(project, uploaded, request.user, name=form.cleaned_data["name"])
+            selected_project = project
         except ValidationError as exc:
             form.add_error("file", exc)
-        else:
-            summary = getattr(snapshot, "import_summary", {})
-            created_revisions = summary.get("created_revisions", 0)
-            reused_revisions = summary.get("reused_revisions", 0)
-            derivative_summary = prepare_revision_derivatives(
-                [entry.revision for entry in snapshot.entries.select_related("revision")],
-                request.user,
-            )
-            message = (
-                f"Projektstand {snapshot.name} wurde importiert: "
-                f"{created_revisions} neue Revisionen, "
-                f"{reused_revisions} unveraenderte Dateien wiederverwendet. "
-                f"{derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet."
-            )
-            if created_revisions:
-                messages.success(request, message)
-            else:
-                messages.warning(request, message)
-            return redirect("plm:project_detail", project_id=project.id)
+    else:
+        snapshot = None
+
+    if 'snapshot' in locals() and snapshot:
+        summary = getattr(snapshot, "import_summary", {})
+        derivative_summary = prepare_revision_derivatives([entry.revision for entry in snapshot.entries.select_related("revision")], request.user)
+        messages.success(request, f"Projektstand {snapshot.name} wurde importiert: {summary.get('created_revisions', 0)} neue Revisionen, {summary.get('reused_revisions', 0)} unveraenderte Dateien wiederverwendet. {derivative_summary['created_jobs']} Analyse-/PNG-Jobs vorbereitet.")
+        return redirect("plm:project_detail", project_id=selected_project.id)
 
     parts = project.parts.filter(is_archived=False).order_by("number")
     snapshots = (
@@ -413,6 +446,7 @@ def upload_project_snapshot(request, project_id):
         {
             "project": project,
             "parts": parts,
+            "archived_parts": project.parts.filter(is_archived=True).order_by("number") if is_plm_admin(request.user) else [],
             "snapshots": snapshots,
             "snapshot_form": form,
             "can_create_part": can_upload_revision(request.user),

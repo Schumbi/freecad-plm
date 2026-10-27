@@ -3,14 +3,15 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Prefetch
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
 from ..forms import ManufacturingFileUploadForm, PartForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
-from ..models import Annotation, AuditEvent, ExportJob, Part, PrintProject, Project
-from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
+from ..models import Annotation, AuditEvent, Checkout, ExportJob, Part, PrintProject, Project, Revision, RevisionArtifact
+from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision, is_plm_admin
 from ..services import (
     assembly_bom_tree,
     create_revision_from_upload,
@@ -18,6 +19,7 @@ from ..services import (
     part_lifecycle_events,
 )
 from ..services.ux import reference_checkins_for_part
+from ..services.snapshots import snapshot_entry_for_revision
 
 
 @login_required
@@ -115,6 +117,8 @@ def part_detail(request, part_id):
     revisions = list(revisions)
     for revision in revisions:
         revision.reference_checkins = reference_checkins.get(revision.id, [])
+        entry = snapshot_entry_for_revision(revision) if revision.file_format == Revision.FileFormat.FCSTD else None
+        revision.import_dependencies = list(entry.snapshot.entries.filter(dependency_root_path=entry.path).select_related("revision__part").order_by("path")) if entry else []
     return render(
         request,
         "plm/part_detail.html",
@@ -137,6 +141,7 @@ def part_detail(request, part_id):
             "form": RevisionUploadForm(part=part),
             "manufacturing_form": ManufacturingFileUploadForm(),
             "can_upload": can_upload_revision(request.user),
+            "can_manage_part": is_plm_admin(request.user),
             "can_release": can_release_revision(request.user),
             "can_delete_print_projects": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),
@@ -181,3 +186,53 @@ def process_export_jobs_once(request, part_id):
     else:
         messages.info(request, "Keine wartenden Jobs vorhanden.")
     return redirect("plm:part_detail", part_id=part.id)
+
+
+@login_required
+def remove_part(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), pk=part_id)
+    if not is_plm_admin(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Entfernen von Teilen.")
+    archive = part.is_archived or not part.revisions.exists() or part.revisions.filter(file_format=Revision.FileFormat.FCSTD).exists()
+    if request.method == "POST":
+        if request.POST.get("confirmation", "").strip() != part.number:
+            messages.error(request, "Die eingegebene Teilenummer stimmt nicht.")
+        else:
+            try:
+                with transaction.atomic():
+                    part = Part.objects.select_for_update().select_related("project").get(pk=part_id)
+                    revisions = part.revisions.all()
+                    archive = part.is_archived or not revisions.exists() or revisions.filter(file_format=Revision.FileFormat.FCSTD).exists()
+                    expected_action = "restore" if part.is_archived else "archive" if archive else "delete"
+                    if request.POST.get("action") != expected_action:
+                        raise ValidationError("Die Dateisituation hat sich geändert. Bitte die Aktion erneut prüfen und bestätigen.")
+                    if part.checkouts.filter(status=Checkout.Status.ACTIVE).exists():
+                        raise ValidationError("Ein aktiver Checkout muss zuerst abgeschlossen oder abgebrochen werden.")
+                    project_id, number = part.project_id, part.number
+                    metadata = {"project_id": project_id, "part_id": part.id, "part_number": number}
+                    label = str(part)
+                    if archive:
+                        restoring = part.is_archived
+                        part.is_archived = not restoring
+                        part.save(update_fields=["is_archived", "updated_at"])
+                        action = AuditEvent.Action.PART_RESTORED if restoring else AuditEvent.Action.PART_ARCHIVED
+                    else:
+                        if ExportJob.objects.filter(revision__part=part, status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING]).exists():
+                            raise ValidationError("Laufende oder wartende Exportjobs müssen zuerst abgeschlossen werden.")
+                        files = [(f.storage, f.name) for f in [*[r.file for r in revisions], *[a.file for a in RevisionArtifact.objects.filter(revision__part=part)]] if f and f.name]
+                        part.annotations.all().delete()
+                        RevisionArtifact.objects.filter(revision__part=part).delete()
+                        ExportJob.objects.filter(revision__part=part).delete()
+                        revisions.delete()
+                        part.delete()
+                        transaction.on_commit(lambda: [storage.delete(name) for storage, name in files])
+                        action = AuditEvent.Action.PART_DELETED
+                    AuditEvent.objects.create(actor=request.user, action=action, object_repr=label, metadata=metadata)
+            except ProtectedError:
+                messages.error(request, "Das Teil ist noch mit anderen Daten verknüpft (z. B. Projektständen, Checkouts, Varianten, Druckprojekten oder Fertigungsdaten) und kann nicht gelöscht werden.")
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+            else:
+                messages.success(request, f"{number} wurde {'wiederhergestellt' if action == AuditEvent.Action.PART_RESTORED else 'archiviert' if action == AuditEvent.Action.PART_ARCHIVED else 'dauerhaft gelöscht'}.")
+                return redirect("plm:project_detail", project_id=project_id)
+    return render(request, "plm/part_confirm_remove.html", {"part": part, "archive": archive}, status=400 if request.method == "POST" else 200)

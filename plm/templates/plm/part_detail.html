@@ -34,6 +34,7 @@
         </div>
         <div class="page-header-actions">
           <span class="type-pill">{{ part.get_category_display }}</span>
+          {% if can_manage_part %}<a class="btn btn-outline-danger" href="{% url 'plm:remove_part' part.id %}">{% if part.is_archived %}Wiederherstellen{% else %}Aus Projekt entfernen{% endif %}</a>{% endif %}
           {% if can_upload %}
             <button type="button" class="btn btn-primary" data-dialog-target="#revision-upload">Neue Revision</button>
           {% endif %}
@@ -91,6 +92,9 @@
                 {% endif %}
                 {% if revision.notes %}
                   <p class="notes-text">{{ revision.notes|truncatechars:180 }}</p>
+                {% endif %}
+                {% if revision.import_dependencies %}
+                  <p class="meta-line">Abhängige Dateien: {% for dependency in revision.import_dependencies %}<a href="{% url 'plm:part_detail' dependency.revision.part_id %}">{{ dependency.path }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>
                 {% endif %}
                 {% for checkin in revision.reference_checkins %}
                   <p class="meta-line">Verknüpfte Teile eingecheckt · {{ checkin.timestamp|date:"d.m.Y H:i" }} · {{ checkin.actor }}</p>

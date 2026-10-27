@@ -128,13 +128,14 @@ def clear_pending_revision_upload(request):
 
 
 def snapshot_entry_for_revision_download(revision):
-    if not revision_reference_files(revision):
-        return None
-    return (
+    entry = (
         revision.snapshot_entries.select_related("snapshot", "snapshot__project")
         .order_by("-snapshot__created_at", "path")
         .first()
     )
+    if entry and (revision_reference_files(revision) or entry.snapshot.entries.filter(dependency_root_path=entry.path).exists()):
+        return entry
+    return None
 
 
 def referenced_revision_zip_response(root_entry):

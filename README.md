@@ -532,3 +532,13 @@ Bestehende Authentifizierung und Administratorrechte für Änderungen gelten wei
 
 Die Datenbankmigration `0026` ergänzt Tags und Zuordnungen; bestehende Projekte
 starten ohne Tags. Das Addon unterstützt Anzeige, Filter und Bearbeitung ab 0.1.9.
+
+## Projektimport und abhängige Dateien
+
+Beim Import werden STEP- und STL-Dateien einer FCStd-Datei zugeordnet. Enthält
+das ZIP genau eine FCStd-Datei, erfolgt die Zuordnung automatisch; bei mehreren
+wird die gewünschte Datei ausgewählt. Enthält es keine FCStd-Datei, werden ein
+bestehendes Projekt und ein darin vorhandenes FreeCAD-Teil ausgewählt. Die
+Zuordnung wird im Projektstand gespeichert und beim Checkout berücksichtigt.
+Weitere Dateitypen werden nicht importiert. STEP und STL bleiben im Checkout
+schreibgeschützt.

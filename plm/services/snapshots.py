@@ -85,16 +85,47 @@ def iter_project_zip_members(uploaded_zip):
 
 
 @transaction.atomic
-def import_project_snapshot(project, uploaded_zip, created_by, name=""):
+def import_project_snapshot(project, uploaded_zip, created_by, name="", dependency_root_path="", dependency_revision_id=None):
     members = list(iter_project_zip_members(uploaded_zip))
     if not members:
         raise ValidationError("Das ZIP enthält keine FreeCAD-, STEP- oder STL-Dateien.")
+
+    fcstd_paths = [m.path for m in members if PurePosixPath(m.path).suffix.lower() == ".fcstd"]
+    external_paths = [m.path for m in members if PurePosixPath(m.path).suffix.lower() in {".step", ".stp", ".stl"}]
+    root_revision = None
+    if external_paths:
+        if fcstd_paths:
+            if len(fcstd_paths) == 1:
+                dependency_root_path = fcstd_paths[0]
+            elif dependency_root_path not in fcstd_paths:
+                raise ValidationError("Bitte die FreeCAD-Datei für die abhängigen Dateien auswählen.")
+        else:
+            try:
+                revision_id = int(dependency_revision_id or 0)
+            except (TypeError, ValueError):
+                revision_id = 0
+            root_revision = Revision.objects.filter(pk=revision_id, part__project=project, part__is_archived=False, file_format=Revision.FileFormat.FCSTD).select_related("part").first()
+            if root_revision is None:
+                raise ValidationError("Bitte ein vorhandenes FreeCAD-Teil des Projekts auswählen.")
+            source_entry = snapshot_entry_for_revision(root_revision)
+            dependency_root_path = source_entry.path if source_entry else safe_snapshot_path(root_revision.original_filename)
+            if dependency_root_path in {m.path for m in members}:
+                raise ValidationError("Der Pfad der FreeCAD-Datei ist im Import bereits belegt.")
 
     snapshot = ProjectSnapshot.objects.create(
         project=project,
         name=name.strip() or PurePosixPath(uploaded_zip.name).stem,
         created_by=created_by,
     )
+    if root_revision:
+        if source_entry:
+            for entry in source_entry.snapshot.entries.select_related("revision"):
+                if entry.path in {m.path for m in members}:
+                    raise ValidationError(f"Der Pfad ist im vorhandenen Projektstand bereits belegt: {entry.path}")
+                ProjectSnapshotEntry.objects.create(snapshot=snapshot, path=entry.path, revision=entry.revision, dependency_root_path=entry.dependency_root_path)
+        else:
+            ProjectSnapshotEntry.objects.create(snapshot=snapshot, path=dependency_root_path, revision=root_revision)
+
     import_summary = {
         "created_parts": 0,
         "created_revisions": 0,
@@ -164,6 +195,7 @@ def import_project_snapshot(project, uploaded_zip, created_by, name=""):
             snapshot=snapshot,
             path=member.path,
             revision=revision,
+            dependency_root_path=dependency_root_path if member.path in external_paths else "",
         )
 
     AuditEvent.objects.create(
@@ -346,6 +378,10 @@ def snapshot_entries_with_references(root_entry):
             continue
         selected[entry.path] = entry
 
+        for dependent in entries:
+            if dependent.dependency_root_path == entry.path and dependent.path not in selected:
+                queue.append(dependent)
+
         for reference_file in revision_reference_files(entry.revision):
             reference_path = resolve_reference_path(entry.path, reference_file)
             referenced_entry = entries_by_path.get(reference_path) or entries_by_name.get(
@@ -437,6 +473,7 @@ def create_snapshot_with_replaced_external_revision(
             snapshot=snapshot,
             path=replacement_path or entry.path,
             revision=revision if replacement_path else entry.revision,
+            dependency_root_path=next((replacement_paths[source.id] for source in replacements if source.path == entry.dependency_root_path), entry.dependency_root_path),
         )
 
     AuditEvent.objects.create(
@@ -480,6 +517,7 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
         ProjectSnapshotEntry.objects.create(
             snapshot=snapshot,
             path=entry.path,
+            dependency_root_path=entry.dependency_root_path,
             revision=replacements.get(
                 entry.path,
                 additions.get(entry.path, entry.revision),

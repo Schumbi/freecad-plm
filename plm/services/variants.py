@@ -18,7 +18,7 @@ from ..fcstd import read_uploaded_file, set_document_string_property
 from .checkouts import create_checkout
 from .manifests import manifest_entries_for_revision
 from .revisions import create_revision_from_upload, next_part_number
-from .snapshots import iter_project_zip_members, revision_reference_files, resolve_reference_path
+from .snapshots import iter_project_zip_members, revision_reference_files, resolve_reference_path, snapshot_entry_for_revision
 
 
 def independent_fcstd(data, path, paths):
@@ -57,6 +57,9 @@ def independent_fcstd(data, path, paths):
 
 
 def create_variant_checkout(*, source_revision, uploaded_file, name, number, actor, snapshot=None, workspace_hint=""):
+    if snapshot is None:
+        source_root = snapshot_entry_for_revision(source_revision)
+        snapshot = source_root.snapshot if source_root else None
     entries = manifest_entries_for_revision(source_revision, snapshot=snapshot)
     root = next(entry for entry in entries if entry["is_root"])
     if PurePosixPath(uploaded_file.name).suffix.lower() == ".zip":
@@ -106,7 +109,8 @@ def create_variant_checkout(*, source_revision, uploaded_file, name, number, act
                     notes=f"Variante aus {source_part.number} {entry['revision'].revision_code}.",
                 )
                 stored_files.append((revision.file.storage, revision.file.name))
-                ProjectSnapshotEntry.objects.create(snapshot=variant_snapshot, path=entry["path"], revision=revision)
+                source_entry = snapshot.entries.filter(path=entry["path"]).first() if snapshot else None
+                ProjectSnapshotEntry.objects.create(snapshot=variant_snapshot, path=entry["path"], revision=revision, dependency_root_path=source_entry.dependency_root_path if source_entry else "")
                 AuditEvent.objects.create(
                     actor=actor, action=AuditEvent.Action.PART_CREATED, object_repr=str(part),
                     metadata={"project_id": project.id, "part_id": part.id, "part_number": part.number,

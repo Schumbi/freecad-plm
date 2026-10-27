@@ -1,0 +1,15 @@
+{% extends "plm/base.html" %}
+{% block content %}
+<h1>Abhängige Dateien zuordnen</h1>
+<form method="post">{% csrf_token %}
+{% if pending.fcstd_paths %}
+<label for="root">FreeCAD-Datei</label><select id="root" name="dependency_root_path" required>{% for path in pending.fcstd_paths %}<option value="{{ path }}">{{ path }}</option>{% endfor %}</select>
+<input type="hidden" name="stage" value="import">
+<button type="submit">Importieren</button>
+{% else %}
+<label for="project">Projekt</label><select id="project" name="target_project">{% for candidate in projects %}<option value="{{ candidate.id }}" {% if candidate.id == selected_project.id %}selected{% endif %}>{{ candidate.code }} · {{ candidate.name }}</option>{% endfor %}</select>
+<button type="submit" name="stage" value="project">Teile anzeigen</button>
+{% if revisions %}<label for="revision">FreeCAD-Teil</label><select id="revision" name="dependency_revision_id">{% for revision in revisions %}<option value="{{ revision.id }}">{{ revision.part.number }} · {{ revision.part.name }} · {{ revision.revision_code }}</option>{% endfor %}</select><button type="submit" name="stage" value="import">Importieren</button>{% else %}<p>Wähle ein Projekt und zeige seine FreeCAD-Teile an.</p>{% endif %}
+{% endif %}
+<button type="submit" name="stage" value="cancel" formnovalidate>Abbrechen</button>
+</form>{% endblock %}

@@ -822,6 +822,7 @@ class ProjectSnapshot(models.Model):
 
 
 class ProjectSnapshotEntry(models.Model):
+    dependency_root_path = models.CharField(max_length=500, blank=True)
     snapshot = models.ForeignKey(
         ProjectSnapshot,
         on_delete=models.CASCADE,
@@ -854,6 +855,9 @@ class AuditEvent(models.Model):
         PROJECT_UPDATED = "project_updated", "Projekt geaendert"
         PROJECT_DELETED = "project_deleted", "Projekt geloescht"
         PART_CREATED = "part_created", "Teil angelegt"
+        PART_ARCHIVED = "part_archived", "Teil archiviert"
+        PART_RESTORED = "part_restored", "Teil wiederhergestellt"
+        PART_DELETED = "part_deleted", "Teil gelöscht"
         REVISION_UPLOADED = "revision_uploaded", "Revision hochgeladen"
         REVISION_RELEASED = "revision_released", "Revision freigegeben"
         REVISION_OBSOLETED = "revision_obsoleted", "Revision obsolet gesetzt"

@@ -145,6 +145,9 @@
           {% endif %}
         </div>
       {% endif %}
+      {% if archived_parts %}
+        <section class="card"><h2>Archivierte Teile und Baugruppen</h2><ul>{% for archived_part in archived_parts %}<li><a href="{% url 'plm:part_detail' archived_part.id %}">{{ archived_part.number }} · {{ archived_part.name }}</a> <a href="{% url 'plm:remove_part' archived_part.id %}">Wiederherstellen</a></li>{% endfor %}</ul></section>
+      {% endif %}
     </div>
 
     <aside class="properties-panel">
@@ -223,7 +226,7 @@
               <div class="cad-format-guide-icon">ZIP</div>
               <div>
                 <strong>Ordnerstruktur als Projektstand übernehmen</strong>
-                <p>FCStd-, STEP- und STL-Dateien werden als Revisionen angelegt. Pfade und Baugruppenstruktur bleiben im neuen Projektstand erhalten.</p>
+                <p>FCStd-Dateien werden als Teile importiert. STEP- und STL-Dateien werden einer FreeCAD-Datei als abhängige Dateien zugeordnet. Bei mehreren FreeCAD-Dateien wählst Du das Ziel; ohne FCStd-Datei wählst Du ein vorhandenes FreeCAD-Teil.</p>
               </div>
             </div>
             {% include "plm/includes/form_field.html" with field=snapshot_form.name %}

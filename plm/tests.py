@@ -1011,27 +1011,16 @@ class RevisionUploadServiceTests(TestCase):
         )
 
     def test_import_project_snapshot_accepts_step_and_stl_files(self):
+        root = create_revision_from_upload(self.part, make_zip_upload(), self.user)
         snapshot = import_project_snapshot(
             self.project,
-            make_project_zip_upload(
-                "vendor-files.zip",
-                members={
-                    "vendor/Bracket.step": STEP_DATA,
-                    "mesh/Handle.stl": ASCII_STL_DATA,
-                },
-            ),
+            make_project_zip_upload("vendor-files.zip", members={"vendor/Bracket.step": STEP_DATA, "mesh/Handle.stl": ASCII_STL_DATA}),
             self.user,
+            dependency_revision_id=root.pk,
         )
-
-        self.assertEqual(snapshot.entries.count(), 2)
-        self.assertEqual(
-            set(Revision.objects.values_list("file_format", flat=True)),
-            {Revision.FileFormat.STEP, Revision.FileFormat.STL},
-        )
-        self.assertEqual(
-            set(snapshot.entries.values_list("path", flat=True)),
-            {"vendor/Bracket.step", "mesh/Handle.stl"},
-        )
+        self.assertEqual(snapshot.entries.count(), 3)
+        self.assertEqual(set(Revision.objects.values_list("file_format", flat=True)), {"fcstd", "step", "stl"})
+        self.assertEqual(snapshot.entries.filter(dependency_root_path=root.original_filename).count(), 2)
 
     def test_import_project_snapshot_reuses_unchanged_revision(self):
         first = import_project_snapshot(
@@ -1365,7 +1354,7 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
 
         self.assertContains(response, "Ordnerstruktur als Projektstand übernehmen")
-        self.assertContains(response, "FCStd-, STEP- und STL-Dateien")
+        self.assertContains(response, "STEP- und STL-Dateien werden einer FreeCAD-Datei")
         self.assertContains(response, "Projektstand importieren")
 
     def test_fcstd_upload_option_creates_new_replacement_snapshot(self):
@@ -3655,8 +3644,8 @@ class FreeCADCmdJobTests(TestCase):
                                      getSubObject=lambda path, *args: objects[path] if args else shapes[path])
         self.assertEqual(namespace["solid_viewer_color"](
             root, solid, {"Body": "#FF0000"}, document_colors={
-                "/tmp/Root.FCStd": {"Body": "#FF0000"},
-                "/tmp/Deckel.FCStd": {"Body": "#F8E45C"},
+                str(Path("/tmp/Root.FCStd").resolve()): {"Body": "#FF0000"},
+                str(Path("/tmp/Deckel.FCStd").resolve()): {"Body": "#F8E45C"},
             }), "#F8E45C")
 
     def test_copied_compound_solid_requires_coincident_geometry(self):
@@ -3687,7 +3676,7 @@ class FreeCADCmdJobTests(TestCase):
                                       Document=root_doc, getSubObjects=lambda: ["0.", "1."],
                                       getSubObject=lambda path, *args: link if args else
                                       types.SimpleNamespace(Solids=[solids[int(path[:-1])]]))
-        colors = {"/tmp/Chip.FCStd": {"Body": "#ED333B"}}
+        colors = {str(Path("/tmp/Chip.FCStd").resolve()): {"Body": "#ED333B"}}
         self.assertEqual([namespace["solid_viewer_color"](
             array, solid, {}, document_colors=colors) for solid in solids], ["#ED333B"] * 2)
 

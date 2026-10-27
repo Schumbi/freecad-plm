@@ -65,6 +65,7 @@ from .projects import (
 from .parts import (
     create_part,
     part_detail,
+    remove_part,
     part_properties,
     process_export_jobs_once,
 )

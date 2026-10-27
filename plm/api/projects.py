@@ -87,6 +87,8 @@ def project_import_api(request):
                 uploaded_zip=uploaded_file,
                 created_by=request.user,
                 name=request.POST.get("snapshot_name", ""),
+                dependency_root_path=request.POST.get("dependency_root_path", ""),
+                dependency_revision_id=request.POST.get("dependency_revision_id") or None,
             )
     except ValidationError as exc:
         return validation_error_response(exc)
@@ -149,6 +151,8 @@ def project_snapshot_import_api(request, project_id):
             uploaded_zip=uploaded_file,
             created_by=request.user,
             name=request.POST.get("name", ""),
+            dependency_root_path=request.POST.get("dependency_root_path", ""),
+            dependency_revision_id=request.POST.get("dependency_revision_id") or None,
         )
     except ValidationError as exc:
         return validation_error_response(exc)

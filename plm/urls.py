@@ -88,6 +88,7 @@ urlpatterns = [
         name="upload_project_snapshot",
     ),
     path("projects/<int:project_id>/parts/new/", views.create_part, name="create_part"),
+    path("parts/<int:part_id>/remove/", views.remove_part, name="remove_part"),
     path("parts/<int:part_id>/", views.part_detail, name="part_detail"),
     path(
         "parts/<int:part_id>/properties/",

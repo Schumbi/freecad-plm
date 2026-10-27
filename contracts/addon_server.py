@@ -70,6 +70,21 @@ class AddonServerContracts(PrintProjectFixture, LiveServerTestCase):
         self.mesh = self.local / "Druckplatte ä.3mf"
         self.mesh.write_bytes(mesh_upload().read())
 
+    def test_project_import_assigns_step_and_stl_to_selected_fcstd(self):
+        from plm.tests import make_project_zip_upload, make_fcstd_bytes, STEP_DATA, ASCII_STL_DATA
+        source = make_project_zip_upload(members={"one.FCStd": make_fcstd_bytes("One"), "two.FCStd": make_fcstd_bytes("Two"), "mesh/a.stl": ASCII_STL_DATA, "a.step": STEP_DATA})
+        path = self.local / "import.zip"
+        path.write_bytes(source.read())
+        result = self.api.import_project_snapshot(self.project.id, path, "Imported", dependency_root_path="two.FCStd")
+        entries = result["snapshot"]["entries"]
+        root = next(item for item in entries if item["path"] == "two.FCStd")
+        manifest = self.api.get_revision_manifest(root["revision_id"], snapshot_id=result["snapshot"]["id"])
+        self.assertEqual({item["path"] for item in manifest["files"]}, {"two.FCStd", "mesh/a.stl", "a.step"})
+        external = next(item for item in manifest["files"] if item["path"] == "mesh/a.stl")
+        target = self.local / "a.stl"
+        self.api.download_revision_file(external["download_url"], target, external["sha256"])
+        self.assertEqual(target.read_bytes(), ASCII_STL_DATA)
+
     def test_create_list_detail_upload_and_verified_download(self):
         created = self.api.create_print_project(self.revision.pk, "DP-2", "Platte ä", "Contract")
         again = self.api.create_print_project(self.revision.pk, "DP-2", "Platte ä", "Contract")
