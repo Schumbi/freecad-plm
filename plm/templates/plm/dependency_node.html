@@ -1,0 +1,5 @@
+<details><summary title="{{ node.path }}">{{ node.name }}{% if node.state and node.state != 'Eindeutig' %} — {{ node.state }}{% endif %}{% if node.cycle %} — Zyklus{% endif %}{% if node.change %} — {{ node.change }}{% endif %}</summary>
+  <p>{{ node.path }}{% if node.url %} · <a href="{{ node.url }}">Herunterladen</a>{% endif %}</p>
+  {% if node.used_by %}<p>Wird verwendet von: {% for source in node.used_by %}{{ source }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% for child in node.children %}{% include "plm/dependency_node.html" with node=child only %}{% endfor %}
+</details>

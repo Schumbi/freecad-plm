@@ -39,6 +39,39 @@ def dependency_rows(snapshot):
     return unique_rows
 
 
+def build_dependency_tree(snapshot, compare, links):
+    entries = {e.path: e for e in snapshot.entries.select_related("revision")} if snapshot else {}
+    previous = dependency_rows(compare) if compare else []
+    old_entries = {e.path: e for e in compare.entries.select_related("revision")} if compare else {}
+    current_keys = {(r["source"], r["target"]) for r in links}
+    old_keys = {(r["source"], r["target"]) for r in previous}
+    edges = [dict(r, change="Hinzugefügt" if compare and (r["source"], r["target"]) not in old_keys else "") for r in links]
+    edges += [dict(r, change="Entfernt") for r in previous if (r["source"], r["target"]) not in current_keys]
+    outgoing, incoming = {}, {}
+    for edge in edges:
+        outgoing.setdefault(edge["source"], []).append(edge)
+        incoming.setdefault(edge["target"], set()).add(edge["source"])
+    covered = set()
+    def node(path, ancestors, edge=None):
+        cycle = path in ancestors
+        covered.add(path)
+        entry = entries.get(path) or old_entries.get(path)
+        children = [] if cycle or (edge and edge["state"] != "Eindeutig") else [
+            node(e["target"], ancestors | {path}, e)
+            for e in sorted(outgoing.get(path, []), key=lambda x: x["target"].casefold())]
+        return {"path": path, "name": PurePosixPath(path).name, "cycle": cycle,
+                "state": edge["state"] if edge else "", "change": edge["change"] if edge else "",
+                "url": reverse("plm:download_revision", args=[entry.revision_id]) if entry else "",
+                "used_by": sorted(incoming.get(path, set())), "children": children}
+    sources = set(outgoing)
+    roots = sorted(sources - set(incoming))
+    tree = [node(path, set()) for path in roots]
+    for path in sorted(sources - covered):
+        if path not in covered:
+            tree.append(node(path, set()))
+    return tree
+
+
 @login_required
 def project_files_overview(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
@@ -97,6 +130,15 @@ def project_files_overview(request, project_id):
     else:
         sort_field = ""
         rows.sort(key=lambda r: (not r["current"], r["type"], r["name"]))
+    sort_headers = []
+    for field, label in (("name", "Pfad / Datei"), ("type", "Typ"), ("owner", "Zugehörigkeit"),
+                         ("version", "Version / Revision"), ("in_snapshot", "Projektstand")):
+        params = request.GET.copy()
+        params["sort"] = field
+        params["direction"] = "desc" if sort_field == field and sort_direction != "desc" else "asc"
+        sort_headers.append({"label": label, "url": "?" + params.urlencode(),
+                             "active": sort_field == field,
+                             "direction": "descending" if sort_direction == "desc" else "ascending"})
     changed = []
     changed_dependencies = []
     if selected and compare:
@@ -111,17 +153,15 @@ def project_files_overview(request, project_id):
         changed_dependencies = [{"source": source, "target": target, "state": "Hinzugefügt" if item in left_links else "Entfernt"}
                                 for item in sorted(left_links ^ right_links) for source, target, _resolution in [item]]
     links = dependency_rows(selected)
-    grouped = {}
-    for link in links:
-        grouped.setdefault(link["source"], []).append(link)
     return render(request, "plm/project_files_overview.html", {
         "project": project, "snapshots": snapshots, "selected": selected, "compare": compare,
         "rows": rows, "dependencies": links,
-        "dependency_tree": [{"source": source, "links": items} for source, items in sorted(grouped.items())],
+        "dependency_tree": build_dependency_tree(selected, compare, links),
         "changed": changed,
         "changed_dependencies": changed_dependencies,
         "query": request.GET.get("q", ""), "show_old": request.GET.get("old") == "1",
         "sort_field": sort_field, "sort_direction": sort_direction,
+        "sort_headers": sort_headers,
     })
 
 

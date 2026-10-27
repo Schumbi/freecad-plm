@@ -7,18 +7,17 @@
   <label>Vergleichen mit <select name="compare"><option value="">Kein Vergleich</option>{% for snapshot in snapshots %}<option value="{{ snapshot.id }}" {% if compare.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>{% endfor %}</select></label>
   <label>Suche <input name="q" type="search" value="{{ query }}"></label>
   <label><input name="old" type="checkbox" value="1" {% if show_old %}checked{% endif %}> Ältere Versionen zeigen</label>
-  <label>Sortieren nach <select name="sort"><option value="">Aktuelle zuerst</option><option value="name" {% if sort_field == 'name' %}selected{% endif %}>Dateiname</option><option value="type" {% if sort_field == 'type' %}selected{% endif %}>Typ</option><option value="owner" {% if sort_field == 'owner' %}selected{% endif %}>Zugehörigkeit</option><option value="version" {% if sort_field == 'version' %}selected{% endif %}>Version / Revision</option><option value="in_snapshot" {% if sort_field == 'in_snapshot' %}selected{% endif %}>Projektstand</option></select></label>
-  <label>Reihenfolge <select name="direction"><option value="asc">Aufsteigend</option><option value="desc" {% if sort_direction == 'desc' %}selected{% endif %}>Absteigend</option></select></label>
+  {% if sort_field %}<input type="hidden" name="sort" value="{{ sort_field }}"><input type="hidden" name="direction" value="{{ sort_direction }}">{% endif %}
   <button type="submit">Anzeigen</button>
 </form>
 <details><summary>Abhängigkeiten im gewählten Projektstand ({{ dependencies|length }})</summary>
-  {% for node in dependency_tree %}<details><summary>{{ node.source }}</summary><ul>{% for dependency in node.links %}<li>→ {{ dependency.target }} ({{ dependency.state }})</li>{% endfor %}</ul></details>
+  {% for node in dependency_tree %}{% include "plm/dependency_node.html" with node=node only %}
   {% empty %}<p>Keine erkannten Abhängigkeiten.</p>{% endfor %}
 </details>
 {% if compare %}<h2>Unterschiede zwischen Projektständen</h2><ul>{% for item in changed %}<li>{{ item.path }}: {{ item.state }}</li>{% empty %}<li>Keine Dateiunterschiede.</li>{% endfor %}</ul>
 <h3>Abhängigkeiten</h3><ul>{% for item in changed_dependencies %}<li>{{ item.source }} → {{ item.target }}: {{ item.state }}</li>{% empty %}<li>Keine Unterschiede.</li>{% endfor %}</ul>{% endif %}
 <details open><summary>Dateiübersicht ({{ rows|length }})</summary>
-<div class="table-wrap"><table><thead><tr><th>Pfad / Datei</th><th>Typ</th><th>Zugehörigkeit</th><th>Version / Revision</th><th>Projektstand</th><th>Öffnen</th></tr></thead><tbody>
+<div class="table-wrap"><table><thead><tr>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{{ header.direction }}"{% endif %}><a href="{{ header.url }}">{{ header.label }}{% if header.active %} {% if header.direction == 'descending' %}↓{% else %}↑{% endif %}{% endif %}</a></th>{% endfor %}<th scope="col">Öffnen</th></tr></thead><tbody>
 {% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.type }}</td><td>{{ row.owner }}</td><td>{{ row.version }}</td><td>{% if row.in_snapshot %}Enthalten{% else %}Außerhalb{% endif %}</td><td><a href="{{ row.url }}">Herunterladen</a></td></tr>{% empty %}<tr><td colspan="6">Keine Dateien gefunden.</td></tr>{% endfor %}
 </tbody></table></div></details>
 {% endblock %}

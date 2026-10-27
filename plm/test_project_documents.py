@@ -118,7 +118,8 @@ class ProjectDocumentTests(TestCase):
         self.assertContains(response, "missing.FCStd")
         self.assertContains(response, "Fehlt")
         self.assertContains(response, "Hinzugefügt")
-        self.assertContains(response, "→ two.FCStd (Eindeutig)", count=1)
+        self.assertContains(response, "Zyklus")
+        self.assertContains(response, "Wird verwendet von")
         self.assertEqual(
             [link for link in response.context["dependencies"] if link["source"] == "one.FCStd" and link["target"] == "two.FCStd"],
             [{"source": "one.FCStd", "target": "two.FCStd", "state": "Eindeutig"}],
