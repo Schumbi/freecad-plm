@@ -101,7 +101,12 @@
                 <td>
                   <div class="inline-actions">
                     <a href="{% url 'plm:edit_api_token' row.token.id %}">Bearbeiten</a>
-                    {% if not row.token.is_revoked %}
+                    {% if row.token.is_revoked %}
+                      <form class="inline-form" method="post" action="{% url 'plm:delete_api_token' row.token.id %}" onsubmit="return confirm('Widerrufenes API-Token endgültig löschen?');">
+                        {% csrf_token %}
+                        <button class="btn-danger btn-sm" type="submit">Löschen</button>
+                      </form>
+                    {% else %}
                       <form class="inline-form" method="post" action="{% url 'plm:revoke_api_token' row.token.id %}">
                         {% csrf_token %}
                         <button class="btn-danger btn-sm" type="submit">Widerrufen</button>

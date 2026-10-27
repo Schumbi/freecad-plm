@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -295,4 +296,30 @@ def revoke_api_token(request, token_id):
             metadata={"user_id": token.user_id, "token_id": token.id},
         )
         messages.success(request, f"API-Token {token.name} wurde widerrufen.")
+    return redirect("plm:user_management")
+
+
+@login_required
+@require_POST
+def delete_api_token(request, token_id):
+    forbidden = admin_required_response(request)
+    if forbidden:
+        return forbidden
+
+    with transaction.atomic():
+        token = get_object_or_404(
+            ApiToken.objects.select_for_update().select_related("user"), id=token_id
+        )
+        if not token.is_revoked:
+            messages.error(request, "Nur widerrufene API-Tokens können gelöscht werden.")
+            return redirect("plm:user_management")
+        name = token.name
+        AuditEvent.objects.create(
+            actor=request.user,
+            action=AuditEvent.Action.API_TOKEN_DELETED,
+            object_repr=str(token),
+            metadata={"user_id": token.user_id, "token_id": token.id},
+        )
+        token.delete()
+    messages.success(request, f"API-Token {name} wurde gelöscht.")
     return redirect("plm:user_management")

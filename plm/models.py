@@ -889,6 +889,7 @@ class AuditEvent(models.Model):
         API_TOKEN_CREATED = "api_token_created", "API-Token angelegt"
         API_TOKEN_UPDATED = "api_token_updated", "API-Token geaendert"
         API_TOKEN_REVOKED = "api_token_revoked", "API-Token widerrufen"
+        API_TOKEN_DELETED = "api_token_deleted", "API-Token gelöscht"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -37,6 +37,7 @@ from .jobs import (
 from .users import (
     create_user,
     create_user_token,
+    delete_api_token,
     edit_api_token,
     edit_user,
     logout_view,

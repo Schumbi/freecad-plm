@@ -2640,6 +2640,34 @@ class RolePermissionTests(TestCase):
             1,
         )
 
+    def test_admin_can_delete_only_revoked_token_and_audits_deletion(self):
+        token, _ = create_api_token(user=self.editor, name="Alt", scopes=[ApiToken.Scope.READ])
+        self.client.force_login(self.admin)
+        url = reverse("plm:delete_api_token", args=[token.id])
+        self.assertNotContains(self.client.get(reverse("plm:user_management")), url)
+        self.assertRedirects(self.client.post(url), reverse("plm:user_management"))
+        self.assertTrue(ApiToken.objects.filter(id=token.id).exists())
+        self.assertFalse(AuditEvent.objects.filter(action=AuditEvent.Action.API_TOKEN_DELETED).exists())
+
+        token.revoked_at = timezone.now()
+        token.save(update_fields=["revoked_at"])
+        self.assertContains(self.client.get(reverse("plm:user_management")), url)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertRedirects(self.client.post(url), reverse("plm:user_management"))
+        self.assertFalse(ApiToken.objects.filter(id=token.id).exists())
+        event = AuditEvent.objects.get(action=AuditEvent.Action.API_TOKEN_DELETED)
+        self.assertEqual(event.actor, self.admin)
+        self.assertEqual(event.metadata, {"user_id": self.editor.id, "token_id": token.id})
+
+    def test_non_admin_cannot_delete_revoked_token(self):
+        token, _ = create_api_token(user=self.editor, name="Alt", scopes=[ApiToken.Scope.READ])
+        token.revoked_at = timezone.now()
+        token.save(update_fields=["revoked_at"])
+        self.client.force_login(self.reader)
+        response = self.client.post(reverse("plm:delete_api_token", args=[token.id]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(ApiToken.objects.filter(id=token.id).exists())
+
     def test_editor_can_upload_revision(self):
         self.assertTrue(can_upload_revision(self.editor))
 
