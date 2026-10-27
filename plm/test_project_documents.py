@@ -95,7 +95,12 @@ class ProjectDocumentTests(TestCase):
         part = Part.objects.create(project=self.project, number="P-001", name="Part")
         first = Revision.objects.create(part=part, revision_code="R1", file_format="fcstd",
             original_filename="one.FCStd", sha256="a" * 64, size_bytes=3, created_by=self.admin,
-            extracted_metadata={"freecad_document": {"references": [{"file": "two.FCStd"}, {"file": "missing.FCStd"}]}})
+            extracted_metadata={"freecad_document": {"references": [
+                {"file": "two.FCStd", "name": "Body"},
+                {"file": "two.FCStd", "name": "Sketch"},
+                {"file": "two.FCStd", "name": "Parameters"},
+                {"file": "missing.FCStd"},
+            ]}})
         first.file.save("one.FCStd", SimpleUploadedFile("one.FCStd", b"one"))
         second = Revision.objects.create(part=part, revision_code="R2", file_format="fcstd",
             original_filename="two.FCStd", sha256="b" * 64, size_bytes=3, created_by=self.admin,
@@ -113,3 +118,8 @@ class ProjectDocumentTests(TestCase):
         self.assertContains(response, "missing.FCStd")
         self.assertContains(response, "Fehlt")
         self.assertContains(response, "Hinzugefügt")
+        self.assertContains(response, "→ two.FCStd (Eindeutig)", count=1)
+        self.assertEqual(
+            [link for link in response.context["dependencies"] if link["source"] == "one.FCStd" and link["target"] == "two.FCStd"],
+            [{"source": "one.FCStd", "target": "two.FCStd", "state": "Eindeutig"}],
+        )

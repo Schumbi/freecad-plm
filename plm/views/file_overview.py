@@ -29,7 +29,14 @@ def dependency_rows(snapshot):
         if entry.dependency_root_path:
             rows.append({"source": entry.dependency_root_path, "target": entry.path,
                          "state": "Eindeutig" if entry.dependency_root_path in by_path else "Fehlt"})
-    return rows
+    unique_rows = []
+    seen = set()
+    for row in rows:
+        key = (row["source"], row["target"])
+        if key not in seen:
+            unique_rows.append(row)
+            seen.add(key)
+    return unique_rows
 
 
 @login_required
