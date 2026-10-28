@@ -4319,7 +4319,7 @@ class AddonApiWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Part.objects.filter(name="Nicht erlaubt").exists())
 
-    def test_api_fcstd_part_creation_rolls_back_when_checkout_cannot_accept_file(self):
+    def test_api_fcstd_part_creation_rolls_back_on_checkout_path_collision(self):
         self.authorize_token([ApiToken.Scope.WRITE, ApiToken.Scope.CHECKOUT])
         root_revision = create_revision_from_upload(
             self.part,
@@ -4335,7 +4335,7 @@ class AddonApiWorkflowTests(TestCase):
                 "name": "Nicht halb anlegen",
                 "checkout_id": checkout.id,
                 "file": make_zip_upload(
-                    "Rollback.FCStd",
+                    "Standalone.FCStd",
                     members={"Document.xml": "<Document />"},
                 ),
             },
@@ -4731,6 +4731,58 @@ class AddonApiWorkflowTests(TestCase):
             ["Box.FCStd", "Chip.FCStd", "Deckel.FCStd", "Druck.FCStd"],
         )
         self.assertEqual(Checkout.objects.get().status, Checkout.Status.ACTIVE)
+
+    def test_checkout_without_snapshot_can_add_part_and_create_snapshot(self):
+        self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])
+        root_revision = create_revision_from_upload(
+            self.part,
+            fcstd_upload_from_bytes(
+                fcstd_with_plm_revision(make_fcstd_bytes("Pferdekopf"), "R0001"),
+                name="Pferdekopf.FCStd",
+            ),
+            self.user,
+        )
+        extra_part = Part.objects.create(
+            project=self.project,
+            number="P-002",
+            name="Befestigungsscheibe",
+        )
+        extra_revision = create_revision_from_upload(
+            extra_part,
+            fcstd_upload_from_bytes(
+                fcstd_with_plm_revision(make_fcstd_bytes("Scheibe"), "R0001"),
+                name="Scheibe.FCStd",
+            ),
+            self.user,
+        )
+        checkout_response = self.post_json(
+            reverse("plm:api_revision_checkout", args=[root_revision.id]),
+            {},
+        )
+        self.assertEqual(checkout_response.status_code, 201)
+        self.assertIsNone(checkout_response.json()["checkout"]["snapshot_id"])
+        checkout_id = checkout_response.json()["checkout"]["id"]
+
+        response = self.post_json(
+            reverse("plm:api_checkout_add_file", args=[checkout_id]),
+            {"revision_id": extra_revision.id},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["added_file"]["path"], "Scheibe.FCStd")
+        self.assertEqual(
+            {entry["path"] for entry in response.json()["manifest"]["files"]},
+            {"Pferdekopf.FCStd", "Scheibe.FCStd"},
+        )
+
+        response = self.client.post(
+            reverse("plm:api_checkout_checkin", args=[checkout_id]),
+            {"files_metadata": "[]", "change_summary": "Scheibe hinzugefügt."},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["checkout"]["status"], Checkout.Status.COMPLETED)
+        snapshot = self.project.snapshots.get()
+        self.assertEqual(snapshot.entries.get(path="Pferdekopf.FCStd").revision_id, root_revision.id)
+        self.assertEqual(snapshot.entries.get(path="Scheibe.FCStd").revision_id, extra_revision.id)
 
     def test_checkout_can_add_unlinked_part_and_complete_snapshot(self):
         self.authorize_token([ApiToken.Scope.READ, ApiToken.Scope.CHECKOUT])

@@ -87,8 +87,6 @@ def cancel_checkout(checkout, actor):
 def add_checkout_file(checkout, revision, actor):
     if checkout.status != Checkout.Status.ACTIVE:
         raise ValidationError("Teile können nur zu aktiven Checkouts hinzugefügt werden.")
-    if checkout.snapshot_id is None:
-        raise ValidationError("Teile können nur zu Checkouts mit Projektstand hinzugefügt werden.")
     if revision.part.project_id != checkout.part.project_id:
         raise ValidationError("Das Teil gehört nicht zum Projekt des Checkouts.")
     if revision.part.is_archived:
@@ -103,12 +101,14 @@ def add_checkout_file(checkout, revision, actor):
     if any(entry["revision"].part_id == revision.part_id for entry in current_entries):
         raise ValidationError("Dieses Teil ist bereits im Checkout enthalten.")
 
-    snapshot_entry = (
-        checkout.snapshot.entries.filter(revision__part=revision.part)
-        .select_related("revision")
-        .order_by("path")
-        .first()
-    )
+    snapshot_entry = None
+    if checkout.snapshot_id:
+        snapshot_entry = (
+            checkout.snapshot.entries.filter(revision__part=revision.part)
+            .select_related("revision")
+            .order_by("path")
+            .first()
+        )
     if snapshot_entry is not None:
         path = safe_snapshot_path(snapshot_entry.path)
     else:

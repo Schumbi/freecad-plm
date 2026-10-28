@@ -525,28 +525,41 @@ def create_snapshot_from_checkout_revisions(checkout, actor, revisions):
         addition.path: addition.revision
         for addition in checkout.added_files.select_related("revision").order_by("path")
     }
-    if not checkout.snapshot_id or (not revisions and not removed_paths and not additions):
+    if not checkout.snapshot_id and not additions:
+        return None
+    if not revisions and not removed_paths and not additions:
         return None
 
     replacements = {item["path"]: item["revision"] for item in revisions}
     snapshot = ProjectSnapshot.objects.create(
         project=checkout.part.project,
-        name=checkout_snapshot_name(checkout.snapshot.name, checkout.id),
+        name=checkout_snapshot_name(
+            checkout.snapshot.name if checkout.snapshot_id else checkout.part.project.name,
+            checkout.id,
+        ),
         created_by=actor,
     )
-    copy_snapshot_documents(checkout.snapshot, snapshot)
     copied_paths = set()
-    for entry in checkout.snapshot.entries.select_related("revision").order_by("path"):
+    if checkout.snapshot_id:
+        copy_snapshot_documents(checkout.snapshot, snapshot)
+        source_entries = checkout.snapshot.entries.select_related("revision").order_by("path")
+    else:
+        source_entries = []
+        root_path = safe_snapshot_path(checkout.base_revision.original_filename)
+        ProjectSnapshotEntry.objects.create(
+            snapshot=snapshot,
+            path=root_path,
+            revision=replacements.get(root_path, checkout.base_revision),
+        )
+        copied_paths.add(root_path)
+    for entry in source_entries:
         if entry.path in removed_paths:
             continue
         ProjectSnapshotEntry.objects.create(
             snapshot=snapshot,
             path=entry.path,
             dependency_root_path=entry.dependency_root_path,
-            revision=replacements.get(
-                entry.path,
-                additions.get(entry.path, entry.revision),
-            ),
+            revision=replacements.get(entry.path, additions.get(entry.path, entry.revision)),
         )
         copied_paths.add(entry.path)
     for path, revision in additions.items():
