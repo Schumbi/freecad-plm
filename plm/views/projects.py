@@ -21,6 +21,7 @@ from ..services import delete_project_tree, import_project_snapshot, search_plm
 from ..services.snapshots import iter_project_zip_members
 from ..services.manufacturing import inspect_manufacturing_upload
 from ..services.print_projects import delete_print_project, reassign_print_project
+from ..services.project_main_file import latest_fcstd_revision
 
 
 @login_required
@@ -269,7 +270,10 @@ def delete_project(request, project_id):
 @login_required
 def project_detail(request, project_id):
     project = get_object_or_404(Project, id=project_id)
-    parts = project.parts.filter(is_archived=False).order_by("number")
+    parts = list(project.parts.filter(is_archived=False).order_by("number"))
+    main_part = next((part for part in parts if part.pk == project.main_part_id), None)
+    main_revision = latest_fcstd_revision(main_part) if main_part else None
+    other_parts = [part for part in parts if part.pk != project.main_part_id] if main_revision else parts
     snapshots = (
         project.snapshots.select_related("created_by")
         .prefetch_related("entries__revision__part", "documents__version")
@@ -282,6 +286,9 @@ def project_detail(request, project_id):
         {
             "project": project,
             "parts": parts,
+            "other_parts": other_parts,
+            "main_part": main_part if main_revision else None,
+            "main_revision": main_revision,
             "archived_parts": project.parts.filter(is_archived=True).order_by("number") if is_plm_admin(request.user) else [],
             "snapshots": snapshots,
             "print_projects": print_projects,

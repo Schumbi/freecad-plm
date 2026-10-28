@@ -2,6 +2,7 @@ from pathlib import PurePosixPath
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -18,6 +19,7 @@ from ..services import (
 )
 
 from ..services.variants import create_variant_checkout
+from ..services.project_main_file import latest_fcstd_revision
 
 from .common import (
     add_manifest_download_urls,
@@ -36,8 +38,20 @@ from .common import (
 def project_parts_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == "GET":
-        parts = project.parts.filter(is_archived=False).select_related("family").order_by("number")
-        return JsonResponse({"parts": [part_payload(part) for part in parts]})
+        parts = project.parts.filter(is_archived=False).select_related("family").prefetch_related(
+            Prefetch("revisions", queryset=Revision.objects.order_by("-created_at", "-pk"), to_attr="project_revisions")
+        ).order_by("number")
+        def file_summary(revision):
+            return {"id": revision.id, "original_filename": revision.original_filename,
+                    "revision_code": revision.revision_code, "file_format": revision.file_format} if revision else None
+
+        return JsonResponse({"parts": [
+            part_payload(part) | {
+                "latest_fcstd_revision": file_summary(latest_fcstd_revision(part)),
+                "latest_revision": file_summary(part.project_revisions[0] if part.project_revisions else None),
+            }
+            for part in parts
+        ]})
 
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Anlegen von Teilen."}, status=403)

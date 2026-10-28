@@ -53,6 +53,7 @@ class Project(TimeStampedModel):
         ORDER = "order", "Auftrag"
 
     folder = models.ForeignKey(ProjectFolder, null=True, blank=True, on_delete=models.PROTECT, related_name="projects")
+    main_part = models.ForeignKey("Part", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     tags = models.ManyToManyField(ProjectTag, blank=True, related_name="projects")
     code = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=200)
@@ -116,6 +117,11 @@ class Part(TimeStampedModel):
 
     def __str__(self):
         return f"{self.number} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_archived:
+            Project.objects.filter(main_part_id=self.pk).update(main_part=None)
 
 
 def revision_upload_path(instance, filename):

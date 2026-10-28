@@ -19,6 +19,7 @@ from .models import (
 )
 from .permissions import ROLE_ADMIN, ROLE_EDITOR, ROLE_NAMES, ROLE_READER
 from .services import inspect_manufacturing_upload
+from .services.project_main_file import latest_fcstd_revision, main_file_candidates
 
 
 TOKEN_PRESET_READ = "read"
@@ -193,6 +194,16 @@ class ProjectForm(forms.ModelForm):
                 folder = folders.get(folder.parent_id)
             return " / ".join(reversed(names))
         self.fields["folder"].label_from_instance = folder_label
+        if self.instance.pk:
+            self.fields["main_part"].queryset = main_file_candidates(self.instance)
+            self.fields["main_part"].label = "FCStd-Hauptdatei"
+            self.fields["main_part"].empty_label = "Keine Hauptdatei"
+            def main_part_label(part):
+                revision = latest_fcstd_revision(part)
+                return f"{revision.original_filename} · {part.number} · {revision.revision_code}"
+            self.fields["main_part"].label_from_instance = main_part_label
+        else:
+            self.fields.pop("main_part")
 
     def clean_new_tags(self):
         from .services.project_tags import tag_names
@@ -217,7 +228,7 @@ class ProjectForm(forms.ModelForm):
 
     class Meta:
         model = Project
-        fields = ["code", "name", "folder", "status", "project_date", "description", "tags", "new_tags"]
+        fields = ["code", "name", "folder", "main_part", "status", "project_date", "description", "tags", "new_tags"]
         widgets = {
             "tags": forms.CheckboxSelectMultiple(),
             "project_date": forms.DateInput(

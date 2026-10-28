@@ -10,6 +10,7 @@ from ..auth import api_auth_required
 from ..models import ApiToken, AuditEvent, Project, ProjectFolder
 from ..permissions import can_upload_revision, is_plm_admin
 from ..services import import_project_snapshot
+from ..services.project_main_file import resolve_main_part
 
 from ..services.project_tags import filter_projects, set_project_tags, tag_names
 
@@ -126,6 +127,11 @@ def project_api(request, project_id):
         if folder_id is not None and (not isinstance(folder_id, int) or isinstance(folder_id, bool) or not ProjectFolder.objects.filter(pk=folder_id).exists()):
             return JsonResponse({"error": "Ordner nicht gefunden."}, status=400)
         project.folder_id = folder_id
+    if "main_part_id" in data:
+        try:
+            project.main_part = resolve_main_part(project, data["main_part_id"])
+        except ValidationError as exc:
+            return validation_error_response(exc)
     try:
         names = tag_names(data["tags"]) if "tags" in data else None
     except ValidationError as exc:

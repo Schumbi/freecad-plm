@@ -20,6 +20,7 @@ def project_payload(project):
     return {
         "id": project.id,
         "folder_id": project.folder_id,
+        "main_part_id": project.main_part_id,
         "code": project.code,
         "name": project.name,
         "description": project.description,

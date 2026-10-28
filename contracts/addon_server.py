@@ -28,6 +28,20 @@ from freecad_plm_addon.workspace import sha256_file
 
 
 class AddonServerContracts(PrintProjectFixture, LiveServerTestCase):
+    def test_main_fcstd_file_roundtrip(self):
+        from django.contrib.auth.models import Group
+        from plm.permissions import ROLE_ADMIN
+
+        self.user.groups.add(Group.objects.get_or_create(name=ROLE_ADMIN)[0])
+        self.token.scopes.append(ApiToken.Scope.ADMIN)
+        self.token.save()
+        part_id = self.revision.part_id
+        parts = self.api.get_parts(self.project.pk)
+        self.assertEqual(parts[0]["latest_fcstd_revision"]["original_filename"], "model.FCStd")
+        updated = self.api.update_project(self.project.pk, {"main_part_id": part_id})
+        self.assertEqual(updated["main_part_id"], part_id)
+        self.assertEqual(self.api.get_project(self.project.pk)["main_part_id"], part_id)
+
     def test_project_folders_and_document_roundtrip(self):
         from django.contrib.auth.models import Group
         from plm.permissions import ROLE_ADMIN

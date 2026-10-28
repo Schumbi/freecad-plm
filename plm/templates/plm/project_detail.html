@@ -81,6 +81,7 @@
 
       <div class="section-header">
         <h2>Teile und Baugruppen</h2>
+        {% if other_parts %}
         <div class="section-header-actions">
           <input
             type="search"
@@ -89,11 +90,23 @@
             aria-label="Teile in dieser Liste filtern"
             data-filter-input="#part-list"
             data-filter-count="#part-filter-count"
-            data-filter-empty="#part-filter-empty">
-          <span class="muted" id="part-filter-count" data-filter-default="{{ parts|length }} Einträge">{{ parts|length }} Einträge</span>
+            data-filter-empty="#part-filter-empty"{% if main_revision %}
+            oninput="document.getElementById('other-project-files').open = true"{% endif %}>
+          <span class="muted" id="part-filter-count" data-filter-default="{{ other_parts|length }} Einträge">{{ other_parts|length }} Einträge</span>
         </div>
+        {% endif %}
       </div>
       {% if parts %}
+        {% if main_revision %}
+          <div class="data-card project-main-file">
+            <span class="page-kicker">FCStd-Hauptdatei</span>
+            <h3><a href="{% url 'plm:part_detail' main_part.id %}">{{ main_revision.original_filename }}</a></h3>
+            <p>{{ main_part.number }} · {{ main_part.name }} · {{ main_revision.revision_code }}</p>
+            <a href="{% url 'plm:download_revision' main_revision.id %}">Herunterladen</a>
+          </div>
+        {% endif %}
+        {% if other_parts %}
+        {% if main_revision %}<details id="other-project-files" class="project-other-files"><summary>Weitere Dateien und Teile <span class="files-count">{{ other_parts|length }}</span></summary>{% endif %}
         <div class="table-wrap" id="part-list">
           <table>
             <thead>
@@ -106,7 +119,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for part in parts %}
+              {% for part in other_parts %}
                 {% with latest=part.revisions.first %}
                   <tr
                     class="clickable-row"
@@ -134,10 +147,12 @@
             </tbody>
           </table>
         </div>
+        {% if main_revision %}</details>{% endif %}
         <div class="empty-state" id="part-filter-empty" hidden>
           <strong>Keine Treffer</strong>
           Für diesen Filter wurden keine Teile gefunden.
         </div>
+        {% endif %}
       {% else %}
         <div class="empty-state">
           <strong>Noch keine Teile</strong>

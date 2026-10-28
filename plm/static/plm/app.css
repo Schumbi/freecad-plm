@@ -2309,6 +2309,12 @@ figure {
 .project-compact-list .project-card-title { overflow-wrap: anywhere; }
 .project-compact-list .project-card-desc, .project-compact-list .project-card-footer { display: none; }
 .project-details { max-width: 100%; }
+.project-main-file { padding: var(--space-4); margin-bottom: var(--space-3); border-color: var(--accent); }
+.project-main-file h3 { margin: var(--space-2) 0; overflow-wrap: anywhere; }
+.project-main-file p { color: var(--muted); margin: 0 0 var(--space-2); }
+.project-other-files { margin-bottom: var(--space-4); }
+.project-other-files > summary { cursor: pointer; padding: var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-weight: 700; }
+.project-other-files[open] > summary { margin-bottom: var(--space-3); }
 .project-details table { table-layout: fixed; width: 100%; }
 .project-details th { white-space: normal; }
 .project-details th:first-child { width: 38%; }
