@@ -14,7 +14,7 @@ done
 backup="/opt/freecad-plm/backups/deploy-$(date +%Y%m%d-%H%M%S)-${sha:0:12}"
 mkdir -m 700 "$backup"
 storage_bytes=$(du -sb storage | cut -f1)
-db_bytes=$("${compose[@]}" exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT pg_database_size(current_database())"' | tr -d '\r')
+db_bytes=$("${compose[@]}" exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT pg_database_size(current_database())"' </dev/null | tr -d '\r')
 free_bytes=$(df -PB1 "$backup" | awk 'NR==2 {print $4}')
 (( free_bytes > storage_bytes + db_bytes + 1073741824 )) || { echo 'Nicht genügend Backup-Speicher.' >&2; exit 1; }
 env_snapshot=$(mktemp .env.rollback.XXXXXXXX)
@@ -36,8 +36,8 @@ rollback() {
   exit "$status"
 }
 trap rollback EXIT
-"${compose[@]}" stop web worker
-"${compose[@]}" exec -T db sh -c 'pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --format=custom' > "$backup/postgres.dump"
+"${compose[@]}" stop web worker </dev/null
+"${compose[@]}" exec -T db sh -c 'pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --format=custom' </dev/null > "$backup/postgres.dump"
 tar -czf "$backup/storage.tar.gz" storage
 (cd "$backup" && sha256sum postgres.dump storage.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS && tar -tzf storage.tar.gz >/dev/null)
 "${compose[@]}" exec -T db pg_restore --list < "$backup/postgres.dump" >/dev/null
@@ -56,17 +56,17 @@ try:
 finally:
     if os.path.exists(tmp): os.unlink(tmp)
 PY
-"${compose[@]}" up -d
+"${compose[@]}" up -d </dev/null
 for i in {1..60}; do
   w=$("${compose[@]}" ps -q web); d=$("${compose[@]}" ps -q db); x=$("${compose[@]}" ps -q worker)
   if [[ -n $w && -n $d && -n $x ]] && [[ $(docker inspect -f '{{.State.Health.Status}}' "$w") == healthy && $(docker inspect -f '{{.State.Health.Status}}' "$d") == healthy && $(docker inspect -f '{{.State.Status}}' "$x") == running ]]; then break; fi
   (( i < 60 )) || { echo 'Dienste nicht gesund.' >&2; exit 1; }
   sleep 5
 done
-"${compose[@]}" exec -T web python manage.py check
-"${compose[@]}" exec -T web python manage.py migrate --check
-"${compose[@]}" exec -T worker python manage.py check
-"${compose[@]}" exec -T worker freecadcmd --version
-"${compose[@]}" exec -T web python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/", timeout=10)'
+"${compose[@]}" exec -T web python manage.py check </dev/null
+"${compose[@]}" exec -T web python manage.py migrate --check </dev/null
+"${compose[@]}" exec -T worker python manage.py check </dev/null
+"${compose[@]}" exec -T worker freecadcmd --version </dev/null
+"${compose[@]}" exec -T web python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/", timeout=10)' </dev/null
 "${compose[@]}" ps
 echo "Deployment $sha abgeschlossen. Backup: $backup"
