@@ -120,10 +120,17 @@ def project_list(request):
     folders = list(ProjectFolder.objects.order_by("name", "pk"))
     by_id = {folder.pk: folder for folder in folders}
     active_folders = set()
+    folder_path = []
     cursor = int(selected_folder) if selected_folder.isdecimal() and len(selected_folder) <= 18 else None
     while cursor in by_id and cursor not in active_folders:
         active_folders.add(cursor)
+        folder_path.append(by_id[cursor].name)
         cursor = by_id[cursor].parent_id
+    selected_folder_label = (
+        "Alle Projekte" if selected_folder == "all" else
+        "Ohne Ordner" if selected_folder == "none" else
+        " / ".join(reversed(folder_path)) if folder_path else "Ordner auswählen"
+    )
     def children(parent_id, ancestors=frozenset()):
         return [{"folder": folder, "children": children(folder.pk, ancestors | {folder.pk})}
                 for folder in folders if folder.parent_id == parent_id and folder.pk not in ancestors]
@@ -135,6 +142,7 @@ def project_list(request):
             "folder_tree": children(None),
             "active_folders": active_folders,
             "selected_folder": selected_folder,
+            "selected_folder_label": selected_folder_label,
             "project_view": view,
             "view_choices": view_choices,
             "project_sort": sort,

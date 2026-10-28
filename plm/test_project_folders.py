@@ -55,6 +55,12 @@ class ProjectFolderApiTests(TestCase):
         response = self.client.get(reverse("plm:project_list"), {"folder": parent.pk})
         self.assertEqual([p.code for p in response.context["projects"]], ["A"])
         self.assertContains(response, "Child")
+        self.assertEqual(response.context["selected_folder_label"], "Parent")
+        self.assertContains(response, 'class="project-folder-picker"')
+        self.assertContains(response, 'id="project-folder-summary">Parent</span>')
+        self.assertNotContains(response, 'grid-template-columns:minmax(12rem,18rem)')
+        response = self.client.get(reverse("plm:project_list"), {"folder": child.pk})
+        self.assertEqual(response.context["selected_folder_label"], "Parent / Child")
         response = self.client.post(reverse("plm:manage_project_folders"),
             {"action": "move_project", "project_id": direct.pk, "parent_id": child.pk})
         self.assertEqual(response.status_code, 302)

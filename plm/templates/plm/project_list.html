@@ -22,18 +22,24 @@
     {% endif %}
   </div>
 
-  <section class="project-overview" aria-label="Projekte" style="display:grid;grid-template-columns:minmax(12rem,18rem) minmax(0,1fr);gap:1rem">
-    <nav aria-label="Projektordner" class="project-folder-tree" style="grid-row:1 / span 3"><strong>Projektordner</strong>
-      <ul><li><a data-folder-link href="?folder=all">Alle Projekte</a></li><li data-folder-id=""><a data-folder-link href="?folder=none">Ohne Ordner</a></li>
-        {% for node in folder_tree %}{% include "plm/includes/project_folder_node.html" %}{% endfor %}
-      </ul>
-      {% if can_create_project %}<a href="{% url 'plm:manage_project_folders' %}">Ordner verwalten</a>{% endif %}
-    </nav>
+  <section class="project-overview" aria-label="Projekte">
     {% if can_create_project %}<form id="folder-drop-form" method="post" action="{% url 'plm:manage_project_folders' %}" hidden>{% csrf_token %}</form>{% endif %}
     <form method="get" id="project-filters" data-project-preferences>
       <input type="hidden" name="folder" value="{{ selected_folder }}">
       <div class="project-list-toolbar">
         <p>{{ projects|length }} Projekte</p>
+        <div class="project-folder-filter">
+          <span id="project-folder-label">Ordner</span>
+          <details id="project-folders" class="project-folder-picker">
+            <summary aria-labelledby="project-folder-label project-folder-summary"><span id="project-folder-summary">{{ selected_folder_label }}</span></summary>
+            <nav aria-label="Projektordner" class="project-folder-popup">
+              <ul class="project-folder-tree"><li><a data-folder-link href="?folder=all" {% if selected_folder == 'all' %}aria-current="page"{% endif %}>Alle Projekte</a></li><li data-folder-id=""><a data-folder-link href="?folder=none" {% if selected_folder == 'none' %}aria-current="page"{% endif %}>Ohne Ordner</a></li>
+                {% for node in folder_tree %}{% include "plm/includes/project_folder_node.html" %}{% endfor %}
+              </ul>
+              {% if can_create_project %}<a class="project-folder-manage" href="{% url 'plm:manage_project_folders' %}">Ordner verwalten</a>{% endif %}
+            </nav>
+          </details>
+        </div>
         <div>
           <label for="project-view">Ansicht</label>
           <select id="project-view" name="view">
@@ -153,6 +159,7 @@
   if (dropForm) {
     document.querySelectorAll('[data-project-id]').forEach(item => item.addEventListener('dragstart', event => {
       event.dataTransfer.setData('text/plain', item.dataset.projectId);
+      document.querySelector('#project-folders').open = true;
     }));
     document.querySelectorAll('[data-folder-id]').forEach(target => {
       target.addEventListener('dragover', event => event.preventDefault());

@@ -2266,7 +2266,8 @@ figure {
 .project-list-toolbar select { width: auto; max-width: 100%; }
 .project-list-toolbar > div { min-width: 0; display: flex; flex-direction: column; }
 .project-list-toolbar > div > select,
-.project-tag-picker > summary {
+.project-tag-picker > summary,
+.project-folder-picker > summary {
   box-sizing: border-box;
   height: 2.75rem;
   min-height: 2.75rem;
@@ -2275,6 +2276,21 @@ figure {
   line-height: 1.25;
 }
 .project-tag-filter { flex: 0 1 15rem; }
+.project-folder-filter { flex: 0 1 15rem; }
+.project-folder-picker { position: relative; }
+.project-folder-picker > summary { cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .55rem .75rem; background: var(--surface); display: flex; align-items: center; gap: .5rem; }
+.project-folder-picker > summary::-webkit-details-marker { display: none; }
+.project-folder-picker > summary::after { content: "▾"; margin-left: auto; }
+.project-folder-picker > summary span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-folder-picker > summary:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: 2px; }
+.project-folder-popup { position: absolute; z-index: 20; top: calc(100% + .35rem); left: 0; width: min(23rem, calc(100vw - 3rem)); max-height: 65vh; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: var(--space-3); }
+.project-folder-tree, .project-folder-tree ul { list-style: none; margin: 0; padding: 0; }
+.project-folder-tree ul { margin-left: .85rem; padding-left: .65rem; border-left: 1px solid var(--border); }
+.project-folder-tree li { min-width: 0; }
+.project-folder-tree a { display: inline-block; padding: .3rem .4rem; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.project-folder-tree a:hover, .project-folder-tree a[aria-current="page"] { background: var(--accent-soft); }
+.project-folder-tree details > summary { cursor: pointer; }
+.project-folder-manage { display: block; border-top: 1px solid var(--border); margin-top: var(--space-2); padding: var(--space-3) .4rem 0; }
 .project-tag-picker { position: relative; }
 .project-tag-picker summary { cursor: pointer; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .55rem .75rem; background: var(--surface); display: flex; align-items: center; gap: .5rem; }
 .project-tag-picker summary::-webkit-details-marker { display: none; }
@@ -2311,6 +2327,7 @@ figure {
   .project-compact-list .project-card { grid-template-columns: 1fr; }
   .project-list-toolbar > div { flex: 1 1 100%; }
   .project-list-toolbar select { width: 100%; }
+  .project-folder-popup { width: 100%; }
   .project-details thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
   .project-details tbody, .project-details tr, .project-details td { display: block; width: 100%; }
   .project-details tbody tr { border-bottom: 1px solid var(--border); }
