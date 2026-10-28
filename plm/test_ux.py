@@ -132,8 +132,8 @@ class UxFeatureTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertLess(html.index("<h2>Revisionen</h2>"), html.index("Baugruppenstruktur"))
-        self.assertLess(html.index("<h2>Revisionen</h2>"), html.index("Lebenszyklus"))
+        self.assertLess(html.index("<h2>Aktuelle Revision</h2>"), html.index("Baugruppenstruktur"))
+        self.assertLess(html.index("<h2>Aktuelle Revision</h2>"), html.index("Lebenszyklus"))
         self.assertContains(response, '<details class="overview-section">', count=3)
         self.assertNotContains(response, '<details class="overview-section" open>')
 

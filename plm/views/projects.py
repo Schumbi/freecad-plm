@@ -271,6 +271,8 @@ def delete_project(request, project_id):
 def project_detail(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     parts = list(project.parts.filter(is_archived=False).order_by("number"))
+    for part in parts:
+        part.latest_revision = part.revisions.order_by("-revision_code", "-pk").first()
     main_part = next((part for part in parts if part.pk == project.main_part_id), None)
     main_revision = latest_fcstd_revision(main_part) if main_part else None
     other_parts = [part for part in parts if part.pk != project.main_part_id] if main_revision else parts

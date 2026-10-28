@@ -19,7 +19,7 @@ def latest_fcstd_revision(part):
     prefetched = getattr(part, "fcstd_revisions", None)
     if prefetched is not None:
         return prefetched[0] if prefetched else None
-    return part.revisions.filter(file_format=Revision.FileFormat.FCSTD).order_by("-created_at", "-pk").first()
+    return part.revisions.filter(file_format=Revision.FileFormat.FCSTD).order_by("-revision_code", "-pk").first()
 
 
 def resolve_main_part(project, part_id):

@@ -45,32 +45,32 @@
       </div>
       <p class="mobile-properties-link"><a href="{% url 'plm:part_properties' part.id %}">Eigenschaften anzeigen</a></p>
 
-      <div class="toolbar">
-        <div class="toolbar-group">
-          <span class="muted" id="revision-filter-count" data-filter-default="{{ revisions|length }} Revisionen">{{ revisions|length }} Revisionen</span>
-        </div>
-        <div class="toolbar-group">
-          <input
-            type="search"
-            class="filter-input"
-            placeholder="In dieser Liste filtern …"
-            aria-label="Revisionen in dieser Liste filtern"
-            data-filter-input="#revision-list"
-            data-filter-count="#revision-filter-count"
-            data-filter-empty="#revision-filter-empty">
-        </div>
-      </div>
-
       <div class="section-header">
-        <h2>Revisionen</h2>
+        <h2>Aktuelle Revision</h2>
       </div>
       {% if revisions %}
-        <div class="object-list" id="revision-list">
+        <div class="object-list">
           {% for revision in revisions %}
+            {% if forloop.counter == 2 %}
+              </div>
+              <details class="overview-section" id="older-revisions">
+                <summary>Revisionen ({{ older_revisions_count }})</summary>
+                <div class="toolbar">
+                  <div class="toolbar-group">
+                    <span class="muted" id="revision-filter-count" data-filter-default="{{ older_revisions_count }} Revisionen">{{ older_revisions_count }} Revisionen</span>
+                  </div>
+                  <div class="toolbar-group">
+                    <input type="search" class="filter-input" placeholder="Revisionen filtern …"
+                      aria-label="Ältere Revisionen filtern" data-filter-input="#revision-list"
+                      data-filter-count="#revision-filter-count" data-filter-empty="#revision-filter-empty">
+                  </div>
+                </div>
+                <div class="object-list" id="revision-list">
+            {% endif %}
             <article
               id="revision-{{ revision.id }}"
               class="revision-card"
-              data-filter-item
+              {% if not forloop.first %}data-filter-item{% endif %}
               data-filter-text="{{ revision.revision_code }} {{ revision.status }} {{ revision.file_format }} {{ revision.original_filename }} {{ revision.notes }}">
               <div class="revision-main">
                 <div class="revision-title-row">
@@ -522,10 +522,13 @@
             </div>
           {% endfor %}
         </div>
-        <div class="empty-state" id="revision-filter-empty" hidden>
-          <strong>Keine Treffer</strong>
-          Für diesen Filter wurden keine Revisionen gefunden.
-        </div>
+        {% if older_revisions_count %}
+          <div class="empty-state" id="revision-filter-empty" hidden>
+            <strong>Keine Treffer</strong>
+            Für diesen Filter wurden keine Revisionen gefunden.
+          </div>
+          </details>
+        {% endif %}
       {% else %}
         <div class="empty-state">Noch keine Revisionen vorhanden.</div>
       {% endif %}

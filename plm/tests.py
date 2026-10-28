@@ -1337,6 +1337,33 @@ class RevisionUploadViewTests(TestCase):
         self.assertContains(response, "Die Revisionsnummer wird automatisch fortgeführt")
         self.assertContains(response, "data-cad-file-guide")
 
+    def test_part_detail_collapses_older_revisions_by_revision_number(self):
+        older = Revision.objects.create(
+            part=self.part, revision_code="R0001", file="older.FCStd",
+            original_filename="older.FCStd", sha256="1" * 64,
+            size_bytes=1, created_by=self.user,
+        )
+        current = Revision.objects.create(
+            part=self.part, revision_code="R0002", file="current.FCStd",
+            original_filename="current.FCStd", sha256="2" * 64,
+            size_bytes=1, created_by=self.user,
+        )
+        Revision.objects.filter(pk=older.pk).update(created_at=current.created_at + timedelta(days=1))
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("plm:part_detail", args=[self.part.id]))
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Aktuelle Revision", html)
+        self.assertIn("Revisionen (1)", html)
+        self.assertLess(html.index(f'id="revision-{current.id}"'), html.index('id="older-revisions"'))
+        self.assertGreater(html.index(f'id="revision-{older.id}"'), html.index('id="older-revisions"'))
+        self.assertIn('id="older-revisions"', html)
+        self.assertNotIn('id="older-revisions" open', html)
+        project_response = self.client.get(reverse("plm:project_detail", args=[self.project.id]))
+        self.assertEqual(project_response.context["parts"][0].latest_revision.id, current.id)
+
     def test_part_detail_offers_external_snapshot_as_optional_replacement(self):
         snapshot = self.create_external_snapshot()
         self.client.force_login(self.user)
@@ -4195,6 +4222,28 @@ class AddonApiWorkflowTests(TestCase):
             url,
             json.dumps(payload),
             content_type="application/json",
+        )
+
+    def test_part_api_orders_revisions_by_number(self):
+        older = Revision.objects.create(
+            part=self.part, revision_code="R0001", file="older.FCStd",
+            original_filename="older.FCStd", sha256="1" * 64,
+            size_bytes=1, created_by=self.user,
+        )
+        current = Revision.objects.create(
+            part=self.part, revision_code="R0002", file="current.FCStd",
+            original_filename="current.FCStd", sha256="2" * 64,
+            size_bytes=1, created_by=self.user,
+        )
+        Revision.objects.filter(pk=older.pk).update(created_at=current.created_at + timedelta(days=1))
+        self.authorize_token([ApiToken.Scope.READ])
+
+        response = self.client.get(reverse("plm:api_part", args=[self.part.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["revision_code"] for item in response.json()["revisions"]],
+            ["R0002", "R0001"],
         )
 
     def test_api_lists_projects_and_creates_parts(self):

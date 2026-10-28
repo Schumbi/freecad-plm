@@ -120,7 +120,7 @@
             </thead>
             <tbody>
               {% for part in other_parts %}
-                {% with latest=part.revisions.first %}
+                {% with latest=part.latest_revision %}
                   <tr
                     class="clickable-row"
                     data-filter-item

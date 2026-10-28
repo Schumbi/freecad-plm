@@ -107,7 +107,7 @@ def part_detail(request, part_id):
                 ),
             ),
         )
-        .order_by("-created_at")
+        .order_by("-revision_code", "-pk")
     )
     selected_revision = None
     selected_revision_id = request.GET.get("properties_revision")
@@ -132,6 +132,7 @@ def part_detail(request, part_id):
                 for annotation in annotations
             ),
             "revisions": revisions,
+            "older_revisions_count": max(0, len(revisions) - 1),
             "selected_revision": selected_revision,
             "lifecycle_events": part_lifecycle_events(part),
             "bom_tree": (

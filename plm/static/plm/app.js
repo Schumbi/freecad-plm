@@ -117,6 +117,16 @@
     });
   }
 
+  function revealLinkedRevision() {
+    var id = window.location.hash.slice(1);
+    if (!/^revision-\d+$/.test(id)) return;
+    var revision = document.getElementById(id);
+    if (!revision) return;
+    var section = revision.closest("#older-revisions");
+    if (section) section.open = true;
+    revision.scrollIntoView({ block: "start" });
+  }
+
   function cadFileDetails(filename) {
     var lower = (filename || "").toLowerCase();
     if (lower.endsWith(".fcstd")) {
@@ -544,6 +554,8 @@
   setupActionMenus();
   setupMessages();
   setupListFilters();
+  revealLinkedRevision();
+  window.addEventListener("hashchange", revealLinkedRevision);
   setupCadFileGuides();
   setupSidebarToggle();
   setupManufacturingSelectors();

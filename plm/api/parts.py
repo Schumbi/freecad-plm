@@ -39,7 +39,7 @@ def project_parts_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == "GET":
         parts = project.parts.filter(is_archived=False).select_related("family").prefetch_related(
-            Prefetch("revisions", queryset=Revision.objects.order_by("-created_at", "-pk"), to_attr="project_revisions")
+            Prefetch("revisions", queryset=Revision.objects.order_by("-revision_code", "-pk"), to_attr="project_revisions")
         ).order_by("number")
         def file_summary(revision):
             return {"id": revision.id, "original_filename": revision.original_filename,
@@ -266,7 +266,7 @@ def create_fcstd_part_api(request, project_id):
 def part_api(request, part_id):
     part = get_object_or_404(Part.objects.select_related("project", "family"), id=part_id)
     if request.method == "GET":
-        revisions = part.revisions.order_by("-created_at")
+        revisions = part.revisions.order_by("-revision_code", "-pk")
         active_checkout = part.checkouts.filter(status=Checkout.Status.ACTIVE).first()
         return JsonResponse(
             {
