@@ -3588,6 +3588,45 @@ class FreeCADCmdJobTests(TestCase):
             ["Body", "Body002"],
         )
 
+    def test_preview_prefers_single_visible_assembly_but_not_multiple_or_hidden_ones(self):
+        namespace = self.freecadcmd_script_namespace()
+
+        def obj(name, type_id, visible=True):
+            return types.SimpleNamespace(
+                Name=name, TypeId=type_id, Visibility=visible, InList=[],
+                Shape=types.SimpleNamespace(Solids=[object()], isNull=lambda: False),
+            )
+
+        body = obj("Body", "PartDesign::Body")
+        assembly = obj("Assembly", "Assembly::AssemblyObject")
+        other_assembly = obj("Assembly002", "Assembly::AssemblyObject")
+        document = types.SimpleNamespace(Objects=[body, assembly])
+        self.assertEqual(namespace["preview_objects"](document), [assembly])
+        self.assertEqual(namespace["exportable_objects"](document), [body, assembly])
+
+        document.Objects.append(other_assembly)
+        self.assertEqual(namespace["preview_objects"](document), [body, assembly, other_assembly])
+        assembly.Visibility = other_assembly.Visibility = False
+        self.assertEqual(namespace["preview_objects"](document), [body])
+
+    def test_3d_and_png_preview_sources_export_only_unique_assembly(self):
+        namespace = self.freecadcmd_script_namespace()
+        shape = types.SimpleNamespace(Solids=[object()], isNull=lambda: False)
+        body = types.SimpleNamespace(Name="Body", TypeId="PartDesign::Body", Visibility=True, InList=[], Shape=shape)
+        assembly = types.SimpleNamespace(Name="Assembly", TypeId="Assembly::AssemblyObject", Visibility=True, InList=[], Shape=shape)
+        document = types.SimpleNamespace(Objects=[body, assembly])
+        import_module = types.SimpleNamespace(export=Mock())
+        mesh_module = types.SimpleNamespace(export=Mock())
+        namespace["export_viewer_preview"] = Mock()
+        with patch.dict(sys.modules, {"Import": import_module, "Mesh": mesh_module}):
+            result = namespace["create_preview_sources"](
+                document, {"revision_code": "R0008"}, Path(self.media_root.name),
+            )
+        self.assertEqual(import_module.export.call_args.args[0], [assembly])
+        self.assertEqual(mesh_module.export.call_args.args[0], [assembly])
+        self.assertEqual(namespace["export_viewer_preview"].call_args.args[0], [assembly])
+        self.assertEqual(result["preview_mesh_path"], str(Path(self.media_root.name) / "R0008-preview.stl"))
+
     def test_viewer_export_preserves_each_solid_and_closes_temporary_document(self):
         namespace = self.freecadcmd_script_namespace()
         solids = [object(), object(), object()]

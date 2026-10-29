@@ -33,7 +33,7 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 7
+PREVIEW_GENERATOR_VERSION = 8
 
 
 def preview_source_context(revision):
@@ -177,6 +177,12 @@ def preview_objects(doc):
     objects = exportable_objects(doc)
     if not objects:
         raise RuntimeError("Keine sichtbaren Volumenkoerper fuer Vorschau-Ansichten gefunden.")
+    assemblies = [
+        obj for obj in objects
+        if getattr(obj, "TypeId", "") == "Assembly::AssemblyObject"
+    ]
+    if len(assemblies) == 1:
+        return assemblies
     return objects
 
 

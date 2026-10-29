@@ -5,6 +5,11 @@ dokumentiert.
 
 ## [Unreleased] - 2026-10-09
 
+- 3D- und PNG-Vorschauen bevorzugen eine eindeutig sichtbare, exportierbare
+  FreeCAD-Baugruppe. Sichtbare Quellkörper außerhalb der Baugruppe werden dann
+  nicht doppelt dargestellt; vorhandene Vorschauen werden beim nächsten Aufruf
+  bei Bedarf neu erzeugt.
+
 - Geometrische Teilevarianten mit optionaler Teilefamilie und konkreter
   Herkunftsrevision. Jede Variante hat eigene Revisionen und Druckprojekte.
 - Variantenanlage aus dem FreeCAD-Add-on inklusive verknüpfter Parameter-
