@@ -38,20 +38,33 @@ from .common import (
 def project_parts_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == "GET":
-        parts = project.parts.filter(is_archived=False).select_related("family").prefetch_related(
+        parts = list(project.parts.filter(is_archived=False).select_related("family").prefetch_related(
             Prefetch("revisions", queryset=Revision.objects.order_by("-revision_code", "-pk"), to_attr="project_revisions")
-        ).order_by("number")
+        ).order_by("number"))
         def file_summary(revision):
             return {"id": revision.id, "original_filename": revision.original_filename,
                     "revision_code": revision.revision_code, "file_format": revision.file_format} if revision else None
 
+        variant_view = None
+        if project.variant_assembly_family_id and project.variant_print_family_id:
+            rows = []
+            for variant in project.variants.all():
+                members = [part for part in parts if part.project_variant_id == variant.id]
+                def member_id(family_id):
+                    matching = [part.id for part in members if part.family_id == family_id]
+                    return matching[0] if len(matching) == 1 else None
+                rows.append({"id": variant.id, "name": variant.name,
+                             "assembly_part_id": member_id(project.variant_assembly_family_id),
+                             "print_part_id": member_id(project.variant_print_family_id)})
+            if rows:
+                variant_view = {"rows": rows}
         return JsonResponse({"parts": [
             part_payload(part) | {
                 "latest_fcstd_revision": file_summary(latest_fcstd_revision(part)),
                 "latest_revision": file_summary(part.project_revisions[0] if part.project_revisions else None),
             }
             for part in parts
-        ]})
+        ], "variant_view": variant_view})
 
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Anlegen von Teilen."}, status=403)

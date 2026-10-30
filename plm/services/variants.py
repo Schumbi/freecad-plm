@@ -10,9 +10,9 @@ from defusedxml.ElementTree import fromstring
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import transaction
+from django.db import models, transaction
 
-from ..models import AuditEvent, Part, PartFamily, Project, ProjectSnapshot, ProjectSnapshotEntry
+from ..models import AuditEvent, Part, PartFamily, Project, ProjectSnapshot, ProjectSnapshotEntry, ProjectVariant
 from ..cad_files import validate_project_file_upload
 from ..fcstd import read_uploaded_file, set_document_string_property
 from .checkouts import create_checkout
@@ -84,6 +84,10 @@ def create_variant_checkout(*, source_revision, uploaded_file, name, number, act
     try:
         with transaction.atomic():
             project = Project.objects.select_for_update().get(pk=source_revision.part.project_id)
+            if ProjectVariant.objects.filter(project=project, name=name).exists():
+                raise ValidationError("Eine Ausführung mit diesem Namen existiert bereits.")
+            position = (ProjectVariant.objects.filter(project=project).aggregate(models.Max("position"))["position__max"] or 0) + 1
+            project_variant = ProjectVariant.objects.create(project=project, name=name, position=position)
             variant_snapshot = ProjectSnapshot.objects.create(project=project, name=name, created_by=actor)
             from .documents import copy_snapshot_documents, capture_current_documents
             if snapshot:
@@ -101,7 +105,7 @@ def create_variant_checkout(*, source_revision, uploaded_file, name, number, act
                     source_part.family = family
                     source_part.save(update_fields=["family", "updated_at"])
                 part = Part.objects.create(
-                    project=project, family=family, variant_source_revision=entry["revision"],
+                    project=project, family=family, project_variant=project_variant, variant_source_revision=entry["revision"],
                     number=number if entry["is_root"] and number else next_part_number(project),
                     name=name if entry["is_root"] else f"{source_part.name} – {name}"[:200],
                     category=source_part.category,

@@ -1,4 +1,5 @@
 from io import BytesIO
+from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
@@ -6,15 +7,44 @@ from unittest.mock import patch
 from xml.etree import ElementTree
 
 from django.contrib.auth import get_user_model
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .auth import create_api_token
-from .models import ApiToken, Checkout, Part, PartFamily, Project, Revision
+from .models import ApiToken, Checkout, Part, PartFamily, Project, ProjectVariant, Revision
 from .services import create_revision_from_upload, import_project_snapshot, delete_project_tree
 from .tests import make_fcstd_bytes, make_project_zip_upload
+
+
+class RodelnVariantMigrationTests(TestCase):
+    def test_existing_chipbox_parts_are_grouped_by_execution_and_role(self):
+        project = Project.objects.create(code="RODELN", name="Chipboxen")
+        assembly = PartFamily.objects.create(project=project, name="Zusammenbau")
+        printing = PartFamily.objects.create(project=project, name="Druck")
+        groups = (
+            ("A-001", "A-002", "P-001", "P-002", "P-003"),
+            ("P-004", "P-005", "P-006", "P-007", "P-008"),
+            ("P-009", "P-010", "P-011", "P-012", "P-013"),
+        )
+        for numbers in groups:
+            for number in numbers:
+                family = assembly if number in ("A-002", "P-008", "P-013") else printing if number in ("A-001", "P-004", "P-009") else None
+                Part.objects.create(project=project, number=number, name=number, family=family)
+        extra = Part.objects.create(project=project, number="P-014", name="Maskottchen")
+
+        import_module("plm.migrations.0034_project_variants").configure_rodeln(apps, None)
+
+        project.refresh_from_db()
+        self.assertEqual((project.variant_assembly_family_id, project.variant_print_family_id),
+                         (assembly.id, printing.id))
+        self.assertEqual([variant.name for variant in project.variants.all()], ["Normal", "12 Chips", "20 Chips"])
+        for variant, numbers in zip(project.variants.all(), groups):
+            self.assertEqual(set(variant.parts.values_list("number", flat=True)), set(numbers))
+        extra.refresh_from_db()
+        self.assertIsNone(extra.project_variant_id)
 
 
 class VariantTests(TestCase):
@@ -50,6 +80,7 @@ class VariantTests(TestCase):
         variant = Part.objects.get(pk=response.json()["part"]["id"])
         self.part.refresh_from_db()
         self.assertEqual(variant.family_id, self.part.family_id)
+        self.assertEqual(variant.project_variant.name, "Chipbox – 20 Chips")
         self.assertEqual(variant.variant_source_revision_id, self.source.id)
         self.assertEqual(variant.revisions.get().revision_code, "R0001")
         self.assertEqual(variant.checkouts.get().status, Checkout.Status.ACTIVE)
@@ -59,6 +90,7 @@ class VariantTests(TestCase):
         another = self.create(name="Chipbox – 10 Chips")
         self.assertEqual(another.status_code, 201, another.content)
         self.assertEqual(PartFamily.objects.count(), 1)
+        self.assertEqual(ProjectVariant.objects.filter(project=self.project).count(), 2)
         detail = self.client.get(reverse("plm:api_part", args=[variant.id])).json()
         self.assertEqual(len(detail["variants"]), 3)
         self.assertTrue(detail["can_create_variant"])
@@ -67,6 +99,28 @@ class VariantTests(TestCase):
         page = self.client.get(reverse("plm:part_detail", args=[variant.id]))
         self.assertContains(page, "Teilefamilie: Chipbox")
         self.assertContains(page, "Chipbox – 10 Chips")
+
+    def test_project_parts_exposes_configured_variant_view(self):
+        created = self.create()
+        self.assertEqual(created.status_code, 201, created.content)
+        derived = Part.objects.get(pk=created.json()["part"]["id"])
+        self.part.refresh_from_db()
+        normal = ProjectVariant.objects.create(project=self.project, name="Normal", position=0)
+        self.part.project_variant = normal
+        self.part.save(update_fields=["project_variant"])
+        print_family = PartFamily.objects.create(project=self.project, name="Druck")
+        normal_print = Part.objects.create(project=self.project, number="PRINT-1", name="Druck", family=print_family, project_variant=normal)
+        derived_print = Part.objects.create(project=self.project, number="PRINT-2", name="Druck 20", family=print_family, project_variant=derived.project_variant)
+        self.project.variant_assembly_family = self.part.family
+        self.project.variant_print_family = print_family
+        self.project.save(update_fields=["variant_assembly_family", "variant_print_family"])
+
+        response = self.client.get(reverse("plm:api_project_parts", args=[self.project.id]))
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["variant_view"]["rows"]
+        self.assertEqual([row["name"] for row in rows], ["Normal", "Chipbox – 20 Chips"])
+        self.assertEqual([(row["assembly_part_id"], row["print_part_id"]) for row in rows],
+                         [(self.part.id, normal_print.id), (derived.id, derived_print.id)])
 
     def test_permissions_and_scopes_enforced_before_mutation(self):
         reader = get_user_model().objects.create_user(username="reader")

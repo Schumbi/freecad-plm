@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
 
@@ -54,6 +55,8 @@ class Project(TimeStampedModel):
 
     folder = models.ForeignKey(ProjectFolder, null=True, blank=True, on_delete=models.PROTECT, related_name="projects")
     main_part = models.ForeignKey("Part", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    variant_assembly_family = models.ForeignKey("PartFamily", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    variant_print_family = models.ForeignKey("PartFamily", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     tags = models.ManyToManyField(ProjectTag, blank=True, related_name="projects")
     code = models.CharField(max_length=40, unique=True)
     name = models.CharField(max_length=200)
@@ -72,6 +75,13 @@ class Project(TimeStampedModel):
     def __str__(self):
         return f"{self.code} - {self.name}"
 
+    def clean(self):
+        super().clean()
+        for field in ("variant_assembly_family", "variant_print_family"):
+            family = getattr(self, field)
+            if family is not None and family.project_id != self.pk:
+                raise ValidationError({field: "Die Teilefamilie gehört zu einem anderen Projekt."})
+
 
 class PartFamily(TimeStampedModel):
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="part_families")
@@ -79,6 +89,19 @@ class PartFamily(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+
+class ProjectVariant(TimeStampedModel):
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="variants")
+    name = models.CharField(max_length=200)
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["position", "pk"]
+        constraints = [models.UniqueConstraint(fields=["project", "name"], name="unique_project_variant_name")]
+
+    def __str__(self):
+        return f"{self.project.code} - {self.name}"
 
 
 class Part(TimeStampedModel):
@@ -89,6 +112,9 @@ class Part(TimeStampedModel):
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="parts")
     family = models.ForeignKey(
         PartFamily, on_delete=models.PROTECT, related_name="parts", null=True, blank=True,
+    )
+    project_variant = models.ForeignKey(
+        ProjectVariant, on_delete=models.PROTECT, related_name="parts", null=True, blank=True,
     )
     variant_source_revision = models.ForeignKey(
         "Revision", on_delete=models.PROTECT, related_name="derived_variants", null=True, blank=True,
@@ -117,6 +143,11 @@ class Part(TimeStampedModel):
 
     def __str__(self):
         return f"{self.number} - {self.name}"
+
+    def clean(self):
+        super().clean()
+        if self.project_variant_id and self.project_variant.project_id != self.project_id:
+            raise ValidationError({"project_variant": "Die Ausführung gehört zu einem anderen Projekt."})
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

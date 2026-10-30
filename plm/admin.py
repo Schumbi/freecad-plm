@@ -11,7 +11,9 @@ from .models import (
     ManufacturingRun,
     ManufacturingRunAttachment,
     Part,
+    PartFamily,
     Project,
+    ProjectVariant,
     ProjectSnapshot,
     ProjectSnapshotEntry,
     Revision,
@@ -28,9 +30,21 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(Part)
 class PartAdmin(admin.ModelAdmin):
-    list_display = ("number", "name", "project", "category", "is_archived")
+    list_display = ("number", "name", "project", "project_variant", "category", "is_archived")
     list_filter = ("category", "is_archived", "project")
     search_fields = ("number", "name", "description", "material", "supplier", "tags")
+
+
+@admin.register(ProjectVariant)
+class ProjectVariantAdmin(admin.ModelAdmin):
+    list_display = ("name", "project", "position")
+    list_filter = ("project",)
+
+
+@admin.register(PartFamily)
+class PartFamilyAdmin(admin.ModelAdmin):
+    list_display = ("name", "project")
+    list_filter = ("project",)
 
 
 @admin.register(Revision)

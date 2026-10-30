@@ -34,6 +34,23 @@ gespeichert. Es gibt keinen zusätzlichen Parametereditor im Server.
 „Varianten anzeigen“ erlaubt im Add-on den Wechsel zwischen Mitgliedern einer
 Familie. Die Web-Teilseite zeigt Familie, Varianten und Herkunftsrevision.
 
+## Projektübersicht nach Ausführungen
+
+`ProjectVariant` fasst alle Teile einer Ausführung zusammen. Die `PartFamily`
+bezeichnet weiterhin den Dateityp bzw. die Rolle des Teils. Am Projekt werden
+die Familien für Zusammenbau und Druckmodell ausgewählt. `GET
+/api/projects/<id>/parts/` liefert neben der vollständigen Teileliste eine
+`variant_view` mit den Ausführungen und den IDs der beiden Hauptteile. Wenn
+eine Rolle nicht eindeutig besetzt ist, bleibt ihre ID leer; die übrigen Teile
+bleiben in der vollständigen Liste erreichbar.
+
+Migration 0034 ordnet im Projekt RODELN die bestehenden Ausführungen Normal,
+12 Chips und 20 Chips anhand ihrer Teilenummern zu. Neue Varianten erhalten
+die Zuordnung für den gesamten kopierten Dateisatz. Für andere Projekte kann
+die Zuordnung im Django-Admin gepflegt werden. Das Add-on zeigt pro Ausführung
+das gewählte Hauptteil direkt im Projektbaum; weitere Dateien und Teile liegen
+in einer zugeklappten Gruppe.
+
 ## Verknüpfte Modelle
 
 Die Chipbox enthält eine Parameterdatei, Box, Deckel und ein Druckmodell.

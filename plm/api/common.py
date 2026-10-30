@@ -45,6 +45,7 @@ def part_payload(part):
         "is_archived": part.is_archived,
         "family": {"id": part.family_id, "name": part.family.name} if part.family_id else None,
         "variant_source_revision_id": part.variant_source_revision_id,
+        "project_variant_id": part.project_variant_id,
     }
 
 

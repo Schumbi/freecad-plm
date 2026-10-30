@@ -335,6 +335,7 @@ def delete_project_tree(project, actor):
     project.parts.update(variant_source_revision=None)
     revisions.delete()
     project.parts.all().delete()
+    project.variants.all().delete()
     project.part_families.all().delete()
     project.delete()
 
