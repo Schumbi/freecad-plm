@@ -20,8 +20,11 @@ def clean_document_path(path):
 
 
 @transaction.atomic
-def upload_document(project, path, uploaded_file, actor):
+def upload_document(project, path, uploaded_file, actor, note=""):
     path = clean_document_path(path)
+    note = note.strip()
+    if len(note) > 255:
+        raise ValidationError("Die Anmerkung darf höchstens 255 Zeichen lang sein.")
     limit = setting_int("PLM_MAX_PROJECT_DOCUMENT_BYTES", 200 * 1024 * 1024)
     if uploaded_file.size > limit:
         raise ValidationError(f"Die Projektdatei darf höchstens {limit} Bytes groß sein.")
@@ -38,7 +41,7 @@ def upload_document(project, path, uploaded_file, actor):
         return latest, False
     filename = PurePosixPath(path).name
     version = ProjectDocumentVersion(document=document, number=(latest.number + 1 if latest else 1),
-                                     filename=filename, sha256=digest, size=len(data), created_by=actor)
+                                     filename=filename, sha256=digest, size=len(data), created_by=actor, note=note)
     stored = document.versions.filter(sha256=digest).first()
     if stored:
         version.file.name = stored.file.name

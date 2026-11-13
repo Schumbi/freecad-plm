@@ -918,6 +918,15 @@ class ProjectDocument(TimeStampedModel):
         return self.path
 
 
+class ProjectDocumentFolder(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="document_folders")
+    path = models.CharField(max_length=500)
+
+    class Meta:
+        ordering = ["path"]
+        constraints = [models.UniqueConstraint(fields=["project", "path"], name="unique_document_folder_per_project")]
+
+
 class ProjectDocumentVersion(models.Model):
     document = models.ForeignKey(ProjectDocument, on_delete=models.CASCADE, related_name="versions")
     number = models.PositiveIntegerField()
@@ -925,6 +934,7 @@ class ProjectDocumentVersion(models.Model):
     filename = models.CharField(max_length=255)
     sha256 = models.CharField(max_length=64)
     size = models.PositiveBigIntegerField()
+    note = models.CharField(max_length=255, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -13,7 +13,7 @@ from .common import validation_error_response
 
 def version_payload(version):
     return {"id": version.pk, "number": version.number, "filename": version.filename,
-            "sha256": version.sha256, "size": version.size,
+            "sha256": version.sha256, "size": version.size, "note": version.note,
             "created_at": version.created_at.isoformat()}
 
 
@@ -37,7 +37,7 @@ def project_documents_api(request, project_id):
     if uploaded is None:
         return JsonResponse({"error": "Datei fehlt."}, status=400)
     try:
-        version, created = upload_document(project, request.POST.get("path") or uploaded.name, uploaded, request.user)
+        version, created = upload_document(project, request.POST.get("path") or uploaded.name, uploaded, request.user, request.POST.get("note", ""))
     except ValidationError as exc:
         return validation_error_response(exc)
     return JsonResponse({"document": document_payload(version.document), "version": version_payload(version), "created": created}, status=201 if created else 200)

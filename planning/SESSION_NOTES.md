@@ -953,3 +953,9 @@ Projekt-ZIP-Import und Snapshot-Download im Browser testen, danach committen.
 - Produktionsdeployment der Höhenkorrektur: Release `8690d7eceac6a277f9b797aa8ad7f0342d979d5c`, Forgejo-Build 483 erfolgreich. Web/Worker verwenden denselben Commit-Tag, laufen ohne Neustartfehler; Systemcheck und Migrationscheck erfolgreich, Bestandszahlen unverändert.
 - Vorher-Backup `/opt/freecad-plm/backups/20261013T102251Z-before-8690d7e` mit Datenbank, Storage und Konfiguration per SHA-256, Restore-Liste und Tar-Inhaltsprüfung validiert. Für Platz wurde ausschließlich das älteste ungenutzte PLM-Imagepaar `c963425f30f1fb9199e4bef626a3634aa897ca24` entfernt; vorherige aktive Version `8bb5ea9f18423a4fdf135c360fb5ee9c005bc896` bleibt als Rollback erhalten. Nach dem Update etwa 1,5 GB frei.
 - HTTPS liefert nach Login-Redirect HTTP 200; die öffentlich ausgelieferte CSS-Datei stimmt per SHA-256 mit der im Chromium-Test vermessenen Datei überein. Aktuelle Startlogs ohne Tracebacks.
+
+### Projektdateien (2026-11-13)
+
+- Projektdateien können gemeinsam hochgeladen und mit einer Anmerkung je neu angelegter Version versehen werden. Anmerkungen sind nachträglich bearbeitbar; identischer Inhalt erzeugt weiterhin keine neue Version.
+- Ordner und Unterordner können auch leer angelegt werden; Dateien lassen sich zwischen Ordnern verschieben. Snapshot-Pfade bleiben dabei unverändert.
+- Administratoren können leere angelegte Ordner und Projektdateien samt Versionshistorie löschen. Von Snapshots referenzierte Dateien sind vor dem Löschen geschützt und können stattdessen archiviert werden. Migration 0035 ergänzt Ordner und Versionsanmerkungen.

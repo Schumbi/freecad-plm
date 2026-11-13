@@ -5,22 +5,32 @@
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if can_manage %}
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
-  <label>Zielordner (optional) <input id="document-folder" name="folder" maxlength="500" placeholder="Schriften"></label>
+  <label>Zielordner (optional) <input id="document-folder" name="folder" maxlength="500" list="document-folders" placeholder="Schriften"></label>
+  <datalist id="document-folders">{% for folder in folders %}<option value="{{ folder }}">{% endfor %}</datalist>
   <label>Dateien <input id="document-files" type="file" name="files" multiple required></label>
+  <label>Anmerkung für neue Versionen <input name="note" maxlength="255"></label>
+  <p>Gleicher Dateipfad und gleicher Inhalt erzeugen keine neue Version. Eine vorhandene Anmerkung lässt sich unten bearbeiten.</p>
   <p id="document-path-preview" aria-live="polite">Dateien auswählen, um die Zielpfade zu sehen.</p>
   <button type="submit">Dateien hochladen</button>
 </form>
+<form method="post">{% csrf_token %}<label>Neuer Ordner oder Unterordner <input name="folder" maxlength="500" placeholder="Schriften/Handbücher" required></label> <button name="action" value="create_folder">Ordner anlegen</button></form>
 {% endif %}
 {% for folder, documents in document_groups %}
 <details {% if not folder %}open{% endif %}><summary>{{ folder|default:"Ohne Ordner" }} ({{ documents|length }})</summary>
-<div class="table-wrap"><table><thead><tr><th>Datei</th><th>Aktuelle Version</th><th>Status</th><th>Aktion</th></tr></thead><tbody>
+{% if can_delete and folder in explicit_folders and not documents %}<form method="post">{% csrf_token %}<input type="hidden" name="folder" value="{{ folder }}"><button name="action" value="delete_folder">Leeren Ordner löschen</button></form>{% endif %}
+<div class="table-wrap"><table><thead><tr><th>Datei</th><th>Versionen und Anmerkungen</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>
 {% for document in documents %}<tr><td>{{ document.path }}</td><td>
-  {% with latest=document.versions.first %}{% if latest %}<a href="{% url 'plm:project_document_download' latest.id %}">V{{ latest.number }} herunterladen</a> {% if latest.filename|lower|slice:"-4:" == '.pdf' %}<a href="{% url 'plm:project_document_download' latest.id %}?preview=1">PDF ansehen</a>{% endif %}{% endif %}{% endwith %}
-  {% if document.versions.count > 1 %}<details><summary>Ältere Versionen</summary>{% for version in document.versions.all %}{% if not forloop.first %}<a href="{% url 'plm:project_document_download' version.id %}">V{{ version.number }}</a> {% endif %}{% endfor %}</details>{% endif %}
+  {% for version in document.versions.all %}
+  <div><a href="{% url 'plm:project_document_download' version.id %}">V{{ version.number }} herunterladen</a> {% if version.filename|lower|slice:"-4:" == '.pdf' %}<a href="{% url 'plm:project_document_download' version.id %}?preview=1">PDF ansehen</a>{% endif %} · {{ version.created_at }} · {{ version.created_by }}{% if version.note %} · {{ version.note }}{% endif %}
+  {% if can_manage %}<form method="post" action="{% url 'plm:project_document_state' document.id %}">{% csrf_token %}<input type="hidden" name="version_id" value="{{ version.id }}"><label>Anmerkung zu V{{ version.number }} <input name="note" maxlength="255" value="{{ version.note }}"></label> <button name="action" value="note">Speichern</button></form>{% endif %}</div>
+  {% endfor %}
+  {% if document.versions.count > 1 %}<span>Ältere Versionen siehe oben</span>{% endif %}
   </td><td>{% if document.is_archived %}Archiviert{% else %}Aktuell{% endif %}</td><td>
   {% if can_manage %}<form method="post" action="{% url 'plm:project_document_state' document.id %}">{% csrf_token %}
-  <button name="action" value="{% if document.is_archived %}restore{% else %}archive{% endif %}">{% if document.is_archived %}Wiederherstellen{% else %}Archivieren{% endif %}</button></form>{% endif %}
-  </td></tr>{% endfor %}</tbody></table></div></details>
+  <button name="action" value="{% if document.is_archived %}restore{% else %}archive{% endif %}">{% if document.is_archived %}Wiederherstellen{% else %}Archivieren{% endif %}</button></form>
+  <form method="post" action="{% url 'plm:project_document_state' document.id %}">{% csrf_token %}<label>Verschieben nach <select name="folder"><option value="">Ohne Ordner</option>{% for target in folders %}<option value="{{ target }}">{{ target }}</option>{% endfor %}</select></label> <button name="action" value="move">Verschieben</button></form>{% endif %}
+  {% if can_delete %}<form method="post" action="{% url 'plm:project_document_state' document.id %}" onsubmit="return confirm('Datei und alle Versionen endgültig löschen?')">{% csrf_token %}<button name="action" value="delete">Datei löschen</button></form>{% endif %}
+  </td></tr>{% empty %}<tr><td colspan="4">Dieser Ordner ist leer.</td></tr>{% endfor %}</tbody></table></div></details>
 {% empty %}<p>Noch keine Projektdateien.</p>{% endfor %}
 {% if can_manage %}<script>
 (() => {

@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .auth import create_api_token
-from .models import ApiToken, Part, Project, ProjectDocument, ProjectDocumentVersion, ProjectSnapshot, ProjectSnapshotEntry, Revision
+from .models import ApiToken, Part, Project, ProjectDocument, ProjectDocumentFolder, ProjectDocumentVersion, ProjectSnapshot, ProjectSnapshotEntry, Revision
 from .services.documents import upload_document, copy_snapshot_documents
 from .services.snapshots import import_project_snapshot
 
@@ -115,6 +115,51 @@ class ProjectDocumentTests(TestCase):
             SimpleUploadedFile("Alpha.otf", b"alpha"), SimpleUploadedFile("Beta.ttf", b"beta")]})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(ProjectDocument.objects.count(), 0)
+
+    def test_folders_move_notes_and_admin_delete(self):
+        self.client.force_login(self.admin)
+        url = reverse("plm:project_documents", args=[self.project.pk])
+        self.assertEqual(self.client.post(url, {"action": "create_folder", "folder": "Pläne/Alt"}).status_code, 302)
+        self.assertTrue(ProjectDocumentFolder.objects.filter(project=self.project, path="Pläne/Alt").exists())
+        self.client.post(url, {"files": [SimpleUploadedFile("a.txt", b"a"), SimpleUploadedFile("b.txt", b"b")], "note": "Erstfassung"})
+        version = ProjectDocumentVersion.objects.get(document__path="a.txt")
+        self.assertEqual(version.note, "Erstfassung")
+        state = reverse("plm:project_document_state", args=[version.document_id])
+        self.client.post(state, {"action": "move", "folder": "Pläne/Alt"})
+        version.document.refresh_from_db()
+        self.assertEqual(version.document.path, "Pläne/Alt/a.txt")
+        self.client.post(state, {"action": "note", "version_id": version.pk, "note": "Korrigiert"})
+        version.refresh_from_db()
+        self.assertEqual(version.note, "Korrigiert")
+        self.client.force_login(self.reader)
+        self.assertEqual(self.client.post(state, {"action": "delete"}).status_code, 403)
+        self.client.force_login(self.admin)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(state, {"action": "delete"})
+        self.assertFalse(ProjectDocumentVersion.objects.filter(pk=version.pk).exists())
+        self.assertFalse(Path(self.temp.name, version.file.name).exists())
+        self.client.post(url, {"action": "delete_folder", "folder": "Pläne/Alt"})
+        self.assertFalse(ProjectDocumentFolder.objects.exists())
+
+    def test_snapshot_blocks_deletion_and_move_preserves_snapshot_path(self):
+        version, _ = upload_document(self.project, "old.txt", SimpleUploadedFile("old.txt", b"old"), self.admin)
+        snapshot = ProjectSnapshot.objects.create(project=self.project, name="Saved", created_by=self.admin)
+        snapshot.documents.create(version=version, path="old.txt")
+        ProjectDocumentFolder.objects.create(project=self.project, path="New")
+        self.client.force_login(self.admin)
+        state = reverse("plm:project_document_state", args=[version.document_id])
+        self.client.post(state, {"action": "move", "folder": "New"})
+        self.client.post(state, {"action": "delete"})
+        self.assertTrue(ProjectDocumentVersion.objects.filter(pk=version.pk).exists())
+        self.assertEqual(snapshot.documents.get().path, "old.txt")
+
+    def test_folder_validation_and_nonempty_deletion(self):
+        self.client.force_login(self.admin)
+        url = reverse("plm:project_documents", args=[self.project.pk])
+        self.assertEqual(self.client.post(url, {"action": "create_folder", "folder": "../bad"}).status_code, 400)
+        ProjectDocumentFolder.objects.create(project=self.project, path="Folder")
+        upload_document(self.project, "Folder/a", SimpleUploadedFile("a", b"a"), self.admin)
+        self.assertEqual(self.client.post(url, {"action": "delete_folder", "folder": "Folder"}).status_code, 400)
 
     def test_overview_handles_missing_and_cyclic_references_and_compares_snapshots(self):
         part = Part.objects.create(project=self.project, number="P-001", name="Part")
