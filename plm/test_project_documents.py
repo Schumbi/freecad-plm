@@ -105,8 +105,8 @@ class ProjectDocumentTests(TestCase):
         self.assertEqual(ProjectDocument.objects.get(path="Schriften/Alpha.otf").versions.count(), 2)
         self.assertEqual(ProjectDocument.objects.get(path="Schriften/Beta.ttf").versions.count(), 1)
         page = self.client.get(url)
-        self.assertContains(page, "Ältere Versionen")
-        self.assertContains(page, "Schriften (3)")
+        self.assertContains(page, "Versionen und Anmerkungen")
+        self.assertContains(page, "3 Dateien")
 
     def test_web_rejects_unsafe_folder_without_partial_upload(self):
         self.client.force_login(self.admin)
