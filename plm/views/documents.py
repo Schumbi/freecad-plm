@@ -3,10 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.db import transaction
+from pathlib import PurePosixPath
 
 from ..models import Project, ProjectDocument, ProjectDocumentVersion
 from ..permissions import can_upload_revision
-from ..services.documents import upload_document
+from ..services.documents import upload_document, clean_document_path
 
 
 @login_required
@@ -16,19 +18,34 @@ def project_documents(request, project_id):
     if request.method == "POST":
         if not can_upload_revision(request.user):
             return HttpResponseForbidden("Keine Berechtigung zum Hochladen.")
-        uploaded = request.FILES.get("file")
-        if uploaded is None:
+        uploads = request.FILES.getlist("files") or request.FILES.getlist("file")
+        if not uploads:
             error = "Bitte eine Datei auswählen."
         else:
             try:
-                upload_document(project, request.POST.get("path") or uploaded.name, uploaded, request.user)
+                raw_folder = request.POST.get("folder", "").strip()
+                if raw_folder.startswith(("/", "\\")):
+                    raise ValidationError("Der Zielordner muss relativ sein.")
+                folder = raw_folder.rstrip("/")
+                paths = [clean_document_path(f"{folder}/{uploaded.name}" if folder else uploaded.name)
+                         for uploaded in uploads]
+                if len(paths) != len(set(paths)):
+                    raise ValidationError("Dateinamen dürfen im Zielordner nicht doppelt vorkommen.")
+                with transaction.atomic():
+                    for path, uploaded in zip(paths, uploads):
+                        upload_document(project, path, uploaded, request.user)
             except ValidationError as exc:
                 error = " ".join(exc.messages)
         if not error:
-            messages.success(request, "Projektdatei gespeichert.")
+            messages.success(request, f"{len(uploads)} Projektdatei(en) gespeichert.")
             return redirect("plm:project_documents", project_id=project.pk)
+    documents = list(project.documents.prefetch_related("versions").order_by("path"))
+    groups = {}
+    for document in documents:
+        folder = str(PurePosixPath(document.path).parent)
+        groups.setdefault("" if folder == "." else folder, []).append(document)
     return render(request, "plm/project_documents.html", {
-        "project": project, "documents": project.documents.prefetch_related("versions").order_by("path"),
+        "project": project, "document_groups": sorted(groups.items()),
         "can_manage": can_upload_revision(request.user), "error": error,
     }, status=400 if error else 200)
 

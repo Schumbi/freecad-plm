@@ -5,17 +5,34 @@
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if can_manage %}
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
-  <label>Relativer Pfad <input name="path" maxlength="500" placeholder="Spezifikationen/Anforderung.pdf"></label>
-  <label>Datei <input type="file" name="file" required></label>
-  <button type="submit">Datei hochladen</button>
+  <label>Zielordner (optional) <input id="document-folder" name="folder" maxlength="500" placeholder="Schriften"></label>
+  <label>Dateien <input id="document-files" type="file" name="files" multiple required></label>
+  <p id="document-path-preview" aria-live="polite">Dateien auswählen, um die Zielpfade zu sehen.</p>
+  <button type="submit">Dateien hochladen</button>
 </form>
 {% endif %}
-<div class="table-wrap"><table><thead><tr><th>Pfad</th><th>Versionen</th><th>Status</th><th>Aktion</th></tr></thead><tbody>
+{% for folder, documents in document_groups %}
+<details {% if not folder %}open{% endif %}><summary>{{ folder|default:"Ohne Ordner" }} ({{ documents|length }})</summary>
+<div class="table-wrap"><table><thead><tr><th>Datei</th><th>Aktuelle Version</th><th>Status</th><th>Aktion</th></tr></thead><tbody>
 {% for document in documents %}<tr><td>{{ document.path }}</td><td>
-  {% for version in document.versions.all %}<a href="{% url 'plm:project_document_download' version.id %}">V{{ version.number }}</a> {% if version.filename|lower|slice:"-4:" == '.pdf' %}<a href="{% url 'plm:project_document_download' version.id %}?preview=1">PDF ansehen</a>{% endif %}{% endfor %}
+  {% with latest=document.versions.first %}{% if latest %}<a href="{% url 'plm:project_document_download' latest.id %}">V{{ latest.number }} herunterladen</a> {% if latest.filename|lower|slice:"-4:" == '.pdf' %}<a href="{% url 'plm:project_document_download' latest.id %}?preview=1">PDF ansehen</a>{% endif %}{% endif %}{% endwith %}
+  {% if document.versions.count > 1 %}<details><summary>Ältere Versionen</summary>{% for version in document.versions.all %}{% if not forloop.first %}<a href="{% url 'plm:project_document_download' version.id %}">V{{ version.number }}</a> {% endif %}{% endfor %}</details>{% endif %}
   </td><td>{% if document.is_archived %}Archiviert{% else %}Aktuell{% endif %}</td><td>
   {% if can_manage %}<form method="post" action="{% url 'plm:project_document_state' document.id %}">{% csrf_token %}
   <button name="action" value="{% if document.is_archived %}restore{% else %}archive{% endif %}">{% if document.is_archived %}Wiederherstellen{% else %}Archivieren{% endif %}</button></form>{% endif %}
-  </td></tr>{% empty %}<tr><td colspan="4">Noch keine Projektdateien.</td></tr>{% endfor %}
-</tbody></table></div>
+  </td></tr>{% endfor %}</tbody></table></div></details>
+{% empty %}<p>Noch keine Projektdateien.</p>{% endfor %}
+{% if can_manage %}<script>
+(() => {
+  const folder = document.getElementById('document-folder');
+  const files = document.getElementById('document-files');
+  const preview = document.getElementById('document-path-preview');
+  function update() {
+    const prefix = folder.value.trim().replace(/\/+$/, '');
+    preview.textContent = [...files.files].map(file => (prefix ? prefix + '/' : '') + file.name).join(' · ') || 'Dateien auswählen, um die Zielpfade zu sehen.';
+  }
+  folder.addEventListener('input', update);
+  files.addEventListener('change', update);
+})();
+</script>{% endif %}
 {% endblock %}

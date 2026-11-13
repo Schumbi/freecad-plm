@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .auth import create_api_token
-from .models import ApiToken, Part, Project, ProjectDocumentVersion, ProjectSnapshot, ProjectSnapshotEntry, Revision
+from .models import ApiToken, Part, Project, ProjectDocument, ProjectDocumentVersion, ProjectSnapshot, ProjectSnapshotEntry, Revision
 from .services.documents import upload_document, copy_snapshot_documents
 from .services.snapshots import import_project_snapshot
 
@@ -90,6 +90,31 @@ class ProjectDocumentTests(TestCase):
         self.assertContains(self.client.get(reverse("plm:project_detail", args=[self.project.pk])), "Dateien und Abhängigkeiten")
         self.assertContains(self.client.get(reverse("plm:project_files_overview", args=[self.project.pk])), "manual.pdf")
         self.assertContains(self.client.get(reverse("plm:project_documents", args=[self.project.pk])), "PDF ansehen")
+
+    def test_web_multiple_files_in_folder_and_independent_versions(self):
+        self.client.force_login(self.admin)
+        url = reverse("plm:project_documents", args=[self.project.pk])
+        response = self.client.post(url, {"folder": "Schriften", "files": [
+            SimpleUploadedFile("Alpha.otf", b"alpha"), SimpleUploadedFile("Beta.ttf", b"beta"),
+            SimpleUploadedFile("Gamma.otf", b"gamma")]})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(set(ProjectDocument.objects.values_list("path", flat=True)),
+                         {"Schriften/Alpha.otf", "Schriften/Beta.ttf", "Schriften/Gamma.otf"})
+        self.assertEqual(ProjectDocumentVersion.objects.count(), 3)
+        self.client.post(url, {"folder": "Schriften", "files": [SimpleUploadedFile("Alpha.otf", b"changed")]})
+        self.assertEqual(ProjectDocument.objects.get(path="Schriften/Alpha.otf").versions.count(), 2)
+        self.assertEqual(ProjectDocument.objects.get(path="Schriften/Beta.ttf").versions.count(), 1)
+        page = self.client.get(url)
+        self.assertContains(page, "Ältere Versionen")
+        self.assertContains(page, "Schriften (3)")
+
+    def test_web_rejects_unsafe_folder_without_partial_upload(self):
+        self.client.force_login(self.admin)
+        url = reverse("plm:project_documents", args=[self.project.pk])
+        response = self.client.post(url, {"folder": "../Schriften", "files": [
+            SimpleUploadedFile("Alpha.otf", b"alpha"), SimpleUploadedFile("Beta.ttf", b"beta")]})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ProjectDocument.objects.count(), 0)
 
     def test_overview_handles_missing_and_cyclic_references_and_compares_snapshots(self):
         part = Part.objects.create(project=self.project, number="P-001", name="Part")
