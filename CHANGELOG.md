@@ -5,6 +5,11 @@ dokumentiert.
 
 ## [Unreleased] - 2026-11-14
 
+- **GLB-Vorschau:** Der Worker erzeugt zusätzlich zum 3MF ein binäres GLB
+  (Positionen/Indizes, Farbe je Solid). Der Viewer lädt GLB bevorzugt und
+  berechnet Normals im Client. Messung am 4,4-MB-3MF: Parsing 4,6 s → 0,08 s,
+  Zeit bis zum Modell inkl. Download/Render < 0,5 s. 3MF bleibt Fallback.
+
 ### 3D-Anzeige beschleunigt
 
 - 3D-Artefakte werden mit `ETag` und `Cache-Control` ausgeliefert; erneutes
