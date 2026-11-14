@@ -10,6 +10,7 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
   <div class="app-shell">
     <aside class="sidebar-nav">
       <div class="brand-block">
@@ -87,7 +88,7 @@
           {% endif %}
         </div>
       </header>
-      <main>
+      <main id="main" tabindex="-1">
         {% for message in messages %}
           <div class="message" role="{% if message.level_tag == 'error' %}alert{% else %}status{% endif %}" aria-live="{% if message.level_tag == 'error' %}assertive{% else %}polite{% endif %}"{% if message.level_tag != 'error' %} data-auto-dismiss{% endif %}>
             <span>{{ message }}</span>
