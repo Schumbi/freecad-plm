@@ -185,6 +185,10 @@ class ProjectForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.fields["tags"].queryset.exists():
+            self.fields["tags"].help_text = (
+                "Noch keine Tags vorhanden – neue Tags im Feld „Neue Tags“ anlegen."
+            )
         folders = {folder.pk: folder for folder in ProjectFolder.objects.all()}
         def folder_label(folder):
             names, seen = [], set()

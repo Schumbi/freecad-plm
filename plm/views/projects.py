@@ -55,12 +55,18 @@ def global_search(request):
         else None
     )
     total_hits = 0
+    parts_have_manufacturing = False
+    revisions_have_manufacturing = False
     if results is not None:
         total_hits = (
             len(results.projects)
             + len(results.parts)
             + len(results.revisions)
             + len(results.snapshot_paths)
+        )
+        parts_have_manufacturing = any(part.has_manufacturing_files for part in results.parts)
+        revisions_have_manufacturing = any(
+            revision.has_manufacturing_files for revision in results.revisions
         )
     return render(
         request,
@@ -69,6 +75,8 @@ def global_search(request):
             "query": query,
             "results": results,
             "total_hits": total_hits,
+            "parts_have_manufacturing": parts_have_manufacturing,
+            "revisions_have_manufacturing": revisions_have_manufacturing,
             "filters_active": filters_active,
             "projects": Project.objects.filter(is_archived=False).order_by("code"),
             "selected_project_id": project_id_value,

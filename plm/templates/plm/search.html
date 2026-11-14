@@ -131,7 +131,7 @@
               <tr>
                 <th>Projekt</th>
                 <th>Nummer</th>
-                <th>Fertigung</th>
+                {% if parts_have_manufacturing %}<th>Fertigung</th>{% endif %}
                 <th>Name</th>
                 <th>Typ</th>
               </tr>
@@ -141,7 +141,7 @@
                 <tr>
                   <td><a href="{% url 'plm:project_detail' part.project_id %}">{{ part.project.code }}</a></td>
                   <td><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
-                  <td>{% if part.has_manufacturing_files %}<a href="{% url 'plm:manufacturing_overview' part.id %}" aria-label="Fertigung für {{ part.number }}">Fertigung</a>{% else %}<span class="muted">–</span>{% endif %}</td>
+                  {% if parts_have_manufacturing %}<td>{% if part.has_manufacturing_files %}<a href="{% url 'plm:manufacturing_overview' part.id %}" aria-label="Fertigung für {{ part.number }}">Fertigung</a>{% else %}<span class="muted">–</span>{% endif %}</td>{% endif %}
                   <td>{{ part.name }}</td>
                   <td>{{ part.get_category_display }}</td>
                 </tr>
@@ -164,7 +164,7 @@
               <tr>
                 <th>Projekt</th>
                 <th>Teil</th>
-                <th>Fertigung</th>
+                {% if revisions_have_manufacturing %}<th>Fertigung</th>{% endif %}
                 <th>Revision</th>
                 <th>Dateiname</th>
                 <th>Status</th>
@@ -175,7 +175,7 @@
                 <tr>
                   <td><a href="{% url 'plm:project_detail' revision.part.project_id %}">{{ revision.part.project.code }}</a></td>
                   <td><a href="{% url 'plm:part_detail' revision.part_id %}#revision-{{ revision.id }}">{{ revision.part.number }}</a></td>
-                  <td>{% if revision.has_manufacturing_files %}<a href="{% url 'plm:manufacturing_overview' revision.part_id %}" aria-label="Fertigung für {{ revision.part.number }}">Fertigung</a>{% else %}<span class="muted">–</span>{% endif %}</td>
+                  {% if revisions_have_manufacturing %}<td>{% if revision.has_manufacturing_files %}<a href="{% url 'plm:manufacturing_overview' revision.part_id %}" aria-label="Fertigung für {{ revision.part.number }}">Fertigung</a>{% else %}<span class="muted">–</span>{% endif %}</td>{% endif %}
                   <td>{{ revision.revision_code }}</td>
                   <td>{{ revision.original_filename }}</td>
                   <td><span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span></td>
