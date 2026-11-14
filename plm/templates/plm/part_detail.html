@@ -45,12 +45,19 @@
         <div class="page-header-actions">
           <span class="type-pill">{{ part.get_category_display }}</span>
           <a class="btn btn-outline-secondary" href="{% url 'plm:manufacturing_overview' part.id %}">Fertigung</a>
-          {% if can_manage_part %}<a class="btn btn-outline-danger" href="{% url 'plm:remove_part' part.id %}">{% if part.is_archived %}Wiederherstellen{% else %}Aus Projekt entfernen{% endif %}</a>{% endif %}
+          {% if revisions|length > 1 %}
+            <a class="btn btn-outline-secondary" href="{% url 'plm:revision_compare' part.id %}">Visuell vergleichen</a>
+          {% endif %}
           {% if can_upload %}
             <button type="button" class="btn btn-primary" data-dialog-target="#revision-upload">Neue Revision</button>
           {% endif %}
-          {% if revisions|length > 1 %}
-            <a class="btn btn-outline-secondary" href="{% url 'plm:revision_compare' part.id %}">Visuell vergleichen</a>
+          {% if can_manage_part %}
+            <details class="action-menu">
+              <summary aria-label="Weitere Aktionen für {{ part.number }}">…</summary>
+              <div class="action-menu-content">
+                <a class="danger-link" href="{% url 'plm:remove_part' part.id %}">{% if part.is_archived %}Wiederherstellen{% else %}Aus Projekt entfernen{% endif %}</a>
+              </div>
+            </details>
           {% endif %}
         </div>
       </div>
@@ -156,12 +163,6 @@
                       <button type="submit" class="btn btn-sm">Freigeben</button>
                     </form>
                   {% endif %}
-                  {% if can_release and revision.status == "released" %}
-                    <form method="post" action="{% url 'plm:obsolete_revision' revision.id %}">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-outline-secondary btn-sm">Als obsolet markieren</button>
-                    </form>
-                  {% endif %}
                 </div>
                 <div class="revision-actions-secondary">
                   <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">Notizen</button>
@@ -180,6 +181,12 @@
                       {% if revision.extracted_metadata.freecadcmd.objects %}
                         <a href="{% url 'plm:create_revision_export_job' revision.id %}">Export planen</a>
                       {% endif %}
+                    {% endif %}
+                    {% if can_release and revision.status == "released" %}
+                      <form method="post" action="{% url 'plm:obsolete_revision' revision.id %}" data-confirm="Revision {{ revision.revision_code }} wird als obsolet markiert. Neue Arbeit erfordert danach eine neue Revision.">
+                        {% csrf_token %}
+                        <button type="submit" class="danger-link">Als obsolet markieren</button>
+                      </form>
                     {% endif %}
                   </div>
                 </details>
@@ -391,7 +398,7 @@
                                 </button>
                               {% endif %}
                               {% if can_release and manufacturing_file.status != "obsolete" %}
-                                <form class="inline-form" method="post" action="{% url 'plm:obsolete_manufacturing_file' manufacturing_file.id %}">
+                                <form class="inline-form" method="post" action="{% url 'plm:obsolete_manufacturing_file' manufacturing_file.id %}" data-confirm="Die Fertigungsdatei {{ manufacturing_file.original_filename }} wird als obsolet markiert.">
                                   {% csrf_token %}
                                   <button type="submit">Als obsolet markieren</button>
                                 </form>

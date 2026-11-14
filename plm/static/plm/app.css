@@ -182,14 +182,14 @@ button,
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-button:not(.plm-dialog-close):not(.logout-button):not(.sidebar-toggle):not(.message-dismiss):not(.search-toggle) {
+button:where(:not(.plm-dialog-close, .logout-button, .sidebar-toggle, .message-dismiss, .search-toggle, .btn-outline-secondary, .btn-secondary-soft, .btn-danger)) {
   background: var(--accent);
   border: 1px solid var(--accent-dark);
   color: #fff;
   cursor: pointer;
 }
 
-button:not(.plm-dialog-close):not(.logout-button):not(.sidebar-toggle):not(.message-dismiss):not(.search-toggle):hover {
+button:where(:not(.plm-dialog-close, .logout-button, .sidebar-toggle, .message-dismiss, .search-toggle, .btn-outline-secondary, .btn-secondary-soft, .btn-danger)):hover {
   background: var(--accent-dark);
 }
 
@@ -2711,4 +2711,17 @@ figure {
   .document-item-options { margin-left: 0; }
   .document-version { grid-template-columns: 1fr; }
   .document-new-folder form { left: 0; right: auto; }
+}
+
+
+.action-menu-content .danger-link,
+.action-menu-content button.danger-link {
+  border: 0;
+  color: var(--danger);
+  text-align: left;
+  width: 100%;
+}
+
+.action-menu-content .danger-link:hover {
+  background: var(--danger-soft);
 }

@@ -303,6 +303,37 @@
     });
   }
 
+  function setupConfirmForms() {
+    var dialog = document.getElementById("confirm-dialog");
+    if (!dialog) return;
+    var message = document.getElementById("confirm-dialog-message");
+    var accept = dialog.querySelector("[data-confirm-accept]");
+    var pending = null;
+
+    document.addEventListener("submit", function (event) {
+      var form = event.target;
+      var text = form.getAttribute("data-confirm");
+      if (!text || form.dataset.confirmed === "1") return;
+      event.preventDefault();
+      pending = form;
+      message.textContent = text;
+      dialog.showModal();
+    });
+
+    accept.addEventListener("click", function () {
+      if (!pending) return;
+      var form = pending;
+      pending = null;
+      form.dataset.confirmed = "1";
+      dialog.close();
+      form.requestSubmit();
+    });
+
+    dialog.addEventListener("close", function () {
+      pending = null;
+    });
+  }
+
   function setupSearchToggle() {
     var toggle = document.querySelector("[data-search-toggle]");
     var topbar = document.querySelector(".topbar");
@@ -693,6 +724,7 @@
   setupFormAccessibility();
   setupClickableRows();
   setupSidebarToggle();
+  setupConfirmForms();
   setupSearchToggle();
   setupUserMenu();
   setupManufacturingSelectors();

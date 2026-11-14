@@ -28,12 +28,17 @@
         </div>
         <div class="page-header-actions">
           <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
-          {% if can_edit_project %}
-            <a class="btn btn-outline-secondary" href="{% url 'plm:edit_project' project.id %}">Projekt bearbeiten</a>
-            <a class="btn btn-outline-danger" href="{% url 'plm:delete_project' project.id %}">Löschen</a>
-          {% endif %}
           {% if can_create_part %}
             <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe</a>
+          {% endif %}
+          {% if can_edit_project %}
+            <a class="btn btn-outline-secondary" href="{% url 'plm:edit_project' project.id %}">Projekt bearbeiten</a>
+            <details class="action-menu">
+              <summary aria-label="Weitere Aktionen für {{ project.code }}">…</summary>
+              <div class="action-menu-content">
+                <a class="danger-link" href="{% url 'plm:delete_project' project.id %}">Projekt löschen</a>
+              </div>
+            </details>
           {% endif %}
         </div>
       </div>
