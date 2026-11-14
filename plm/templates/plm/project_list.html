@@ -30,7 +30,7 @@
     <form method="get" id="project-filters" data-project-preferences>
       <input type="hidden" name="folder" value="{{ selected_folder }}">
       <div class="project-list-toolbar">
-        <p>{{ projects|length }} Projekte</p>
+        <p>{{ projects|length }} Projekt{{ projects|length|pluralize:"e" }}</p>
         <div class="project-folder-filter">
           <span id="project-folder-label">Ordner</span>
           <details id="project-folders" class="project-folder-picker">
@@ -106,7 +106,7 @@
             {% for project in projects %}<tr draggable="{{ can_create_project|yesno:'true,false' }}" data-project-id="{{ project.id }}">
               <td data-label="Projekt"><span class="project-code">{{ project.code }}</span><h2 class="project-card-title"><a href="{% url 'plm:project_detail' project.id %}">{{ project.name }}</a></h2><p class="project-detail-description">{{ project.description|default:"Keine Beschreibung hinterlegt." }}</p></td>
               <td data-label="Status / Tags"><span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span><div class="project-tag-chips">{% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% empty %}<span class="muted">Keine Tags</span>{% endfor %}</div></td>
-              <td data-label="Umfang">{{ project.part_count }} Teile<br>{{ project.snapshot_count }} Projektstände</td>
+              <td data-label="Umfang">{{ project.part_count }} Teil{{ project.part_count|pluralize:"e" }}<br>{{ project.snapshot_count }} {% if project.snapshot_count == 1 %}Projektstand{% else %}Projektstände{% endif %}</td>
               <td data-label="Datumsangaben"><dl class="project-detail-dates">
                 <dt>Projektdatum</dt><dd>{{ project.project_date|date:"d.m.Y" }}</dd>
                 <dt>Erstellungsdatum</dt><dd>{{ project.created_at|date:"d.m.Y H:i" }}</dd>
@@ -136,8 +136,8 @@
             {% for tag in project.tags.all %}<a class="project-tag-chip" href="?{{ presentation_query }}&amp;tag={{ tag.id }}">{{ tag.name }}</a>{% endfor %}
           </div>
           <div class="project-card-footer">
-            <span>{{ project.part_count }} Teile</span>
-            <span>{{ project.snapshot_count }} Stände</span>
+            <span>{{ project.part_count }} Teil{{ project.part_count|pluralize:"e" }}</span>
+            <span>{{ project.snapshot_count }} {% if project.snapshot_count == 1 %}Stand{% else %}Stände{% endif %}</span>
             <span>Projektdatum: {{ project.project_date|date:"d.m.Y" }}</span>
           </div>
         </article>

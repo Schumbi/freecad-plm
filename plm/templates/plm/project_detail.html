@@ -68,7 +68,7 @@
             data-filter-count="#part-filter-count"
             data-filter-empty="#part-filter-empty"{% if main_revision %}
             oninput="document.getElementById('other-project-files').open = true"{% endif %}>
-          <span class="muted" id="part-filter-count" data-filter-default="{{ other_parts|length }} Einträge">{{ other_parts|length }} Einträge</span>
+          <span class="muted" id="part-filter-count" data-filter-default="{{ other_parts|length }} Eintr{% if other_parts|length == 1 %}ag{% else %}äge{% endif %}">{{ other_parts|length }} Eintr{% if other_parts|length == 1 %}ag{% else %}äge{% endif %}</span>
         </div>
         {% endif %}
       </div>

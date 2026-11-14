@@ -66,7 +66,7 @@
                 <summary>Revisionen ({{ older_revisions_count }})</summary>
                 <div class="toolbar">
                   <div class="toolbar-group">
-                    <span class="muted" id="revision-filter-count" data-filter-default="{{ older_revisions_count }} Revisionen">{{ older_revisions_count }} Revisionen</span>
+                    <span class="muted" id="revision-filter-count" data-filter-default="{{ older_revisions_count }} Revision{% if older_revisions_count != 1 %}en{% endif %}">{{ older_revisions_count }} Revision{% if older_revisions_count != 1 %}en{% endif %}</span>
                   </div>
                   <div class="toolbar-group">
                     <input type="search" class="filter-input" placeholder="Revisionen filtern …"

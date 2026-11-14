@@ -11,7 +11,7 @@
 <div class="data-card">
   <form method="post" class="form-card">
     {% csrf_token %}<input type="hidden" name="tag_id" value="{{ tag.id }}">
-    <label for="tag-name-{{ tag.id }}">{{ tag.project_count }} Projekte · Tag-Name</label>
+    <label for="tag-name-{{ tag.id }}">{{ tag.project_count }} Projekt{{ tag.project_count|pluralize:"e" }} · Tag-Name</label>
     <input id="tag-name-{{ tag.id }}" name="name" value="{{ tag.name }}" maxlength="80" required>
     <button name="action" value="rename">Umbenennen / zusammenführen</button>
   </form>
