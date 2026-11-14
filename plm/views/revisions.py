@@ -13,7 +13,6 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from ..derivatives import ensure_revision_png_views, prepare_revision_derivatives
 from ..forms import (
-    ManufacturingFileUploadForm,
     RevisionExportJobForm,
     RevisionNotesForm,
     RevisionUploadForm,
@@ -42,6 +41,7 @@ from ..services import (
 
 from .common import (
     PENDING_REVISION_UPLOAD_SESSION_KEY,
+    attach_manufacturing_forms,
     VIEWER_SUPPORTED_ARTIFACT_TYPES,
     build_revision_compare_pairs,
     clear_pending_revision_upload,
@@ -84,7 +84,7 @@ def upload_revision(request, part_id):
     if request.method != "POST":
         return redirect("plm:part_detail", part_id=part.id)
 
-    form = RevisionUploadForm(request.POST, request.FILES, part=part)
+    form = RevisionUploadForm(request.POST, request.FILES, part=part, id_prefix="revision")
     if form.is_valid():
         try:
             with transaction.atomic():
@@ -151,7 +151,7 @@ def upload_revision(request, part_id):
             "part": part,
             "revisions": revisions,
             "form": form,
-            "manufacturing_form": ManufacturingFileUploadForm(),
+            "manufacturing_forms": attach_manufacturing_forms(revisions),
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),
             "can_edit_notes": can_edit_revision_notes(request.user),

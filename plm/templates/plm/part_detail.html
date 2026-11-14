@@ -450,10 +450,10 @@
                       <div class="file-drop-zone" data-file-drop tabindex="0">
                         <strong>Fertigungsdatei hierher ziehen</strong>
                         <span class="muted">oder über das Dateifeld auswählen</span>
-                        {% include "plm/includes/form_field.html" with field=manufacturing_form.file %}
+                        {% include "plm/includes/form_field.html" with field=revision.manufacturing_form.file %}
                         <span class="file-drop-name" data-file-drop-name></span>
                       </div>
-                      {% for field in manufacturing_form %}
+                      {% for field in revision.manufacturing_form %}
                         {% if field.name != "file" %}{% include "plm/includes/form_field.html" with field=field %}{% endif %}
                       {% endfor %}
                       <button type="submit">Fertigungsdatei hochladen</button>

@@ -357,6 +357,20 @@ class PartTagsForm(forms.Form):
         return tag_names(self.cleaned_data.get("tags", ""))
 
 
+def apply_widget_id_prefix(form, prefix):
+    """Vergibt eindeutige Feld-IDs, ohne die POST-Feldnamen zu aendern.
+
+    Mehrere Dialoge auf derselben Seite rendern sonst identische IDs
+    (z. B. ``id_file``); ``<label for=...>`` und Screenreader ordnen sie
+    dann dem falschen Feld zu.
+    """
+    if not prefix:
+        return form
+    for name, field in form.fields.items():
+        field.widget.attrs["id"] = f"id_{prefix}-{name}"
+    return form
+
+
 class RevisionUploadForm(forms.Form):
     file = forms.FileField(
         label="CAD-Datei",
@@ -379,10 +393,11 @@ class RevisionUploadForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, part=None, **kwargs):
+    def __init__(self, *args, part=None, id_prefix=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.part = part
         self.project_file_metadata = None
+        apply_widget_id_prefix(self, id_prefix)
         if part is not None:
             self.fields["target_snapshot"].queryset = (
                 ProjectSnapshot.objects.filter(
@@ -514,9 +529,10 @@ class ManufacturingFileUploadForm(forms.ModelForm):
             "estimated_material_g": "Geschaetztes Material g",
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, id_prefix=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.upload_info = None
+        apply_widget_id_prefix(self, id_prefix)
         self.fields["machine"].queryset = ManufacturingMachine.objects.filter(
             is_active=True
         )

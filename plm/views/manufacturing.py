@@ -13,6 +13,7 @@ from ..services import (
 
 from .common import (
     VIEWER_SUPPORTED_MANUFACTURING_TYPES,
+    attach_manufacturing_forms,
     missing_viewer_preview_response,
     revision_viewer_artifact,
     viewer_preview_response,
@@ -125,7 +126,9 @@ def upload_manufacturing_file(request, revision_id):
     if request.method != "POST":
         return redirect("plm:part_detail", part_id=revision.part_id)
 
-    form = ManufacturingFileUploadForm(request.POST, request.FILES)
+    form = ManufacturingFileUploadForm(
+        request.POST, request.FILES, id_prefix=f"mf{revision.id}"
+    )
     if form.is_valid():
         try:
             save_manufacturing_upload(form, revision, request.user)
@@ -138,11 +141,15 @@ def upload_manufacturing_file(request, revision_id):
             )
             return redirect("plm:part_detail", part_id=revision.part_id)
 
-    revisions = (
+    revisions = list(
         revision.part.revisions.select_related("created_by")
         .prefetch_related("artifacts", "export_jobs", "manufacturing_files")
         .order_by("-created_at")
     )
+    attach_manufacturing_forms(revisions)
+    for item in revisions:
+        if item.pk == revision.pk:
+            item.manufacturing_form = form
     return render(
         request,
         "plm/part_detail.html",
@@ -150,8 +157,7 @@ def upload_manufacturing_file(request, revision_id):
             "part": revision.part,
             "revisions": revisions,
             "selected_revision": revision,
-            "form": RevisionUploadForm(),
-            "manufacturing_form": form,
+            "form": RevisionUploadForm(id_prefix="revision"),
             "manufacturing_form_revision": revision,
             "can_upload": can_upload_revision(request.user),
             "can_release": can_release_revision(request.user),

@@ -360,3 +360,17 @@ def ensure_revision_viewer_preview(revision, user, *, process_inline=True):
         revision.refresh_from_db()
         return "ready" if job.status == ExportJob.Status.SUCCEEDED and revision_viewer_artifact(revision) else "failed"
     return "queued"
+
+def attach_manufacturing_forms(revisions):
+    """Gibt jeder Revision ein eigenes, eindeutig praefigiertes Upload-Formular.
+
+    Ohne Prefix wuerden alle Dialoge dieselben Feld-IDs (z. B. ``id_file``)
+    rendern; Labels und Screenreader ordnen sie dann dem falschen Feld zu.
+    """
+    from ..forms import ManufacturingFileUploadForm
+
+    for revision in revisions:
+        revision.manufacturing_form = ManufacturingFileUploadForm(
+            id_prefix=f"mf{revision.id}"
+        )
+    return revisions

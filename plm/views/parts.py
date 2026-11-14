@@ -9,7 +9,7 @@ from django.db.models import Prefetch
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
-from ..forms import ManufacturingFileUploadForm, PartForm, PartTagsForm, RevisionUploadForm
+from ..forms import PartForm, PartTagsForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
 from ..models import Annotation, AuditEvent, Checkout, ExportJob, Part, PrintProject, Project, ProjectSnapshotEntry, Revision, RevisionArtifact
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision, is_plm_admin
@@ -23,6 +23,7 @@ from ..services import (
 )
 from ..services.ux import reference_checkins_for_part
 from ..services.snapshots import snapshot_entry_for_revision
+from .common import attach_manufacturing_forms
 
 
 @login_required
@@ -144,8 +145,8 @@ def part_detail(request, part_id):
                 if part.category == Part.Category.ASSEMBLY
                 else None
             ),
-            "form": RevisionUploadForm(part=part),
-            "manufacturing_form": ManufacturingFileUploadForm(),
+            "form": RevisionUploadForm(part=part, id_prefix="revision"),
+            "manufacturing_forms": attach_manufacturing_forms(revisions),
             "can_upload": can_upload_revision(request.user),
             "can_manage_part": is_plm_admin(request.user),
             "can_release": can_release_revision(request.user),
