@@ -1,4 +1,7 @@
 {% extends "plm/base.html" %}
+
+{% block title %}{{ part.number }} entfernen · FreeCAD-PLM{% endblock %}
+
 {% block content %}
 <div class="page-header"><div><h1>{{ part.number }} · {{ part.name }}</h1>
 {% if part.is_archived %}<p>Dieses Teil wird wieder in der Projektliste angezeigt.</p>{% elif archive %}<p>Dieses Teil wird archiviert. Revisionen und Dateien bleiben erhalten. Es kann über diese Seite wiederhergestellt werden.</p>{% else %}<p>Dieses Teil und seine Revisionen, Dateien und Anmerkungen werden dauerhaft gelöscht. Verknüpfte Daten können die Löschung verhindern.</p>{% endif %}
