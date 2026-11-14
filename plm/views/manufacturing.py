@@ -137,7 +137,7 @@ def upload_manufacturing_file(request, revision_id):
         else:
             messages.success(
                 request,
-                f"Fertigungsdatei fuer {revision.revision_code} wurde hochgeladen.",
+                f"Fertigungsdatei für {revision.revision_code} wurde hochgeladen.",
             )
             return redirect("plm:part_detail", part_id=revision.part_id)
 

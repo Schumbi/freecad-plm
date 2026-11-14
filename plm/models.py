@@ -326,7 +326,7 @@ class ExportJob(TimeStampedModel):
 
     class Status(models.TextChoices):
         QUEUED = "queued", "Wartend"
-        RUNNING = "running", "Laeuft"
+        RUNNING = "running", "Läuft"
         SUCCEEDED = "succeeded", "Erfolgreich"
         FAILED = "failed", "Fehlgeschlagen"
 
@@ -452,7 +452,7 @@ class ManufacturingFile(TimeStampedModel):
     class Purpose(models.TextChoices):
         PRINT = "print", "3D-Druck"
         EXTERNAL_MANUFACTURING = "external_manufacturing", "Externe Fertigung"
-        INSPECTION = "inspection", "Pruefung"
+        INSPECTION = "inspection", "Prüfung"
         DOCUMENTATION = "documentation", "Dokumentation"
 
     class Status(models.TextChoices):
@@ -540,7 +540,7 @@ class ManufacturingFile(TimeStampedModel):
 class ManufacturingRun(TimeStampedModel):
     class Status(models.TextChoices):
         PLANNED = "planned", "Geplant"
-        RUNNING = "running", "Laeuft"
+        RUNNING = "running", "Läuft"
         SUCCEEDED = "succeeded", "Erfolgreich"
         FAILED = "failed", "Fehlgeschlagen"
         SCRAPPED = "scrapped", "Ausschuss"

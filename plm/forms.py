@@ -262,7 +262,7 @@ class PartForm(forms.ModelForm):
         help_text="Unterstützt werden FreeCAD-, STEP- und STL-Dateien.",
     )
     change_summary = forms.CharField(
-        label="Aenderungen",
+        label="Änderungen",
         required=False,
         widget=forms.Textarea(attrs={"rows": 4}),
         help_text="Kurz dokumentieren, was diese initiale Revision enthaelt.",
@@ -523,10 +523,10 @@ class ManufacturingFileUploadForm(forms.ModelForm):
             "printer_profile": "Druckerprofil",
             "material": "Material",
             "material_brand": "Materialhersteller",
-            "nozzle_diameter": "Duese mm",
-            "layer_height": "Layerhoehe mm",
-            "estimated_print_time_seconds": "Geschaetzte Druckzeit Sekunden",
-            "estimated_material_g": "Geschaetztes Material g",
+            "nozzle_diameter": "Düse (mm)",
+            "layer_height": "Layerhöhe (mm)",
+            "estimated_print_time_seconds": "Geschätzte Druckzeit (Sekunden)",
+            "estimated_material_g": "Geschätztes Material (g)",
         }
 
     def __init__(self, *args, id_prefix=None, **kwargs):
