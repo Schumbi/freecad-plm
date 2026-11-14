@@ -99,11 +99,11 @@
                   <tr
                     class="clickable-row"
                     data-filter-item
-                    data-filter-text="{{ part.number }} {{ part.name }} {{ part.description }} {{ part.get_category_display }}"
-                    onclick="window.location='{% url 'plm:part_detail' part.id %}';">
-                    <td><span class="object-title">{{ part.number }}</span></td>
+                    data-row-href="{% url 'plm:part_detail' part.id %}"
+                    data-filter-text="{{ part.number }} {{ part.name }} {{ part.description }} {{ part.get_category_display }}">
+                    <td><a class="object-title" href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></td>
                     <td>
-                      <span class="object-title">{{ part.name }}</span>
+                      <a class="object-title" href="{% url 'plm:part_detail' part.id %}">{{ part.name }}</a>
                       {% if part.description %}<div class="meta-line">{{ part.description|truncatechars:90 }}</div>{% endif %}
                     </td>
                     <td><span class="type-pill">{{ part.get_category_display }}</span></td>

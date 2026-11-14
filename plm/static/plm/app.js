@@ -183,6 +183,16 @@
     });
   }
 
+  function setupClickableRows() {
+    document.querySelectorAll("tr[data-row-href]").forEach(function (row) {
+      row.addEventListener("click", function (event) {
+        if (event.target.closest("a, button, input, select, textarea, label")) return;
+        if (window.getSelection && String(window.getSelection()).length) return;
+        window.location = row.getAttribute("data-row-href");
+      });
+    });
+  }
+
   function setupSidebarToggle() {
     var toggle = document.querySelector("[data-sidebar-toggle]");
     var shell = document.querySelector(".app-shell");
@@ -656,6 +666,7 @@
   revealLinkedRevision();
   window.addEventListener("hashchange", revealLinkedRevision);
   setupCadFileGuides();
+  setupClickableRows();
   setupSidebarToggle();
   setupSearchToggle();
   setupUserMenu();
