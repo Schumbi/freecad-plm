@@ -69,7 +69,10 @@ PLM_PUBLIC_URL=https://plm.example.local</code></pre>
 
     <form method="post" class="mt-4">
       {% csrf_token %}
-      <button class="btn btn-primary" type="submit"{% if not bambuddy_configured %} disabled{% endif %}>Verbindung testen</button>
+      <button class="btn btn-primary" type="submit"{% if not bambuddy_configured %} disabled aria-describedby="bambuddy-test-hint"{% endif %}>Verbindung testen</button>
+      {% if not bambuddy_configured %}
+        <p class="field-hint" id="bambuddy-test-hint">Nicht verfügbar: <code>BAMBUDDY_URL</code> und <code>BAMBUDDY_API_KEY</code> sind auf dem Server nicht gesetzt. Siehe „Serverkonfiguration“ oben.</p>
+      {% endif %}
     </form>
   </section>
 {% endblock %}
