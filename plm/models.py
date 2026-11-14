@@ -1,3 +1,4 @@
+from hashlib import sha256
 from uuid import uuid4
 
 from django.db import models
@@ -27,6 +28,24 @@ class ProjectTag(models.Model):
     def save(self, *args, **kwargs):
         self.name = " ".join(self.name.split())
         self.key = self.name.casefold()
+        super().save(*args, **kwargs)
+
+
+class PartTag(models.Model):
+    name = models.CharField(max_length=255)
+    identity_hash = models.CharField(max_length=64, unique=True, editable=False)
+
+    class Meta:
+        ordering = ["name", "pk"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.name = " ".join(self.name.split())
+        if not self.name or "," in self.name:
+            raise ValidationError("Ein Teile-Tag darf nicht leer sein oder ein Komma enthalten.")
+        self.identity_hash = sha256(self.name.casefold().encode("utf-8")).hexdigest()
         super().save(*args, **kwargs)
 
 
@@ -130,6 +149,11 @@ class Part(TimeStampedModel):
     material = models.CharField(max_length=120, blank=True)
     supplier = models.CharField(max_length=160, blank=True)
     tags = models.CharField(max_length=255, blank=True)
+    structured_tags = models.ManyToManyField(
+        PartTag,
+        blank=True,
+        related_name="parts",
+    )
     is_archived = models.BooleanField(default=False)
 
     class Meta:
