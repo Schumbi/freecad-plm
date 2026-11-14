@@ -1734,6 +1734,18 @@ td form {
   justify-content: space-between;
 }
 
+.viewer-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.model-viewer-toolbar-actions button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-dark);
+  color: var(--accent-dark);
+}
+
 .model-viewer-toolbar-actions {
   align-items: center;
   display: flex;

@@ -654,6 +654,7 @@ edgesButton?.addEventListener("click", () => setFeatureEdges(!featureEdges));
 wireframeButton?.addEventListener("click", () => {
   setWireframe(!wireframe);
   wireframeButton.classList.toggle("btn-primary", wireframe);
+  wireframeButton.setAttribute("aria-pressed", String(wireframe));
 });
 
 dialog?.addEventListener("close", () => {
