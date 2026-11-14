@@ -155,7 +155,7 @@
                   {% endif %}
                 </div>
                 <div class="revision-actions-secondary">
-                  <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">Anmerkungen</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#notes-{{ revision.id }}">Notizen</button>
                   <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#manufacturing-{{ revision.id }}">Fertigung</button>
                   <details class="action-menu">
                     <summary>Mehr</summary>
@@ -181,7 +181,7 @@
             <div class="plm-dialog" id="notes-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="notes-title-{{ revision.id }}" hidden>
               <div class="plm-dialog-panel">
                 <div class="plm-dialog-header">
-                  <h5 class="plm-dialog-title" id="notes-title-{{ revision.id }}">Anmerkungen {{ revision.revision_code }}</h5>
+                  <h5 class="plm-dialog-title" id="notes-title-{{ revision.id }}">Notizen {{ revision.revision_code }}</h5>
                   <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
                 </div>
                 <div class="plm-dialog-body">
@@ -193,7 +193,7 @@
                   {% if can_edit_notes %}
                     <form class="form-card" method="post" action="{% url 'plm:update_revision_notes' revision.id %}">
                       {% csrf_token %}
-                      <label for="notes-text-{{ revision.id }}">Anmerkungen</label>
+                      <label for="notes-text-{{ revision.id }}">Notizen</label>
                       <textarea id="notes-text-{{ revision.id }}" name="notes" rows="6">{{ revision.notes }}</textarea>
                       <button type="submit">Speichern</button>
                     </form>

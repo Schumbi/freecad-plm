@@ -37,6 +37,7 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+  --radius-md: 12px;
   --sidebar-width: 15rem;
   --context-width: 18.5rem;
   --topbar-height: 3.75rem;
@@ -627,7 +628,8 @@ main {
 }
 
 .errors,
-.errorlist {
+.errorlist,
+.form-errors {
   background: var(--danger-soft);
   border-left: 3px solid var(--danger);
   color: var(--danger);

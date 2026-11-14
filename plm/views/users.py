@@ -60,6 +60,7 @@ def user_management_list(request):
         {
             "user_rows": user_rows,
             "token_rows": token_rows,
+            "active_section": "admin",
         },
     )
 
@@ -95,6 +96,7 @@ def create_user(request):
             "form": form,
             "title": "Benutzer anlegen",
             "submit_label": "Anlegen",
+            "active_section": "admin",
         },
         status=400 if request.method == "POST" else 200,
     )
@@ -144,6 +146,7 @@ def edit_user(request, user_id):
             "managed_user": target_user,
             "title": f"Benutzer bearbeiten: {target_user.username}",
             "submit_label": "Speichern",
+            "active_section": "admin",
         },
         status=400 if request.method == "POST" else 200,
     )
@@ -180,6 +183,7 @@ def set_user_password(request, user_id):
         {
             "form": form,
             "managed_user": target_user,
+            "active_section": "admin",
         },
         status=400 if request.method == "POST" else 200,
     )
@@ -230,6 +234,7 @@ def create_user_token(request, user_id):
             "raw_token": raw_token,
             "title": f"API-Token fuer {target_user.username} anlegen",
             "submit_label": "Token anlegen",
+            "active_section": "admin",
         },
         status=201 if raw_token else (400 if request.method == "POST" else 200),
     )
@@ -272,6 +277,7 @@ def edit_api_token(request, token_id):
             "token": token,
             "title": f"API-Token bearbeiten: {token.name}",
             "submit_label": "Speichern",
+            "active_section": "admin",
         },
         status=400 if request.method == "POST" else 200,
     )

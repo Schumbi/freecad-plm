@@ -67,6 +67,7 @@ def project_documents(request, project_id):
         "can_manage": can_upload_revision(request.user), "can_delete": is_plm_admin(request.user),
         "folders": sorted(folder for folder in groups if folder),
         "explicit_folders": set(project.document_folders.values_list("path", flat=True)), "error": error,
+        "active_section": "projects",
     }, status=400 if error else 200)
 
 

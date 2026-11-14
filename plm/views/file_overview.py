@@ -162,6 +162,7 @@ def project_files_overview(request, project_id):
         "query": request.GET.get("q", ""), "show_old": request.GET.get("old") == "1",
         "sort_field": sort_field, "sort_direction": sort_direction,
         "sort_headers": sort_headers,
+        "active_section": "projects",
     })
 
 

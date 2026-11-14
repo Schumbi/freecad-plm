@@ -69,4 +69,5 @@ def manage_project_folders(request):
         "folders": folders,
         "projects": Project.objects.select_related("folder").order_by("code"),
         "error": error,
+        "active_section": "projects",
     }, status=400 if error else 200)

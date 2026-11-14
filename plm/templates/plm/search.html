@@ -171,7 +171,7 @@
               {% for revision in results.revisions %}
                 <tr>
                   <td><a href="{% url 'plm:project_detail' revision.part.project_id %}">{{ revision.part.project.code }}</a></td>
-                  <td><a href="{% url 'plm:part_detail' revision.part_id %}">{{ revision.part.number }}</a></td>
+                  <td><a href="{% url 'plm:part_detail' revision.part_id %}#revision-{{ revision.id }}">{{ revision.part.number }}</a></td>
                   <td>{{ revision.revision_code }}</td>
                   <td>{{ revision.original_filename }}</td>
                   <td><span class="status-badge status-{{ revision.status }}">{{ revision.get_status_display }}</span></td>

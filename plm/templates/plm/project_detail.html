@@ -162,7 +162,7 @@
         </div>
       {% endif %}
       {% if archived_parts %}
-        <section class="card"><h2>Archivierte Teile und Baugruppen</h2><ul>{% for archived_part in archived_parts %}<li><a href="{% url 'plm:part_detail' archived_part.id %}">{{ archived_part.number }} · {{ archived_part.name }}</a> <a href="{% url 'plm:remove_part' archived_part.id %}">Wiederherstellen</a></li>{% endfor %}</ul></section>
+        <section class="panel"><h2>Archivierte Teile und Baugruppen</h2><ul>{% for archived_part in archived_parts %}<li><a href="{% url 'plm:part_detail' archived_part.id %}">{{ archived_part.number }} · {{ archived_part.name }}</a> <a href="{% url 'plm:remove_part' archived_part.id %}">Wiederherstellen</a></li>{% endfor %}</ul></section>
       {% endif %}
     </div>
 

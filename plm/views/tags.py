@@ -41,4 +41,5 @@ def manage_project_tags(request):
             error = " ".join(exc.messages)
     return render(request, "plm/project_tags.html", {
         "tags": ProjectTag.objects.annotate(project_count=Count("projects")), "error": error,
+        "active_section": "projects",
     }, status=400 if error else 200)
