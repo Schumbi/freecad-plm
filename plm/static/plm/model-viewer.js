@@ -207,6 +207,19 @@ function setFeatureEdges(enabled) {
   });
 }
 
+function scheduleFeatureEdges(loadId) {
+  if (!featureEdges) return;
+  const apply = () => {
+    if (featureEdges && loadId === activeLoadId && dialog.open) setFeatureEdges(true);
+  };
+  // Erst das Modell zeigen, dann teure Kantengeometrie berechnen.
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(apply, { timeout: 600 });
+  } else {
+    window.setTimeout(apply, 50);
+  }
+}
+
 function fitCamera(object, viewDirection = new THREE.Vector3(1, 0.75, 1).normalize()) {
   const box = new THREE.Box3().setFromObject(object);
   if (box.isEmpty()) {
@@ -421,11 +434,11 @@ async function openViewer(trigger) {
     }
     scene.add(currentObject);
     setWireframe(wireframe);
-    setFeatureEdges(featureEdges);
     showView(initialView);
-    await loadViewerAnnotations();
-    setStatus("", false);
     if (!animationFrame) animate();
+    setStatus("", false);
+    scheduleFeatureEdges(loadId);
+    loadViewerAnnotations();
     if (loaded.refreshRequired) refreshDisplayedModel(trigger, sourceUrl, loadId, actualFormat);
   } catch (error) {
     if (loadId === activeLoadId && dialog.open) {
@@ -577,6 +590,7 @@ async function prepareAndLoadModel(sourceUrl, prepareUrl, statusUrl, loadId) {
 }
 
 async function waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, report) {
+  const startedAt = Date.now();
   report("3D-Vorschau wird erzeugt...");
   const initial = await fetchJson(prepareUrl, { method: "POST" });
   if (initial.message) report(initial.message);
@@ -598,8 +612,12 @@ async function waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, report) 
     if (!["queued", "running", "pending", "missing"].includes(status.status)) {
       throw new Error("Unbekannter Vorschau-Status. Bitte erneut öffnen.");
     }
-    report(`${status.message || "3D-Vorschau wird erzeugt..."} Du kannst das Fenster schließen und später wieder öffnen.`);
-    await wait(3000);
+    const elapsed = Math.round((Date.now() - startedAt) / 1000);
+    report(
+      `${status.message || "3D-Vorschau wird erzeugt..."} (${elapsed} s) `
+      + "Du kannst das Fenster schließen und später wieder öffnen."
+    );
+    await wait(1000);
   }
 }
 
@@ -623,10 +641,10 @@ async function refreshDisplayedModel(trigger, sourceUrl, loadId, format) {
     currentObject = replacement;
     scene.add(currentObject);
     setWireframe(wireframe);
-    setFeatureEdges(featureEdges);
     camera.position.copy(position);
     controls.target.copy(target);
-    await loadViewerAnnotations();
+    scheduleFeatureEdges(loadId);
+    loadViewerAnnotations();
     if (loadId === activeLoadId) formatElement.textContent = format.toUpperCase();
   } catch (error) {
     if (loadId === activeLoadId && dialog.open) {
