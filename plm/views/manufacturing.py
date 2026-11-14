@@ -197,6 +197,7 @@ def manufacturing_file_viewer_source(request, manufacturing_file_id):
             manufacturing_file.file,
             manufacturing_file.original_filename,
             file_format,
+            etag=manufacturing_file.sha256,
         )
 
     preview = revision_viewer_artifact(manufacturing_file.revision, allow_previous=True)

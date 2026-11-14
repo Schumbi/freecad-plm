@@ -579,7 +579,9 @@ def revision_viewer_source(request, revision_id):
         id=revision_id,
     )
     if revision.file_format == Revision.FileFormat.STL:
-        return viewer_file_response(revision.file, revision.original_filename, "stl")
+        return viewer_file_response(
+            revision.file, revision.original_filename, "stl", etag=revision.sha256
+        )
     artifact = revision_viewer_artifact(revision, allow_previous=True)
     if not artifact:
         return missing_viewer_preview_response()

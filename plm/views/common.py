@@ -8,7 +8,12 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.http import FileResponse, HttpResponseForbidden, HttpResponseNotFound
 from django.urls import reverse
-from ..derivatives import revision_has_complete_png_views, revision_has_pending_png_job, revision_png_view_names
+from ..derivatives import (
+    revision_has_complete_png_views,
+    revision_has_pending_png_job,
+    revision_has_pending_viewer_job,
+    revision_png_view_names,
+)
 from ..forms import user_role
 from ..freecadcmd import PREVIEW_GENERATOR_VERSION, create_export_job, process_export_job, filter_preview_context, preview_source_context
 from ..models import ExportJob, ManufacturingFile, Revision, RevisionArtifact
@@ -182,13 +187,26 @@ def revision_viewer_artifact(revision, *, allow_previous=False):
     ).order_by("-created_at", "-id").first()
 
 
-def viewer_file_response(field_file, filename, file_format, *, cad_coordinates=False, refresh_required=False):
+def viewer_file_response(
+    field_file,
+    filename,
+    file_format,
+    *,
+    cad_coordinates=False,
+    refresh_required=False,
+    etag="",
+):
     response = FileResponse(
         field_file.open("rb"),
         as_attachment=False,
         filename=filename,
         content_type=VIEWER_CONTENT_TYPES.get(file_format, "application/octet-stream"),
     )
+    # Revisionsartefakte sind unveraenderlich; der ETag erlaubt 304-Antworten
+    # statt erneut mehrere Megabyte zu uebertragen.
+    response["Cache-Control"] = "private, no-cache"
+    if etag:
+        response["ETag"] = f'"{etag}"'
 
     if cad_coordinates:
         response["X-PLM-Viewer-Coordinates"] = "cad"
@@ -210,6 +228,7 @@ def viewer_preview_response(artifact):
         artifact.file, artifact.original_filename, artifact.artifact_type,
         cad_coordinates=True,
         refresh_required=stale_sources or artifact.metadata.get("preview_generator_version") != PREVIEW_GENERATOR_VERSION,
+        etag=artifact.sha256,
     )
 
 
@@ -229,7 +248,7 @@ def viewer_status_payload(revision):
         }
 
     pending_job = filter_preview_context(revision.export_jobs.filter(
-        job_type=ExportJob.JobType.PNG_VIEWS,
+        job_type__in=(ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER),
         status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING],
     ), revision).order_by("-created_at").first()
     if pending_job:
@@ -241,7 +260,7 @@ def viewer_status_payload(revision):
         }
 
     failed_job = filter_preview_context(revision.export_jobs.filter(
-        job_type=ExportJob.JobType.PNG_VIEWS,
+        job_type__in=(ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER),
         status=ExportJob.Status.FAILED,
     ), revision).order_by("-created_at").first()
     if failed_job:
@@ -346,12 +365,12 @@ def ensure_revision_viewer_preview(revision, user, *, process_inline=True):
         return "ready"
     if revision_viewer_artifact(revision):
         return "ready"
-    if revision_has_pending_png_job(revision):
+    if revision_has_pending_viewer_job(revision) or revision_has_pending_png_job(revision):
         return "pending"
 
     job = create_export_job(
         revision=revision,
-        job_type=ExportJob.JobType.PNG_VIEWS,
+        job_type=ExportJob.JobType.VIEWER,
         created_by=user,
     )
     if process_inline and settings.PROCESS_EXPORT_JOBS_INLINE:
