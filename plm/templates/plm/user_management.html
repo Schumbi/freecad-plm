@@ -29,6 +29,11 @@
       <h2>Benutzer</h2>
       <span class="muted">{{ user_rows|length }} Einträge</span>
     </div>
+    <p class="field-hint">
+      Administrator:in verwaltet Benutzer, Projekte und Freigaben ·
+      Bearbeiter:in lädt Revisionen hoch und pflegt Daten ·
+      Leser:in kann ansehen und herunterladen.
+    </p>
     {% if user_rows %}
       <div class="table-wrap">
         <table>
@@ -50,7 +55,7 @@
                 <td>{{ row.user.username }}</td>
                 <td>{{ row.user.get_full_name|default:"–" }}</td>
                 <td>{{ row.user.email|default:"–" }}</td>
-                <td>{{ row.role }}</td>
+                <td>{{ row.role_label }}</td>
                 <td>{% if row.user.is_active %}<span class="status-badge status-released">Aktiv</span>{% else %}<span class="status-badge status-obsolete">Inaktiv</span>{% endif %}</td>
                 <td>{{ row.user.last_login|date:"d.m.Y H:i"|default:"–" }}</td>
                 <td>{{ row.token_count }}</td>

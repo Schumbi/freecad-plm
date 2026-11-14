@@ -8,6 +8,7 @@ from django.views.decorators.http import require_POST
 from ..auth import create_api_token
 from ..forms import AdminSetPasswordForm, ApiTokenForm, UserManagementForm, set_user_role, token_preset_for_scopes, token_preset_label, user_role
 from ..models import ApiToken, AuditEvent
+from ..permissions import ROLE_ADMIN, ROLE_EDITOR, ROLE_READER
 
 from .common import (
     admin_required_response,
@@ -38,10 +39,21 @@ def user_management_list(request):
         ApiToken.objects.select_related("user")
         .order_by("user__username", "name")
     )
+    role_labels = {
+        ROLE_ADMIN: "Administrator:in",
+        ROLE_EDITOR: "Bearbeiter:in",
+        ROLE_READER: "Leser:in",
+        "": "Keine Rolle",
+    }
     user_rows = [
         {
             "user": user,
             "role": user_role(user) or "-",
+            "role_label": (
+                "Superuser"
+                if user.is_superuser
+                else role_labels.get(user_role(user), "Keine Rolle")
+            ),
             "token_count": user.api_tokens.count(),
         }
         for user in users
