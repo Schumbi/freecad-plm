@@ -176,7 +176,7 @@
               </div>
             </article>
 
-            <div class="plm-dialog" id="notes-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="notes-title-{{ revision.id }}" hidden>
+            <dialog class="plm-dialog" id="notes-{{ revision.id }}" aria-labelledby="notes-title-{{ revision.id }}">
               <div class="plm-dialog-panel">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="notes-title-{{ revision.id }}">Notizen {{ revision.revision_code }}</h5>
@@ -198,9 +198,9 @@
                   {% endif %}
                 </div>
               </div>
-            </div>
+            </dialog>
 
-            <div class="plm-dialog" id="revision-properties-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="revision-properties-title-{{ revision.id }}" hidden>
+            <dialog class="plm-dialog" id="revision-properties-{{ revision.id }}" aria-labelledby="revision-properties-title-{{ revision.id }}">
               <div class="plm-dialog-panel">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="revision-properties-title-{{ revision.id }}">Eigenschaften {{ revision.revision_code }}</h5>
@@ -210,9 +210,9 @@
                   {% include "plm/includes/revision_properties.html" with revision=revision %}
                 </div>
               </div>
-            </div>
+            </dialog>
 
-            <div class="plm-dialog" id="freecad-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="freecad-title-{{ revision.id }}" hidden>
+            <dialog class="plm-dialog" id="freecad-{{ revision.id }}" aria-labelledby="freecad-title-{{ revision.id }}">
               <div class="plm-dialog-panel wide">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="freecad-title-{{ revision.id }}">FreeCAD-Metadaten {{ revision.revision_code }}</h5>
@@ -300,9 +300,9 @@
                   </dl>
                 </div>
               </div>
-            </div>
+            </dialog>
 
-            <div class="plm-dialog" id="manufacturing-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="manufacturing-title-{{ revision.id }}" hidden>
+            <dialog class="plm-dialog" id="manufacturing-{{ revision.id }}" aria-labelledby="manufacturing-title-{{ revision.id }}">
               <div class="plm-dialog-panel wide">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="manufacturing-title-{{ revision.id }}">Fertigung {{ revision.revision_code }}</h5>
@@ -450,9 +450,9 @@
                   {% endif %}
                 </div>
               </div>
-            </div>
+            </dialog>
 
-            <div class="plm-dialog" id="jobs-{{ revision.id }}" role="dialog" aria-modal="true" aria-labelledby="jobs-title-{{ revision.id }}" hidden>
+            <dialog class="plm-dialog" id="jobs-{{ revision.id }}" aria-labelledby="jobs-title-{{ revision.id }}">
               <div class="plm-dialog-panel wide">
                 <div class="plm-dialog-header">
                   <h5 class="plm-dialog-title" id="jobs-title-{{ revision.id }}">Jobs und Artefakte {{ revision.revision_code }}</h5>
@@ -517,7 +517,7 @@
                   {% endif %}
                 </div>
               </div>
-            </div>
+            </dialog>
           {% endfor %}
         </div>
         {% if older_revisions_count %}
@@ -624,7 +624,7 @@
   </div>
 
   {% if can_upload %}
-    <div class="plm-dialog" id="revision-upload" role="dialog" aria-modal="true" aria-labelledby="revision-upload-title" hidden>
+    <dialog class="plm-dialog" id="revision-upload" aria-labelledby="revision-upload-title">
       <div class="plm-dialog-panel">
         <div class="plm-dialog-header">
           <h5 class="plm-dialog-title" id="revision-upload-title">Neue Revision hochladen</h5>
@@ -664,6 +664,6 @@
           </form>
         </div>
       </div>
-    </div>
+    </dialog>
   {% endif %}
 {% endblock %}

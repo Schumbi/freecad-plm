@@ -106,7 +106,7 @@ function resizeRenderer() {
 }
 
 function animate() {
-  if (!renderer || dialog.hidden) {
+  if (!renderer || !dialog.open) {
     animationFrame = null;
     return;
   }
@@ -381,8 +381,7 @@ function parseModel(buffer, format, cadCoordinates = false) {
 async function openViewer(trigger) {
   const loadId = ++activeLoadId;
   ensureScene();
-  dialog.hidden = false;
-  document.body.classList.add("modal-open");
+  dialog.showModal();
   resizeRenderer();
   setStatus("3D-Modell wird geladen...");
   clearModel();
@@ -399,7 +398,7 @@ async function openViewer(trigger) {
 
   try {
     const loaded = await loadModelBuffer(trigger, sourceUrl, loadId);
-    if (loadId !== activeLoadId || dialog.hidden) return;
+    if (loadId !== activeLoadId || !dialog.open) return;
     const actualFormat = loaded.format || format;
     formatElement.textContent = actualFormat.toUpperCase();
     currentObject = parseModel(loaded.buffer, actualFormat, loaded.cadCoordinates);
@@ -415,7 +414,7 @@ async function openViewer(trigger) {
     if (!animationFrame) animate();
     if (loaded.refreshRequired) refreshDisplayedModel(trigger, sourceUrl, loadId, actualFormat);
   } catch (error) {
-    if (loadId === activeLoadId && !dialog.hidden) {
+    if (loadId === activeLoadId && dialog.open) {
       setStatus(error.message || "3D-Modell konnte nicht angezeigt werden.");
     }
   }
@@ -569,9 +568,9 @@ async function waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, report) 
   if (initial.message) report(initial.message);
 
   for (let attempt = 0; ; attempt += 1) {
-    if (loadId !== activeLoadId || dialog.hidden) throw new Error("3D-Anzeige wurde abgebrochen.");
+    if (loadId !== activeLoadId || !dialog.open) throw new Error("3D-Anzeige wurde abgebrochen.");
     const status = attempt === 0 ? initial : await fetchJson(statusUrl);
-    if (loadId !== activeLoadId || dialog.hidden) throw new Error("3D-Anzeige wurde abgebrochen.");
+    if (loadId !== activeLoadId || !dialog.open) throw new Error("3D-Anzeige wurde abgebrochen.");
 
     if (status.status === "ready") {
       report("3D-Vorschau ist bereit. Modell wird geladen...");
@@ -601,7 +600,7 @@ async function refreshDisplayedModel(trigger, sourceUrl, loadId, format) {
     const loaded = await waitForPreview(sourceUrl, prepareUrl, statusUrl, loadId, () => {
       formatElement.textContent = `${format.toUpperCase()} · bisherige Vorschau; Farben werden aktualisiert …`;
     });
-    if (loadId !== activeLoadId || dialog.hidden) return;
+    if (loadId !== activeLoadId || !dialog.open) return;
     // Geometry is from the same immutable revision; keep the user's camera.
     const position = camera.position.clone();
     const target = controls.target.clone();
@@ -616,7 +615,7 @@ async function refreshDisplayedModel(trigger, sourceUrl, loadId, format) {
     await loadViewerAnnotations();
     if (loadId === activeLoadId) formatElement.textContent = format.toUpperCase();
   } catch (error) {
-    if (loadId === activeLoadId && !dialog.hidden) {
+    if (loadId === activeLoadId && dialog.open) {
       formatElement.textContent = `${format.toUpperCase()} · bisherige Vorschau; Aktualisierung fehlgeschlagen: ${error.message}`;
     }
   }
@@ -643,8 +642,8 @@ wireframeButton?.addEventListener("click", () => {
   wireframeButton.classList.toggle("btn-primary", wireframe);
 });
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && dialog && dialog.hidden && animationFrame) {
+dialog?.addEventListener("close", () => {
+  if (animationFrame) {
     cancelAnimationFrame(animationFrame);
     animationFrame = null;
   }
