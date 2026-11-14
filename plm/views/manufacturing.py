@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..forms import ManufacturingFileUploadForm, RevisionUploadForm
-from ..models import AuditEvent, ManufacturingFile, Revision
+from ..models import AuditEvent, ManufacturingFile, Part, Revision
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision
 from ..services import (
     create_manufacturing_file_from_upload,
@@ -19,6 +19,97 @@ from .common import (
     viewer_file_format,
     viewer_file_response,
 )
+
+
+def save_manufacturing_upload(form, revision, user):
+    create_manufacturing_file_from_upload(
+        revision=revision,
+        uploaded_file=form.cleaned_data["file"],
+        uploaded_by=user,
+        file_type=form.cleaned_data.get("file_type", ""),
+        purpose=form.cleaned_data["purpose"],
+        status=ManufacturingFile.Status.APPROVED,
+        label=form.cleaned_data["label"],
+        description=form.cleaned_data["description"],
+        slicer_name=form.cleaned_data["slicer_name"],
+        slicer_version=form.cleaned_data["slicer_version"],
+        machine=form.cleaned_data["machine"],
+        machine_label=form.cleaned_data["machine_label"],
+        printer_profile=form.cleaned_data["printer_profile"],
+        material=form.cleaned_data["material"],
+        material_brand=form.cleaned_data["material_brand"],
+        nozzle_diameter=form.cleaned_data["nozzle_diameter"],
+        layer_height=form.cleaned_data["layer_height"],
+        estimated_print_time_seconds=form.cleaned_data["estimated_print_time_seconds"],
+        estimated_material_g=form.cleaned_data["estimated_material_g"],
+    )
+
+
+@login_required
+def manufacturing_overview(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), pk=part_id)
+    revisions = list(part.revisions.order_by("-revision_code", "-pk"))
+    active_revisions = [rev for rev in revisions if rev.status != Revision.Status.OBSOLETE]
+    revision_ids = {rev.pk for rev in active_revisions}
+    selected_revision = active_revisions[0] if active_revisions else None
+    form = ManufacturingFileUploadForm()
+    status = 200
+
+    if request.method == "POST":
+        if not can_upload_revision(request.user):
+            return HttpResponseForbidden("Keine Berechtigung zum Hochladen von Fertigungsdateien.")
+        form = ManufacturingFileUploadForm(request.POST, request.FILES)
+        revision_id = request.POST.get("revision", "")
+        if not active_revisions:
+            form.add_error(None, "Keine aktive Revision vorhanden. Upload nicht möglich.")
+        elif not revision_id.isdecimal() or int(revision_id) not in revision_ids:
+            form.add_error(None, "Bitte eine aktive Revision dieses Teils auswählen.")
+        else:
+            selected_revision = next(rev for rev in active_revisions if rev.pk == int(revision_id))
+            if form.is_valid():
+                try:
+                    save_manufacturing_upload(form, selected_revision, request.user)
+                except ValidationError as exc:
+                    form.add_error("file", exc)
+                else:
+                    messages.success(request, f"Fertigungsdatei für {selected_revision.revision_code} wurde hochgeladen.")
+                    return redirect("plm:manufacturing_overview", part_id=part.pk)
+        status = 400
+
+    selected_filter = request.GET.get("revision", "")
+    file_type = request.GET.get("type", "")
+    sort = request.GET.get("sort", "newest")
+    files = ManufacturingFile.objects.filter(revision__part=part).select_related("revision", "machine")
+    if selected_filter in {str(rev.pk) for rev in revisions}:
+        files = files.filter(revision_id=selected_filter)
+    else:
+        selected_filter = ""
+    if file_type in ManufacturingFile.FileType.values:
+        files = files.filter(file_type=file_type)
+    else:
+        file_type = ""
+    ordering = {
+        "oldest": ("created_at", "pk"),
+        "revision": ("-revision__revision_code", "-created_at", "-pk"),
+        "type": ("file_type", "-created_at", "-pk"),
+    }
+    if sort not in ordering:
+        sort = "newest"
+    files = files.order_by(*ordering.get(sort, ("-created_at", "-pk")))
+    return render(request, "plm/manufacturing_overview.html", {
+        "part": part,
+        "revisions": revisions,
+        "active_revisions": active_revisions,
+        "selected_revision": selected_revision,
+        "manufacturing_files": files,
+        "selected_filter": selected_filter,
+        "selected_type": file_type,
+        "sort": sort,
+        "file_types": ManufacturingFile.FileType.choices,
+        "form": form,
+        "can_upload": can_upload_revision(request.user),
+        "can_release": can_release_revision(request.user),
+    }, status=status)
 
 
 @login_required
@@ -37,29 +128,7 @@ def upload_manufacturing_file(request, revision_id):
     form = ManufacturingFileUploadForm(request.POST, request.FILES)
     if form.is_valid():
         try:
-            create_manufacturing_file_from_upload(
-                revision=revision,
-                uploaded_file=form.cleaned_data["file"],
-                uploaded_by=request.user,
-                file_type=form.cleaned_data.get("file_type", ""),
-                purpose=form.cleaned_data["purpose"],
-                status=ManufacturingFile.Status.APPROVED,
-                label=form.cleaned_data["label"],
-                description=form.cleaned_data["description"],
-                slicer_name=form.cleaned_data["slicer_name"],
-                slicer_version=form.cleaned_data["slicer_version"],
-                machine=form.cleaned_data["machine"],
-                machine_label=form.cleaned_data["machine_label"],
-                printer_profile=form.cleaned_data["printer_profile"],
-                material=form.cleaned_data["material"],
-                material_brand=form.cleaned_data["material_brand"],
-                nozzle_diameter=form.cleaned_data["nozzle_diameter"],
-                layer_height=form.cleaned_data["layer_height"],
-                estimated_print_time_seconds=form.cleaned_data[
-                    "estimated_print_time_seconds"
-                ],
-                estimated_material_g=form.cleaned_data["estimated_material_g"],
-            )
+            save_manufacturing_upload(form, revision, request.user)
         except ValidationError as exc:
             form.add_error("file", exc)
         else:

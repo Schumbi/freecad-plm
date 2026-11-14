@@ -1,0 +1,133 @@
+{% extends "plm/base.html" %}
+
+{% block extra_head %}
+  {# Die bestehende globale .plm-dialog-Regel setzt display:flex auch für geschlossene Dialoge. #}
+  <style>dialog.plm-dialog:not([open]) { display: none; }</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' part.project_id %}">{{ part.project.code }}</a></li>
+      <li><a href="{% url 'plm:part_detail' part.id %}">{{ part.number }}</a></li>
+      <li><span aria-current="page">Fertigung</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">{{ part.project.code }} · {{ part.number }}</span>
+      <h1>Fertigungsdateien</h1>
+      <p class="lead-text">Alle Fertigungsdateien von {{ part.name }} über sämtliche Revisionen.</p>
+    </div>
+    <div class="page-header-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'plm:part_detail' part.id %}">Zum Teil</a>
+    </div>
+  </div>
+
+  <form method="get" class="toolbar" aria-label="Fertigungsdateien filtern">
+    <div class="toolbar-group">
+      <div class="form-field">
+        <label for="filter-revision">Revision</label>
+        <select id="filter-revision" name="revision">
+          <option value="">Alle Revisionen</option>
+          {% for revision in revisions %}
+            <option value="{{ revision.id }}" {% if selected_filter == revision.id|stringformat:"s" %}selected{% endif %}>{{ revision.revision_code }} · {{ revision.get_status_display }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="filter-type">Dateityp</label>
+        <select id="filter-type" name="type">
+          <option value="">Alle Typen</option>
+          {% for value, label in file_types %}
+            <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="sort">Sortieren</label>
+        <select id="sort" name="sort">
+          <option value="newest" {% if sort == "newest" %}selected{% endif %}>Neueste zuerst</option>
+          <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Älteste zuerst</option>
+          <option value="revision" {% if sort == "revision" %}selected{% endif %}>Revision</option>
+          <option value="type" {% if sort == "type" %}selected{% endif %}>Dateityp</option>
+        </select>
+      </div>
+      <button type="submit">Anzeigen</button>
+    </div>
+  </form>
+
+  <section class="data-card" aria-labelledby="manufacturing-list-title">
+    <div class="section-header">
+      <h2 id="manufacturing-list-title">Dateiübersicht</h2>
+      <span class="muted">{{ manufacturing_files|length }} Datei{{ manufacturing_files|length|pluralize:"en" }}</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Datei</th>
+            <th scope="col">Revision</th>
+            <th scope="col">Typ</th>
+            <th scope="col">Status</th>
+            <th scope="col">Maschine / Material</th>
+            <th scope="col">Hochgeladen</th>
+            <th scope="col">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in manufacturing_files %}
+            <tr>
+              <td>{{ item.label|default:item.original_filename }}{% if item.label %}<br><span class="muted">{{ item.original_filename }}</span>{% endif %}</td>
+              <td><a href="{% url 'plm:part_detail' part.id %}#revision-{{ item.revision_id }}">{{ item.revision.revision_code }}</a></td>
+              <td>{{ item.get_file_type_display }}</td>
+              <td><span class="status-badge status-{{ item.status }}">{{ item.get_status_display }}</span></td>
+              <td>{% if item.machine %}{{ item.machine }}{% else %}{{ item.machine_label|default:"–" }}{% endif %}{% if item.material %} · {{ item.material }}{% endif %}</td>
+              <td>{{ item.created_at|date:"d.m.Y H:i" }}</td>
+              <td>
+                <a href="{% url 'plm:download_manufacturing_file' item.id %}">Download</a>
+                {% if can_release %}
+                  · <a href="{% url 'plm:delete_manufacturing_file' item.id %}">Löschen</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7">Keine Fertigungsdateien für diese Auswahl vorhanden.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if can_upload %}
+    <section class="data-card" aria-labelledby="manufacturing-upload-title">
+      <div class="section-header"><h2 id="manufacturing-upload-title">Fertigungsdatei hochladen</h2></div>
+      {% if not active_revisions %}
+        <p class="empty-state">Keine aktive Revision vorhanden. Upload nicht möglich.</p>
+        {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      {% else %}
+      <form class="form-card" method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-field">
+          <label for="upload-revision">Aktive Revision</label>
+          <select id="upload-revision" name="revision" required>
+            {% for revision in active_revisions %}
+              <option value="{{ revision.id }}" {% if selected_revision.id == revision.id %}selected{% endif %}>{{ revision.revision_code }} · {{ revision.get_status_display }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% include "plm/includes/form_field.html" with field=form.file %}
+        {% for field in form %}
+          {% if field.name != "file" %}{% include "plm/includes/form_field.html" with field=field %}{% endif %}
+        {% endfor %}
+        <button type="submit">Fertigungsdatei hochladen</button>
+      </form>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}
