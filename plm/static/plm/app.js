@@ -183,6 +183,30 @@
     });
   }
 
+  function setupFormAccessibility() {
+    document.querySelectorAll(".form-field").forEach(function (container) {
+      var input = container.querySelector("input, select, textarea");
+      if (!input) return;
+      var ids = (input.getAttribute("aria-describedby") || "")
+        .split(/\s+/)
+        .filter(Boolean);
+      container.querySelectorAll(".field-hint[id], .errors[id]").forEach(function (node) {
+        if (ids.indexOf(node.id) === -1) ids.push(node.id);
+      });
+      if (ids.length) input.setAttribute("aria-describedby", ids.join(" "));
+      if (container.classList.contains("has-error")) {
+        input.setAttribute("aria-invalid", "true");
+      }
+    });
+
+    var firstError = document.querySelector(
+      ".form-field.has-error input, .form-field.has-error select, .form-field.has-error textarea"
+    );
+    if (firstError && !firstError.closest("dialog")) {
+      firstError.focus();
+    }
+  }
+
   function setupClickableRows() {
     document.querySelectorAll("tr[data-row-href]").forEach(function (row) {
       row.addEventListener("click", function (event) {
@@ -666,6 +690,7 @@
   revealLinkedRevision();
   window.addEventListener("hashchange", revealLinkedRevision);
   setupCadFileGuides();
+  setupFormAccessibility();
   setupClickableRows();
   setupSidebarToggle();
   setupSearchToggle();

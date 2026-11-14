@@ -1,10 +1,10 @@
 <div class="form-field{% if field.errors %} has-error{% endif %}">
-  {{ field.label_tag }}
+  <div class="field-label">{{ field.label_tag }}{% if field.field.required %}<span class="required-marker" aria-hidden="true">*</span>{% endif %}</div>
   {{ field }}
   {% if field.help_text %}
-    <small class="field-hint">{{ field.help_text }}</small>
+    <small class="field-hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>
   {% endif %}
   {% if field.errors %}
-    <span class="errors">{{ field.errors }}</span>
+    <span class="errors" id="{{ field.auto_id }}_error">{{ field.errors }}</span>
   {% endif %}
 </div>

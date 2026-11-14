@@ -1,3 +1,9 @@
+{% load plm_permissions %}{% if form.errors %}
+  <div class="form-errors" role="alert">Bitte prüfe die markierten Felder.</div>
+{% endif %}
+{% if form|has_required_fields %}
+  <p class="form-legend"><span class="required-marker" aria-hidden="true">*</span> Pflichtfeld</p>
+{% endif %}
 {% for field in form %}
   {% include "plm/includes/form_field.html" with field=field %}
 {% endfor %}

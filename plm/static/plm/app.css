@@ -2188,6 +2188,27 @@ td form {
   font-size: 0.82rem;
 }
 
+.field-label {
+  align-items: baseline;
+  display: flex;
+  gap: 0.15rem;
+}
+
+.field-label label {
+  margin-bottom: 0;
+}
+
+.required-marker {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.form-legend {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0 0 var(--space-3);
+}
+
 .form-actions {
   align-items: center;
   border-top: 1px solid var(--border);
