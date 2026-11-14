@@ -83,7 +83,8 @@ def search_plm(
             | Q(description__icontains=term)
             | Q(project__code__icontains=term)
             | Q(project__name__icontains=term)
-        )
+            | Q(tags__name__icontains=term)
+        ).distinct()
         revision_query = revision_query.filter(
             Q(revision_code__icontains=term)
             | Q(original_filename__icontains=term)
@@ -92,12 +93,13 @@ def search_plm(
             | Q(part__name__icontains=term)
             | Q(part__project__code__icontains=term)
             | Q(part__project__name__icontains=term)
-        )
+            | Q(part__tags__name__icontains=term)
+        ).distinct()
         snapshot_query = snapshot_query.filter(path__icontains=term)
 
     projects = list(project_query.order_by("code")[:limit])
     parts = list(
-        part_query.select_related("project").order_by("project__code", "number")[:limit]
+        part_query.select_related("project").prefetch_related("tags").order_by("project__code", "number")[:limit]
     )
     revisions = list(
         revision_query

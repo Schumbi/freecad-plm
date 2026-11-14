@@ -9,7 +9,7 @@ from django.db.models import Prefetch
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from ..derivatives import prepare_revision_derivatives
-from ..forms import ManufacturingFileUploadForm, PartForm, RevisionUploadForm
+from ..forms import ManufacturingFileUploadForm, PartForm, PartTagsForm, RevisionUploadForm
 from ..freecadcmd import process_queued_export_jobs
 from ..models import Annotation, AuditEvent, Checkout, ExportJob, Part, PrintProject, Project, ProjectSnapshotEntry, Revision, RevisionArtifact
 from ..permissions import can_edit_revision_notes, can_release_revision, can_upload_revision, is_plm_admin
@@ -18,6 +18,8 @@ from ..services import (
     create_revision_from_upload,
     next_part_number,
     part_lifecycle_events,
+    set_part_tags,
+    tags_as_legacy_string,
 )
 from ..services.ux import reference_checkins_for_part
 from ..services.snapshots import snapshot_entry_for_revision
@@ -40,6 +42,7 @@ def create_part(request, project_id):
                     if not part.number:
                         part.number = next_part_number(project)
                     part.save()
+                    set_part_tags(part, form.cleaned_data.get("tags") or [])
                     AuditEvent.objects.create(
                         actor=request.user,
                         action=AuditEvent.Action.PART_CREATED,
@@ -87,7 +90,8 @@ def create_part(request, project_id):
 @login_required
 def part_detail(request, part_id):
     part = get_object_or_404(
-        Part.objects.select_related("project", "family", "variant_source_revision__part"), id=part_id,
+        Part.objects.select_related("project", "family", "variant_source_revision__part").prefetch_related("tags"),
+        id=part_id,
     )
     annotations = list(
         part.annotations.select_related("created_by", "revision").order_by(
@@ -153,13 +157,41 @@ def part_detail(request, part_id):
 
 @login_required
 def part_properties(request, part_id):
-    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    part = get_object_or_404(Part.objects.select_related("project").prefetch_related("tags"), id=part_id)
+    can_edit_tags = can_upload_revision(request.user)
+    tags_form = PartTagsForm(initial={"tags": tags_as_legacy_string(part)})
     return render(
         request,
         "plm/part_properties.html",
         {
             "part": part,
+            "tags_form": tags_form,
+            "can_edit_tags": can_edit_tags,
         },
+    )
+
+
+@login_required
+def update_part_tags(request, part_id):
+    part = get_object_or_404(Part.objects.select_related("project"), id=part_id)
+    if not can_upload_revision(request.user):
+        return HttpResponseForbidden("Keine Berechtigung zum Bearbeiten von Teile-Tags.")
+    if request.method != "POST":
+        return redirect("plm:part_properties", part_id=part.id)
+    form = PartTagsForm(request.POST)
+    if form.is_valid():
+        set_part_tags(part, form.cleaned_data["tags"])
+        messages.success(request, f"Tags für {part.number} wurden gespeichert.")
+        return redirect("plm:part_detail", part_id=part.id)
+    return render(
+        request,
+        "plm/part_properties.html",
+        {
+            "part": part,
+            "tags_form": form,
+            "can_edit_tags": True,
+        },
+        status=400,
     )
 
 

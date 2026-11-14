@@ -148,8 +148,7 @@ class Part(TimeStampedModel):
     description = models.TextField(blank=True)
     material = models.CharField(max_length=120, blank=True)
     supplier = models.CharField(max_length=160, blank=True)
-    tags = models.CharField(max_length=255, blank=True)
-    structured_tags = models.ManyToManyField(
+    tags = models.ManyToManyField(
         PartTag,
         blank=True,
         related_name="parts",

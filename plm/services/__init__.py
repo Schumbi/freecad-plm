@@ -94,3 +94,4 @@ from .search import (
     search_plm,
 )
 from .ux import assembly_bom_tree, part_lifecycle_events
+from .part_tags import set_part_tags, tag_names as part_tag_names, tags_as_legacy_string

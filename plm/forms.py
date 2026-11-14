@@ -263,6 +263,11 @@ class PartForm(forms.ModelForm):
         widget=forms.Textarea(attrs={"rows": 4}),
         help_text="Kurz dokumentieren, was diese initiale Revision enthaelt.",
     )
+    tags = forms.CharField(
+        label="Tags",
+        required=False,
+        help_text="Mehrere Tags durch Kommas trennen.",
+    )
 
     class Meta:
         model = Part
@@ -272,7 +277,6 @@ class PartForm(forms.ModelForm):
             "category",
             "description",
             "material",
-            "tags",
         ]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
@@ -283,8 +287,11 @@ class PartForm(forms.ModelForm):
             "category": "Typ",
             "description": "Beschreibung",
             "material": "Material",
-            "tags": "Tags",
         }
+
+    def clean_tags(self):
+        from .services.part_tags import tag_names
+        return tag_names(self.cleaned_data.get("tags", ""))
 
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -332,6 +339,18 @@ class PartForm(forms.ModelForm):
             cleaned_data["name"] = name
 
         return cleaned_data
+
+
+class PartTagsForm(forms.Form):
+    tags = forms.CharField(
+        label="Tags",
+        required=False,
+        help_text="Mehrere Tags durch Kommas trennen. Leer lassen, um alle Tags zu entfernen.",
+    )
+
+    def clean_tags(self):
+        from .services.part_tags import tag_names
+        return tag_names(self.cleaned_data.get("tags", ""))
 
 
 class RevisionUploadForm(forms.Form):

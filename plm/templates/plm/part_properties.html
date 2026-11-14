@@ -26,4 +26,18 @@
   <div class="panel properties-page">
     {% include "plm/includes/part_properties.html" %}
   </div>
+
+  {% if can_edit_tags %}
+    <section class="data-card" aria-labelledby="tags-edit-title">
+      <div class="section-header">
+        <h2 id="tags-edit-title">Tags bearbeiten</h2>
+      </div>
+      <form class="form-card" method="post" action="{% url 'plm:update_part_tags' part.id %}" novalidate>
+        {% csrf_token %}
+        {% if tags_form.non_field_errors %}<div class="form-errors" role="alert">{{ tags_form.non_field_errors }}</div>{% endif %}
+        {% include "plm/includes/form_field.html" with field=tags_form.tags %}
+        <button type="submit">Tags speichern</button>
+      </form>
+    </section>
+  {% endif %}
 {% endblock %}

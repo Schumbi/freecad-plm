@@ -2860,6 +2860,7 @@ class RolePermissionTests(TestCase):
         self.assertEqual(part.revisions.count(), 1)
         self.assertEqual(part.revisions.get().revision_code, "R0001")
         self.assertEqual(part.revisions.get().export_jobs.count(), 2)
+        self.assertEqual(list(part.tags.values_list("name", flat=True)), ["test"])
 
     def test_empty_part_number_is_generated(self):
         self.client.force_login(self.editor)

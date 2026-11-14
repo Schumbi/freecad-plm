@@ -32,7 +32,7 @@ class ProjectAdmin(admin.ModelAdmin):
 class PartAdmin(admin.ModelAdmin):
     list_display = ("number", "name", "project", "project_variant", "category", "is_archived")
     list_filter = ("category", "is_archived", "project")
-    search_fields = ("number", "name", "description", "material", "supplier", "tags")
+    search_fields = ("number", "name", "description", "material", "supplier", "tags__name")
 
 
 @admin.register(ProjectVariant)

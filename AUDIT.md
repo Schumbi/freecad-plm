@@ -72,14 +72,12 @@ kein Kontext-Verlust.
 
 ## 2. Architektur und technische Schulden
 
-### A1 – `Part.tags` ist CharField statt M2M 🟡
-**Datei:** `plm/models.py` Z. 132  
-**Befund:** `Part.tags = models.CharField(max_length=255, blank=True)` ist ein unkontrollierter
-Freitext. `Project.tags` dagegen nutzt `ManyToManyField(ProjectTag, ...)`. Die Inkonsistenz
-macht einheitliches Filtern, Auswerten und Umbenennen von Teile-Tags unmöglich.  
-**Kontext:** Laut Gespräch ist strukturierte Migration geplant.  
-**Risiko beim Fix:** Migration 0036, alle Stellen die `part.tags` lesen/schreiben (Form, View,
-API, Template, Serialisierung in `extracted_metadata`).
+### A1 – `Part.tags` ist CharField statt M2M 🟢 BEHOBEN (AP-E1/E2, 2026-11-14)
+**Datei:** `plm/models.py`
+**Befund:** `Part.tags = models.CharField(max_length=255, blank=True)` war ein unkontrollierter
+Freitext. Migrationen 0036/0037/0038 führen `PartTag` ein und migrieren Bestandsdaten.
+API liefert rückwärtskompatibel `"tags"` (Legacy-String) und `"tag_items"` (strukturiert).
+Tags sind als Chips in Teildetail und Eigenschaften dargestellt; Suche und Formulare integriert.
 
 ---
 
@@ -456,8 +454,8 @@ Vertragstests `run_contract_tests.py` müssen grün bleiben.
 | C2 | ⏳ Nicht begonnen | 🟢 gering | Nach C1 sequenziell | Alle Dialog-Trigger durchklicken |
 | D1 | ⏳ Nicht begonnen | 🟡 mittel | Neue View + Berechtigungen | Reader/Editor/Admin-Tests |
 | D2 | ✅ Abgeschlossen | 🟢 keines | Teil- und Suchnavigation | Browserpfade, Rollen- und Query-Tests |
-| E1 | ⏳ Nicht begonnen | 🔴 hoch | DB-Migration + Datenmigration | Separater Branch, `run_tests.py` + `run_contract_tests.py` |
-| E2 | ⏳ Nicht begonnen | 🟡 mittel | API-Rückgabe ändert sich | Addon-Vertragstests |
+| E1 | ✅ Abgeschlossen | 🟢 keines | PartTag-Modell + Datenmigration 0036/0037 | 441 Tests grün, Migrationstest vor/zurück |
+| E2 | ✅ Abgeschlossen | 🟢 keines | Rückwärtskompatible API (`tags` + `tag_items`) | 441 Tests + 13 Addon-Vertragstests grün, Playwright-Prüfung |
 
 ---
 

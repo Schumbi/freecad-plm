@@ -70,6 +70,7 @@ from .parts import (
     part_detail,
     remove_part,
     part_properties,
+    update_part_tags,
     process_export_jobs_once,
 )
 from .revisions import (

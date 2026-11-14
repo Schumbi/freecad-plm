@@ -96,6 +96,7 @@ urlpatterns = [
     path("projects/<int:project_id>/parts/new/", views.create_part, name="create_part"),
     path("parts/<int:part_id>/remove/", views.remove_part, name="remove_part"),
     path("parts/<int:part_id>/", views.part_detail, name="part_detail"),
+    path("parts/<int:part_id>/tags/", views.update_part_tags, name="update_part_tags"),
     path("parts/<int:part_id>/manufacturing/", views.manufacturing_overview, name="manufacturing_overview"),
     path(
         "parts/<int:part_id>/properties/",

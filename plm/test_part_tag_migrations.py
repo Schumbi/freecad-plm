@@ -6,6 +6,8 @@ from django.test import TransactionTestCase
 
 
 class PartTagMigrationTests(TransactionTestCase):
+    # Prüft Zustand 0037 (PartTag + structured_tags befüllt) sowie
+    # Rückwärtsmigration auf 0036 (nur Schema, keine Daten).
     migrate_from = ("plm", "0035_projectdocumentversion_note_projectdocumentfolder")
     migrate_to = ("plm", "0037_migrate_part_tags")
 
@@ -30,15 +32,21 @@ class PartTagMigrationTests(TransactionTestCase):
                 project=project,
                 number=f"P-{index:03d}",
                 name=key,
-                tags=value,
+                tags=value,                  # CharField noch vorhanden bei 0035
             ).pk
             for index, (key, value) in enumerate(self.original.items(), start=1)
         }
 
     def tearDown(self):
-        self.migrate(self.migrate_to)
+        # Migrate to the latest state so TransactionTestCase can flush cleanly.
+        executor = MigrationExecutor(connection)
+        # Get all migrations; migrate to end so foreign keys are consistent.
+        loader = executor.loader
+        targets = [(key[0], key[1]) for key in loader.graph.leaf_nodes()]
+        executor.migrate(targets)
 
     def test_forward_and_backward_data_migration(self):
+        # --- Forward: Daten nach 0037 (structured_tags befüllt) ---
         apps = self.migrate(self.migrate_to)
         Part = apps.get_model("plm", "Part")
         PartTag = apps.get_model("plm", "PartTag")
@@ -48,6 +56,7 @@ class PartTagMigrationTests(TransactionTestCase):
         long_part = Part.objects.get(pk=self.part_ids["long"])
         empty = Part.objects.get(pk=self.part_ids["empty"])
 
+        # Historisches Feld vor 0038 heißt noch "structured_tags".
         self.assertEqual(
             set(first.structured_tags.values_list("name", flat=True)),
             {"Montage", "Äußeres & Prüfung"},
@@ -68,11 +77,14 @@ class PartTagMigrationTests(TransactionTestCase):
             sha256("montage".encode("utf-8")).hexdigest(),
         )
 
+        # --- Reverse: zurück auf 0036 (nur Schema, keine Daten) ---
         reverse_apps = self.migrate(("plm", "0036_add_structured_part_tags"))
         ReversePart = reverse_apps.get_model("plm", "Part")
         ReversePartTag = reverse_apps.get_model("plm", "PartTag")
         self.assertFalse(ReversePartTag.objects.exists())
         for key, part_id in self.part_ids.items():
             part = ReversePart.objects.get(pk=part_id)
+            # CharField "tags" ist noch vorhanden, bleibt unverändert.
             self.assertEqual(part.tags, self.original[key])
+            # M2M "structured_tags" existiert wieder, aber ist leer.
             self.assertFalse(part.structured_tags.exists())

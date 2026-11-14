@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from ..auth import api_auth_required, token_has_scope
 from ..models import ApiToken, AuditEvent, Checkout, Part, Project, ProjectSnapshot, Revision
+from ..services.part_tags import set_part_tags, tag_names as part_tag_names
 from ..permissions import is_plm_admin
 from ..services import (
     add_checkout_file,
@@ -39,7 +40,8 @@ def project_parts_api(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     if request.method == "GET":
         parts = list(project.parts.filter(is_archived=False).select_related("family").prefetch_related(
-            Prefetch("revisions", queryset=Revision.objects.order_by("-revision_code", "-pk"), to_attr="project_revisions")
+            Prefetch("revisions", queryset=Revision.objects.order_by("-revision_code", "-pk"), to_attr="project_revisions"),
+            "tags",
         ).order_by("number"))
         def file_summary(revision):
             return {"id": revision.id, "original_filename": revision.original_filename,
@@ -70,6 +72,9 @@ def project_parts_api(request, project_id):
         return JsonResponse({"error": "Keine Berechtigung zum Anlegen von Teilen."}, status=403)
     data = json_body(request)
     number = data.get("number", "").strip() or next_part_number(project)
+    raw_tags = data.get("tags", "")
+    if isinstance(raw_tags, list):
+        raw_tags = ", ".join(str(t) for t in raw_tags)
     part = Part.objects.create(
         project=project,
         number=number,
@@ -78,8 +83,9 @@ def project_parts_api(request, project_id):
         description=data.get("description", "").strip(),
         material=data.get("material", "").strip(),
         supplier=data.get("supplier", "").strip(),
-        tags=data.get("tags", "").strip(),
     )
+    if raw_tags or "tags" in data:
+        set_part_tags(part, raw_tags)
     AuditEvent.objects.create(
         actor=request.user,
         action=AuditEvent.Action.PART_CREATED,
@@ -301,10 +307,22 @@ def part_api(request, part_id):
     if not user_can_mutate_models(request.user):
         return JsonResponse({"error": "Keine Berechtigung zum Bearbeiten von Teilen."}, status=403)
     data = json_body(request)
-    for field in ("name", "description", "material", "supplier", "tags", "category"):
+    for field in ("name", "description", "material", "supplier", "category"):
         if field in data:
             setattr(part, field, data[field].strip())
     if "is_archived" in data:
         part.is_archived = bool(data["is_archived"])
     part.save()
+    if "tags" in data:
+        raw = data["tags"]
+        if isinstance(raw, list):
+            raw = ", ".join(str(t) for t in raw)
+        try:
+            set_part_tags(part, raw)
+        except Exception as exc:
+            from django.core.exceptions import ValidationError
+            if isinstance(exc, ValidationError):
+                from .common import validation_error_response
+                return validation_error_response(exc)
+            raise
     return JsonResponse({"part": part_payload(part)})

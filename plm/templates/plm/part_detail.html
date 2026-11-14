@@ -31,6 +31,13 @@
               <a href="{% url 'plm:part_detail' part.variant_source_revision.part_id %}#revision-{{ part.variant_source_revision_id }}">{{ part.variant_source_revision }}</a>
             </p>
           {% endif %}
+          {% with part_tags=part.tags.all %}
+            {% if part_tags %}
+              <div class="project-tag-chips" aria-label="Teile-Tags">
+                {% for tag in part_tags %}<span class="project-tag-chip">{{ tag.name }}</span>{% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
         </div>
         <div class="page-header-actions">
           <span class="type-pill">{{ part.get_category_display }}</span>

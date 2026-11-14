@@ -24,10 +24,16 @@
     <dt>Lieferant</dt>
     <dd>{{ part.supplier }}</dd>
   {% endif %}
-  {% if part.tags %}
-    <dt>Tags</dt>
-    <dd>{{ part.tags }}</dd>
-  {% endif %}
+  {% with part_tags=part.tags.all %}
+    {% if part_tags %}
+      <dt>Tags</dt>
+      <dd>
+        <div class="project-tag-chips">
+          {% for tag in part_tags %}<span class="project-tag-chip">{{ tag.name }}</span>{% endfor %}
+        </div>
+      </dd>
+    {% endif %}
+  {% endwith %}
   {% if part.description %}
     <dt>Beschreibung</dt>
     <dd>{{ part.description }}</dd>

@@ -32,6 +32,10 @@ def project_payload(project):
 
 
 def part_payload(part):
+    # tags may be prefetched or not – both paths work without N+1
+    tag_objs = list(part.tags.order_by("name", "pk"))
+    tag_items = [{"id": t.id, "name": t.name} for t in tag_objs]
+    legacy_tags = ", ".join(t.name for t in tag_objs)
     return {
         "id": part.id,
         "project_id": part.project_id,
@@ -41,7 +45,8 @@ def part_payload(part):
         "description": part.description,
         "material": part.material,
         "supplier": part.supplier,
-        "tags": part.tags,
+        "tags": legacy_tags,
+        "tag_items": tag_items,
         "is_archived": part.is_archived,
         "family": {"id": part.family_id, "name": part.family.name} if part.family_id else None,
         "variant_source_revision_id": part.variant_source_revision_id,
