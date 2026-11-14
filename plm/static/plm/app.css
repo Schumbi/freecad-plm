@@ -1767,6 +1767,34 @@ td form {
   display: none;
 }
 
+
+/* Zwischen 1100 und 1500 px ist neben dem Eigenschaftenpanel zu wenig Platz
+   fuer Metadaten und Aktionsspalte. Beides untereinander statt gequetscht. */
+@media (max-width: 1499px) {
+  .object-layout .page-header {
+    flex-direction: column;
+  }
+
+  .object-layout .page-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .revision-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .revision-actions {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .revision-actions-primary,
+  .revision-actions-secondary {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 1100px) {
   .sidebar-toggle {
     display: inline-flex;
@@ -1776,13 +1804,41 @@ td form {
     grid-template-columns: 1fr;
   }
 
-  .app-shell.sidebar-collapsed .sidebar-nav {
+  /* Navigation als Off-Canvas-Drawer: der Inhalt beginnt oben, die
+     Navigation wird nur bei Bedarf ueber den Schalter geoeffnet. */
+  .sidebar-nav {
+    box-shadow: var(--shadow-lg);
+    height: 100dvh;
+    inset: 0 auto 0 0;
+    max-width: 22rem;
+    overflow-y: auto;
+    padding-bottom: var(--space-6);
+    position: fixed;
+    transform: translateX(-102%);
+    transition: transform 0.18s ease;
+    visibility: hidden;
+    width: min(20rem, 86vw);
+    z-index: 60;
+  }
+
+  .app-shell.sidebar-open .sidebar-nav {
+    transform: none;
+    visibility: visible;
+  }
+
+  .sidebar-backdrop {
+    background: rgba(17, 24, 39, 0.45);
+    inset: 0;
+    position: fixed;
+    z-index: 50;
+  }
+
+  .sidebar-backdrop[hidden] {
     display: none;
   }
 
-  .sidebar-nav {
-    height: auto;
-    position: static;
+  body.sidebar-open {
+    overflow: hidden;
   }
 
   .topbar {

@@ -12,7 +12,7 @@
 <body>
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
   <div class="app-shell">
-    <aside class="sidebar-nav">
+    <aside class="sidebar-nav" id="primary-nav">
       <div class="brand-block">
         <a class="brand-name" href="{% url 'plm:project_list' %}">
           <img class="brand-mark" src="{% static 'plm/icons/favicon-32.png' %}" width="32" height="32" alt="">
@@ -65,10 +65,11 @@
         </section>
       {% endif %}
     </aside>
+    <div class="sidebar-backdrop" data-sidebar-backdrop hidden></div>
     <div class="app-main">
       <header class="topbar">
         <div class="topbar-start">
-          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Navigation ein- und ausblenden">☰</button>
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Navigation ein- und ausblenden" aria-controls="primary-nav" aria-expanded="false">☰</button>
           {% block topbar_search %}
             {% include "plm/includes/global_search_form.html" %}
           {% endblock %}
