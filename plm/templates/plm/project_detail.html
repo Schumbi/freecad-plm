@@ -34,7 +34,6 @@
           {% endif %}
           {% if can_create_part %}
             <a class="btn btn-primary" href="{% url 'plm:create_part' project.id %}">Neues Teil oder Baugruppe</a>
-            <button type="button" class="btn btn-outline-secondary" data-dialog-target="#snapshot-import">Stand importieren</button>
           {% endif %}
         </div>
       </div>
@@ -176,7 +175,7 @@
     <h2>Projektstände</h2>
     {% if can_create_part %}
       <div class="section-actions">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#snapshot-import">ZIP importieren</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-dialog-target="#snapshot-import">Projektstand importieren</button>
       </div>
     {% endif %}
   </div>
