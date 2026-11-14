@@ -303,6 +303,23 @@
     });
   }
 
+  function setupProjectMove() {
+    var dialog = document.getElementById("move-project-dialog");
+    if (!dialog) return;
+    var idField = document.getElementById("move-project-id");
+    var nameField = document.getElementById("move-project-name");
+    var folderSelect = document.getElementById("move-project-folder");
+
+    document.querySelectorAll("[data-move-project]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        idField.value = button.getAttribute("data-move-project");
+        nameField.textContent = button.getAttribute("data-move-project-name") || "";
+        folderSelect.value = button.getAttribute("data-move-current") || "";
+        dialog.showModal();
+      });
+    });
+  }
+
   function setupConfirmForms() {
     var dialog = document.getElementById("confirm-dialog");
     if (!dialog) return;
@@ -724,6 +741,7 @@
   setupFormAccessibility();
   setupClickableRows();
   setupSidebarToggle();
+  setupProjectMove();
   setupConfirmForms();
   setupSearchToggle();
   setupUserMenu();

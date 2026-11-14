@@ -105,11 +105,11 @@
   {% if projects %}
     {% if project_view == 'details' %}
       <div class="table-wrap project-details">
-        <table id="project-list">
+        <table id="project-list"{% if can_create_project and folder_options %} class="has-actions"{% endif %}>
           <caption>Projektdatum: einstellbares Datum des Projekts. Erstellungsdatum: Zeitpunkt des Anlegens im PLM.</caption>
           <thead><tr>
             <th scope="col">Projekt</th><th scope="col">Status / Tags</th>
-            <th scope="col">Umfang</th><th scope="col">Datumsangaben</th>
+            <th scope="col">Umfang</th><th scope="col">Datumsangaben</th>{% if can_create_project and folder_options %}<th scope="col">Aktionen</th>{% endif %}
           </tr></thead>
           <tbody>
             {% for project in projects %}<tr draggable="{{ can_create_project|yesno:'true,false' }}" data-project-id="{{ project.id }}">
@@ -121,6 +121,7 @@
                 <dt>Erstellungsdatum</dt><dd>{{ project.created_at|date:"d.m.Y H:i" }}</dd>
                 <dt>Zuletzt geändert</dt><dd>{{ project.updated_at|date:"d.m.Y H:i" }}</dd>
               </dl></td>
+              {% if can_create_project and folder_options %}<td data-label="Aktionen"><button type="button" class="link-button" data-move-project="{{ project.id }}" data-move-project-name="{{ project.code }} · {{ project.name }}" data-move-current="{{ project.folder_id|default:"" }}">Verschieben</button></td>{% endif %}
             </tr>{% endfor %}
           </tbody>
         </table>
@@ -148,6 +149,7 @@
             <span>{{ project.part_count }} Teil{{ project.part_count|pluralize:"e" }}</span>
             <span>{{ project.snapshot_count }} {% if project.snapshot_count == 1 %}Stand{% else %}Stände{% endif %}</span>
             <span>Projektdatum: {{ project.project_date|date:"d.m.Y" }}</span>
+            {% if can_create_project and folder_options %}<button type="button" class="link-button" data-move-project="{{ project.id }}" data-move-project-name="{{ project.code }} · {{ project.name }}" data-move-current="{{ project.folder_id|default:"" }}">Verschieben</button>{% endif %}
           </div>
         </article>
       {% endfor %}
@@ -197,4 +199,35 @@
     });
   }
   </script>
+
+  {% if can_create_project and folder_options %}
+    <dialog class="plm-dialog" id="move-project-dialog" aria-labelledby="move-project-title">
+      <div class="plm-dialog-panel">
+        <div class="plm-dialog-header">
+          <h5 class="plm-dialog-title" id="move-project-title">Projekt verschieben</h5>
+          <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
+        </div>
+        <div class="plm-dialog-body">
+          <form class="form-card" method="post" action="{% url 'plm:manage_project_folders' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="move_project">
+            <input type="hidden" name="project_id" id="move-project-id">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <p id="move-project-name" class="muted"></p>
+            <div class="form-field">
+              <label for="move-project-folder">Zielordner</label>
+              <select name="parent_id" id="move-project-folder">
+                <option value="">Ohne Ordner</option>
+                {% for folder in folder_options %}<option value="{{ folder.id }}">{{ folder.path }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="submit">Verschieben</button>
+              <button type="button" class="btn btn-outline-secondary" data-dialog-close>Abbrechen</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
+  {% endif %}
 {% endblock %}

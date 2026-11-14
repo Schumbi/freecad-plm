@@ -51,6 +51,9 @@ def manage_project_folders(request):
                     else:
                         raise ValidationError("Unbekannte Aktion.")
             messages.success(request, "Projektordner aktualisiert.")
+            next_url = request.POST.get("next", "")
+            if next_url.startswith("/") and not next_url.startswith("//"):
+                return redirect(next_url)
             return redirect("plm:manage_project_folders")
         except (ValidationError, IntegrityError, ProtectedError) as exc:
             error = "Nur leere Ordner können gelöscht werden." if isinstance(exc, ProtectedError) else " ".join(getattr(exc, "messages", [str(exc)]))

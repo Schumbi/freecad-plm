@@ -159,6 +159,16 @@ def project_list(request):
         return f"{base}?{query}" if query else base
 
     untagged = request.GET.get("untagged") == "1"
+    def folder_path(folder):
+        names, seen = [], set()
+        while folder and folder.pk not in seen:
+            seen.add(folder.pk)
+            names.append(folder.name)
+            folder = by_id.get(folder.parent_id)
+        return " / ".join(reversed(names))
+
+    folder_options = [{"id": folder.pk, "path": folder_path(folder)} for folder in folders]
+
     active_filter_chips = []
     if selected_folder == "none":
         active_filter_chips.append({"label": "Ohne Ordner", "url": url_without("folder")})
@@ -188,6 +198,7 @@ def project_list(request):
         {
             "projects": projects,
             "folder_tree": children(None),
+            "folder_options": folder_options,
             "active_folders": active_folders,
             "selected_folder": selected_folder,
             "selected_folder_label": selected_folder_label,

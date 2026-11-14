@@ -2640,6 +2640,11 @@ figure {
 .project-details th:nth-child(2) { width: 22%; }
 .project-details th:nth-child(3) { width: 15%; }
 .project-details th:nth-child(4) { width: 25%; }
+.project-details table.has-actions th:first-child { width: 32%; }
+.project-details table.has-actions th:nth-child(2) { width: 19%; }
+.project-details table.has-actions th:nth-child(3) { width: 12%; }
+.project-details table.has-actions th:nth-child(4) { width: 24%; }
+.project-details table.has-actions th:nth-child(5) { width: 13%; }
 .project-details td { overflow-wrap: anywhere; vertical-align: top; }
 .project-details .status-badge { white-space: normal; }
 .project-details caption { color: var(--muted); padding: var(--space-3); }
@@ -2753,4 +2758,20 @@ figure {
 
 .action-menu-content .danger-link:hover {
   background: var(--danger-soft);
+}
+
+
+.link-button {
+  background: transparent;
+  border: 0;
+  color: var(--accent-dark);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  min-height: auto;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  width: auto;
 }
