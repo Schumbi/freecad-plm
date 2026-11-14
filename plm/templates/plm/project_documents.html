@@ -1,5 +1,5 @@
 {% extends "plm/base.html" %}
-{% block title %}Projektdateien · {{ project.code }}{% endblock %}
+{% block title %}Projektdateien · {{ project.code }} · FreeCAD-PLM{% endblock %}
 {% block breadcrumbs %}<nav class="breadcrumbs" aria-label="Brotkrumen"><ol><li><a href="{% url 'plm:project_list' %}">Projekte</a></li><li><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></li><li><span aria-current="page">Projektdateien</span></li></ol></nav>{% endblock %}
 {% block content %}
 <div class="document-page">

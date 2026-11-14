@@ -3,7 +3,36 @@
 Alle wesentlichen Änderungen am FreeCAD-PLM-Server werden in dieser Datei
 dokumentiert.
 
-## [Unreleased] - 2026-10-09
+## [Unreleased] - 2026-11-14
+
+### UX-, Usability- und Accessibility-Überarbeitung
+
+Grundlage: `planning/UX_AUDIT_2026-11-14.md`. Alle Änderungen sind mit
+`UX QW-*`, `UX HI-*`, `UX ST-*` bzw. `UX OP-*` committet.
+
+- Globales Suchfeld wieder lesbar (Padding/Spezifität), einheitliche
+  Fokusringe und WCAG-AA-Kontraste für Primäraktionen und Sekundärtext.
+- Aktiver Arbeitsbereich in der Navigation inkl. `aria-current`; sprechende
+  Seitentitel und bereichsrichtige Breadcrumbs.
+- Responsive Korrekturen: Revisionskarte und Seitenkopf stapeln unter
+  1500 px, mobile Navigation als Off-Canvas-Drawer (standardmäßig zu,
+  Zustand gemerkt), mobile Kopfzeile mit Such-Overlay und Benutzermenü.
+- Formulare: Pflichtfeldmarker, Fehlerzusammenfassung, `aria-invalid`,
+  eindeutige Feld-IDs in Dialogen, Labels ohne Doppelpunkt, echte Umlaute,
+  gruppiertes Fertigungsformular mit eingeklappten Prozessparametern.
+- Tabellen und Listen: Teilezeilen mit echten Links (Tastatur/neuer Tab),
+  Aktionsspalte in der Projektliste, Dateityp-Filter in der Dateiübersicht.
+- Aktionen: destruktive Aktionen aus der Primärreihe in Menüs, Bestätigung
+  für Obsolet-Markierungen, Projekte per Dialog verschiebbar.
+- Suche/Filter: ein Suchfeld, Facetten greifen sofort, aktive Filter als
+  entfernbare Chips, Leerzustände mit Aktionen.
+- Statusmeldungen als Live-Region; Fehler bleiben stehen; Skip-Link;
+  Aktivitätsprotokoll in der Verwaltung; Tastaturkürzel (`/`, `g p`,
+  `g v`, `?`); Druckansicht; `prefers-reduced-motion`.
+- Neue Dokumentation: `planning/UI_COMPONENTS.md`, `planning/GLOSSARY.md`.
+- Neue Regressionstests: `plm/test_ux_accessibility.py`.
+
+## [2026-10-09]
 
 - Teile-Tags sind strukturiert: zentrales `PartTag`-Modell, Migration der
   bisherigen kommagetrennten Freitextwerte (0036–0038), Bearbeitung in den
