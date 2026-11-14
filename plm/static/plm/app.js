@@ -1,49 +1,26 @@
 (function () {
   "use strict";
 
-  function closeDialog(dialog) {
-    if (!dialog) return;
-    dialog.hidden = true;
-    if (!document.querySelector(".plm-dialog:not([hidden])")) {
-      document.body.classList.remove("modal-open");
-    }
-  }
-
-  function openDialog(dialog) {
-    if (!dialog) return;
-    dialog.hidden = false;
-    document.body.classList.add("modal-open");
-    var focusable = dialog.querySelector(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
-    );
-    if (focusable) focusable.focus();
-  }
-
   function setupDialogs() {
     document.addEventListener("click", function (event) {
       var trigger = event.target.closest("[data-dialog-target]");
       if (trigger) {
         event.preventDefault();
-        openDialog(document.querySelector(trigger.getAttribute("data-dialog-target")));
+        var dialog = document.querySelector(trigger.getAttribute("data-dialog-target"));
+        if (dialog) dialog.showModal();
         return;
       }
-
       if (event.target.matches("[data-dialog-close]")) {
-        closeDialog(event.target.closest(".plm-dialog"));
+        var d = event.target.closest("dialog");
+        if (d) d.close();
         return;
       }
-
-      if (event.target.classList.contains("plm-dialog")) {
-        closeDialog(event.target);
+      // Klick auf Backdrop (außerhalb des Panels)
+      if (event.target.tagName === "DIALOG") {
+        event.target.close();
       }
     });
-
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        var openDialogs = document.querySelectorAll(".plm-dialog:not([hidden])");
-        closeDialog(openDialogs[openDialogs.length - 1]);
-      }
-    });
+    // ESC wird nativ vom Browser behandelt
   }
 
   function setupActionMenus() {

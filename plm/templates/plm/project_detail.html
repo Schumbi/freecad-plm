@@ -148,7 +148,7 @@
         {% endif %}
       </div>
       {% if print_projects %}
-        <div class="plm-dialog" id="print-projects" role="dialog" aria-modal="true" aria-labelledby="print-projects-title" hidden>
+        <dialog class="plm-dialog" id="print-projects" aria-labelledby="print-projects-title">
           <div class="plm-dialog-panel wide">
             <div class="plm-dialog-header">
               <h5 class="plm-dialog-title" id="print-projects-title">Druckprojekte · {{ project.code }}</h5>
@@ -158,7 +158,7 @@
               {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_create_part can_delete_print_projects=can_delete_print_projects show_primary_revision=True %}
             </div>
           </div>
-        </div>
+        </dialog>
       {% else %}
         <p class="muted">Noch keine Druckprojekte. Sie werden über „Druckprojekt öffnen/erstellen“ in FreeCAD angelegt.</p>
       {% endif %}
@@ -190,7 +190,7 @@
             <a class="btn btn-primary btn-sm" href="{% url 'plm:download_project_snapshot' snapshot.id %}">ZIP laden</a>
           </div>
         </article>
-        <div class="plm-dialog" id="snapshot-{{ snapshot.id }}" role="dialog" aria-modal="true" aria-labelledby="snapshot-title-{{ snapshot.id }}" hidden>
+        <dialog class="plm-dialog" id="snapshot-{{ snapshot.id }}" aria-labelledby="snapshot-title-{{ snapshot.id }}">
           <div class="plm-dialog-panel wide">
             <div class="plm-dialog-header">
               <h5 class="plm-dialog-title" id="snapshot-title-{{ snapshot.id }}">Dateien in {{ snapshot.name }}</h5>
@@ -222,7 +222,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       {% endfor %}
     </div>
   {% else %}
@@ -230,7 +230,7 @@
   {% endif %}
 
   {% if can_create_part %}
-    <div class="plm-dialog" id="snapshot-import" role="dialog" aria-modal="true" aria-labelledby="snapshot-import-title" hidden>
+    <dialog class="plm-dialog" id="snapshot-import" aria-labelledby="snapshot-import-title">
       <div class="plm-dialog-panel">
         <div class="plm-dialog-header">
           <h5 class="plm-dialog-title" id="snapshot-import-title">Projektstand aus ZIP importieren</h5>
@@ -256,6 +256,6 @@
           </form>
         </div>
       </div>
-    </div>
+    </dialog>
   {% endif %}
 {% endblock %}
