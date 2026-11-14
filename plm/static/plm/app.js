@@ -269,6 +269,52 @@
     });
   }
 
+  function setupSearchToggle() {
+    var toggle = document.querySelector("[data-search-toggle]");
+    var topbar = document.querySelector(".topbar");
+    var search = document.getElementById("global-search");
+    if (!toggle || !topbar || !search) return;
+
+    function setOpen(open) {
+      topbar.classList.toggle("search-open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        var input = search.querySelector("input");
+        if (input) input.focus();
+      }
+    }
+
+    toggle.addEventListener("click", function () {
+      setOpen(!topbar.classList.contains("search-open"));
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && topbar.classList.contains("search-open")) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+  }
+
+  function setupUserMenu() {
+    var menu = document.querySelector(".user-menu-popover");
+    if (!menu) return;
+
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) {
+        menu.open = false;
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && menu.open) {
+        menu.open = false;
+        var summary = menu.querySelector("summary");
+        if (summary) summary.focus();
+      }
+    });
+  }
+
   function setupManufacturingSelectors() {
     document.querySelectorAll("[data-manufacturing-browser]").forEach(function (browser) {
       var rows = browser.querySelectorAll("[data-manufacturing-select]");
@@ -611,6 +657,8 @@
   window.addEventListener("hashchange", revealLinkedRevision);
   setupCadFileGuides();
   setupSidebarToggle();
+  setupSearchToggle();
+  setupUserMenu();
   setupManufacturingSelectors();
   setupExportJobsPolling();
   setupCompareStatusPolling();

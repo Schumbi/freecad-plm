@@ -182,14 +182,14 @@ button,
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-button:not(.plm-dialog-close):not(.logout-button):not(.sidebar-toggle):not(.message-dismiss) {
+button:not(.plm-dialog-close):not(.logout-button):not(.sidebar-toggle):not(.message-dismiss):not(.search-toggle) {
   background: var(--accent);
   border: 1px solid var(--accent-dark);
   color: #fff;
   cursor: pointer;
 }
 
-button:not(.plm-dialog-close):not(.logout-button):not(.sidebar-toggle):not(.message-dismiss):hover {
+button:not(.plm-dialog-close):not(.logout-button):not(.sidebar-toggle):not(.message-dismiss):not(.search-toggle):hover {
   background: var(--accent-dark);
 }
 
@@ -595,6 +595,66 @@ input[type="radio"] {
   display: flex;
   gap: var(--space-3);
   min-width: 0;
+}
+
+.user-menu-popover {
+  position: relative;
+}
+
+.user-menu-popover > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.user-menu-popover > summary::-webkit-details-marker {
+  display: none;
+}
+
+.user-caret {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.user-menu-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: var(--space-3);
+  min-width: 13rem;
+  padding: var(--space-3);
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 45;
+}
+
+.user-menu-name {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.user-menu-panel .logout-button {
+  width: 100%;
+}
+
+.search-toggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: none;
+  height: 2.25rem;
+  justify-content: center;
+  width: 2.25rem;
+}
+
+.search-toggle:hover {
+  background: var(--surface-muted);
 }
 
 .user-chip {
@@ -1882,6 +1942,41 @@ td form {
   .section-header,
   .snapshot-card {
     display: block;
+  }
+
+  .topbar {
+    position: relative;
+  }
+
+  .search-toggle {
+    display: inline-flex;
+  }
+
+  .global-search {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    display: none;
+    left: 0;
+    max-width: none;
+    padding: 0.6rem var(--space-4);
+    position: absolute;
+    right: 0;
+    top: 100%;
+    width: auto;
+    z-index: 45;
+  }
+
+  .topbar.search-open .global-search {
+    display: block;
+  }
+
+  .global-search input {
+    width: 100%;
+  }
+
+  .user-name {
+    display: none;
   }
 
   .page-header-actions,
