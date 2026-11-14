@@ -301,6 +301,22 @@ class Revision(TimeStampedModel):
     def __str__(self):
         return f"{self.part.number} {self.revision_code}"
 
+    @property
+    def preview_summary(self):
+        """Kurze, nutzerlesbare Zusammenfassung der erzeugten Vorschauen."""
+        counts = {}
+        for artifact in self.artifacts.all():
+            counts[artifact.artifact_type] = counts.get(artifact.artifact_type, 0) + 1
+        labels = []
+        if counts.get("3mf"):
+            labels.append("3D")
+        if counts.get("png"):
+            labels.append(f"{counts['png']} Ansichten")
+        for artifact_type in ("step", "stl"):
+            if counts.get(artifact_type):
+                labels.append(artifact_type.upper())
+        return " · ".join(labels)
+
 
 class ExportJob(TimeStampedModel):
     class JobType(models.TextChoices):

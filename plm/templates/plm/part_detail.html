@@ -117,9 +117,9 @@
                   <p class="notes-text">{{ checkin.summary|linebreaksbr }}</p>
                 {% endfor %}
                 <div class="pill-row">
-                  {% for artifact in revision.artifacts.all %}
-                    <span class="artifact-pill">{{ artifact.artifact_type|upper }}{% if artifact.view_name %} {{ artifact.view_name }}{% endif %}</span>
-                  {% endfor %}
+                  {% if revision.preview_summary %}
+                    <span class="revision-media-line"><span class="revision-media-label">Vorschau</span> {{ revision.preview_summary }}</span>
+                  {% endif %}
                   {% for manufacturing_file in revision.manufacturing_files.all %}
                     {% if manufacturing_file.file_type == "slicer_project_3mf" %}
                       <span class="artifact-pill slicer-sync-pill" title="Zuletzt synchronisiert {{ manufacturing_file.updated_at|date:'d.m.Y H:i' }}">
