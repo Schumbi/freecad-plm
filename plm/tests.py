@@ -1822,7 +1822,7 @@ class RevisionUploadViewTests(TestCase):
         self.assertTrue(
             ExportJob.objects.filter(
                 revision=revision,
-                job_type=ExportJob.JobType.PNG_VIEWS,
+                job_type=ExportJob.JobType.VIEWER,
                 status=ExportJob.Status.QUEUED,
             ).exists()
         )

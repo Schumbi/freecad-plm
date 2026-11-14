@@ -29,6 +29,13 @@ def revision_has_complete_png_views(revision):
     return revision_png_view_names(revision) >= set(PNG_VIEW_NAMES)
 
 
+def revision_has_pending_viewer_job(revision):
+    return revision.export_jobs.filter(
+        job_type=ExportJob.JobType.VIEWER,
+        status__in=[ExportJob.Status.QUEUED, ExportJob.Status.RUNNING],
+    ).exists()
+
+
 def revision_has_pending_png_job(revision):
     return filter_preview_context(revision.export_jobs.filter(
         job_type=ExportJob.JobType.PNG_VIEWS,

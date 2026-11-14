@@ -323,6 +323,7 @@ class ExportJob(TimeStampedModel):
         INSPECT = "inspect", "FreeCAD-Analyse"
         EXPORT = "export", "Export"
         PNG_VIEWS = "png_views", "PNG-Ansichten"
+        VIEWER = "viewer", "3D-Vorschau"
 
     class Status(models.TextChoices):
         QUEUED = "queued", "Wartend"

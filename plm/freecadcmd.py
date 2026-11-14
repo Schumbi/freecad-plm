@@ -341,6 +341,23 @@ def create_preview_sources(doc, spec, output_dir):
     }
 
 
+def create_viewer_source(doc, spec, output_dir):
+    """Erzeugt nur das 3MF fuer den Web-Viewer, ohne PNG-/STEP-Export."""
+    objects = preview_objects(doc)
+    viewer_path = output_dir / f"{spec['revision_code']}-viewer.3mf"
+    export_viewer_preview(
+        objects,
+        viewer_path,
+        spec.get("viewer_colors", {}),
+        spec.get("viewer_document_colors", {}),
+    )
+    return {
+        "artifacts": [
+            {"path": str(viewer_path), "artifact_type": "3mf", "view_name": "viewer-preview"},
+        ],
+    }
+
+
 def main():
     spec_path = Path(sys.argv[1])
     result_path = Path(sys.argv[2])
@@ -354,6 +371,8 @@ def main():
         result["artifacts"] = export_objects(doc, spec, output_dir)
     elif spec["job_type"] == "png_views":
         result.update(create_preview_sources(doc, spec, output_dir))
+    elif spec["job_type"] == "viewer":
+        result.update(create_viewer_source(doc, spec, output_dir))
     elif spec["job_type"] != "inspect":
         raise RuntimeError(f"Unbekannter Job-Typ: {spec['job_type']}")
 
@@ -384,7 +403,7 @@ def create_export_job(
     parameters=None,
 ):
     parameters = dict(parameters or {})
-    if job_type == ExportJob.JobType.PNG_VIEWS:
+    if job_type in (ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER):
         parameters.update(preview_source_context(revision))
     job = ExportJob.objects.create(
         revision=revision,
@@ -546,12 +565,12 @@ def run_freecadcmd_job(job):
                     "parameters": job.parameters,
                     "viewer_colors": fcstd_viewer_colors(fcstd_path)
                     if job.revision.file_format == Revision.FileFormat.FCSTD
-                    and job.job_type == ExportJob.JobType.PNG_VIEWS else {},
+                    and job.job_type in (ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER) else {},
                     "viewer_document_colors": {
                         str(path.resolve()): fcstd_viewer_colors(path)
                         for path in workdir.rglob("*")
                         if path.suffix.lower() == ".fcstd"
-                    } if job.job_type == ExportJob.JobType.PNG_VIEWS else {},
+                    } if job.job_type in (ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER) else {},
                 }
             ),
             encoding="utf-8",
@@ -719,7 +738,7 @@ def apply_freecadcmd_result(job, result):
             "selected_objects": job.selected_objects,
             "parameters": job.parameters,
         }
-        if job.job_type == ExportJob.JobType.PNG_VIEWS:
+        if job.job_type in (ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER):
             artifact_metadata["preview_generator_version"] = PREVIEW_GENERATOR_VERSION
         artifact = RevisionArtifact.objects.create(
             revision=job.revision,
