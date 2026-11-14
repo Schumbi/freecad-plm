@@ -108,22 +108,55 @@
         <p class="empty-state">Keine aktive Revision vorhanden. Upload nicht möglich.</p>
         {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
       {% else %}
-      <form class="form-card" method="post" enctype="multipart/form-data" novalidate>
+      <form class="form-card manufacturing-upload-form" method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-        <div class="form-field">
-          <label for="upload-revision">Aktive Revision</label>
-          <select id="upload-revision" name="revision" required>
-            {% for revision in active_revisions %}
-              <option value="{{ revision.id }}" {% if selected_revision.id == revision.id %}selected{% endif %}>{{ revision.revision_code }} · {{ revision.get_status_display }}</option>
-            {% endfor %}
-          </select>
+        {% if form.errors %}<div class="form-errors" role="alert">Bitte prüfe die markierten Felder.</div>{% endif %}
+
+        <fieldset class="form-section">
+          <legend>Datei und Zweck</legend>
+          <div class="form-grid two-columns">
+            <div class="form-field">
+              <div class="field-label"><label for="upload-revision">Aktive Revision</label><span class="required-marker" aria-hidden="true">*</span></div>
+              <select id="upload-revision" name="revision" required>
+                {% for revision in active_revisions %}
+                  <option value="{{ revision.id }}" {% if selected_revision.id == revision.id %}selected{% endif %}>{{ revision.revision_code }} · {{ revision.get_status_display }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% include "plm/includes/form_field.html" with field=form.purpose %}
+            <div class="full">{% include "plm/includes/form_field.html" with field=form.file %}</div>
+            {% include "plm/includes/form_field.html" with field=form.label %}
+            {% include "plm/includes/form_field.html" with field=form.slicer_name %}
+            <div class="full">{% include "plm/includes/form_field.html" with field=form.description %}</div>
+          </div>
+        </fieldset>
+
+        <fieldset class="form-section">
+          <legend>Maschine und Material</legend>
+          <div class="form-grid two-columns">
+            {% include "plm/includes/form_field.html" with field=form.machine %}
+            {% include "plm/includes/form_field.html" with field=form.machine_label %}
+            {% include "plm/includes/form_field.html" with field=form.printer_profile %}
+            {% include "plm/includes/form_field.html" with field=form.slicer_version %}
+            {% include "plm/includes/form_field.html" with field=form.material %}
+            {% include "plm/includes/form_field.html" with field=form.material_brand %}
+          </div>
+        </fieldset>
+
+        <details class="form-section-optional">
+          <summary>Prozessparameter <span class="muted">(optional)</span></summary>
+          <div class="form-grid two-columns">
+            {% include "plm/includes/form_field.html" with field=form.nozzle_diameter %}
+            {% include "plm/includes/form_field.html" with field=form.layer_height %}
+            {% include "plm/includes/form_field.html" with field=form.estimated_print_time_seconds %}
+            {% include "plm/includes/form_field.html" with field=form.estimated_material_g %}
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button type="submit">Fertigungsdatei hochladen</button>
         </div>
-        {% include "plm/includes/form_field.html" with field=form.file %}
-        {% for field in form %}
-          {% if field.name != "file" %}{% include "plm/includes/form_field.html" with field=field %}{% endif %}
-        {% endfor %}
-        <button type="submit">Fertigungsdatei hochladen</button>
       </form>
       {% endif %}
     </section>
