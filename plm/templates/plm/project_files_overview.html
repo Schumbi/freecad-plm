@@ -47,6 +47,13 @@
         </select>
       </div>
       <div class="form-field">
+        <label for="file-type">Dateityp</label>
+        <select id="file-type" name="type">
+          <option value="">Alle Typen</option>
+          {% for type in type_choices %}<option value="{{ type }}"{% if selected_type == type %} selected{% endif %}>{{ type }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
         <label for="query">Suche</label>
         <input id="query" name="q" type="search" value="{{ query }}" placeholder="Dateipfad filtern">
       </div>
@@ -111,7 +118,7 @@
                   <a href="{{ header.url }}">{{ header.label }}{% if header.active %} {% if header.direction == 'descending' %}↓{% else %}↑{% endif %}{% endif %}</a>
                 </th>
               {% endfor %}
-              <th scope="col">Öffnen</th>
+              <th scope="col">Aktion</th>
             </tr>
           </thead>
           <tbody>

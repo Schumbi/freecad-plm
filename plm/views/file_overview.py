@@ -118,6 +118,12 @@ def project_files_overview(request, project_id):
             rows.append({"name": version.original_filename, "type": "Druckprojektdatei", "owner": print_project.code,
                          "version": str(version.pk), "current": False, "in_snapshot": False,
                          "url": reverse("plm:project_misc_file", args=["print-version", version.pk])})
+    type_choices = sorted({row["type"] for row in rows})
+    selected_type = request.GET.get("type", "")
+    if selected_type not in type_choices:
+        selected_type = ""
+    if selected_type:
+        rows = [row for row in rows if row["type"] == selected_type]
     query = request.GET.get("q", "").casefold().strip()
     if query:
         rows = [r for r in rows if query in (r["name"] + " " + r["type"] + " " + r["owner"]).casefold()]
@@ -160,6 +166,7 @@ def project_files_overview(request, project_id):
         "changed": changed,
         "changed_dependencies": changed_dependencies,
         "query": request.GET.get("q", ""), "show_old": request.GET.get("old") == "1",
+        "type_choices": type_choices, "selected_type": selected_type,
         "sort_field": sort_field, "sort_direction": sort_direction,
         "sort_headers": sort_headers,
         "active_section": "projects",

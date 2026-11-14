@@ -140,7 +140,7 @@
 
               <div class="revision-actions">
                 <div class="revision-actions-primary">
-                  <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">{{ revision.get_file_format_display }} laden</a>
+                  <a class="btn btn-primary btn-sm" href="{% url 'plm:download_revision' revision.id %}">{{ revision.get_file_format_display }}-Datei laden</a>
                   <a class="btn btn-outline-secondary btn-sm" href="freecad-plm://revision/{{ revision.id }}?project_id={{ part.project_id }}&amp;part_id={{ part.id }}&amp;action={% if revision.file_format == 'fcstd' %}checkout{% else %}readonly{% endif %}">
                     {% if revision.file_format == "fcstd" %}In FreeCAD bearbeiten{% else %}In FreeCAD öffnen{% endif %}
                   </a>
@@ -381,7 +381,7 @@
                             </td>
                             <td>{{ manufacturing_file.material|default:"-" }}</td>
                             <td>
-                              <a href="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">Download</a>
+                              <a href="{% url 'plm:download_manufacturing_file' manufacturing_file.id %}">Herunterladen</a>
                               {% if manufacturing_file.file_type == "slicer_3mf" or manufacturing_file.file_type == "slicer_project_3mf" or manufacturing_file.file_type == "stl_print" or manufacturing_file.file_type == "step_vendor" %}
                                 <button
                                   type="button"

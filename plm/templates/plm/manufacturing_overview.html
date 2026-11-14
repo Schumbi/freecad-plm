@@ -87,7 +87,7 @@
               <td>{% if item.machine %}{{ item.machine }}{% else %}{{ item.machine_label|default:"–" }}{% endif %}{% if item.material %} · {{ item.material }}{% endif %}</td>
               <td>{{ item.created_at|date:"d.m.Y H:i" }}</td>
               <td>
-                <a href="{% url 'plm:download_manufacturing_file' item.id %}">Download</a>
+                <a href="{% url 'plm:download_manufacturing_file' item.id %}">Herunterladen</a>
                 {% if can_release %}
                   · <a href="{% url 'plm:delete_manufacturing_file' item.id %}">Löschen</a>
                 {% endif %}

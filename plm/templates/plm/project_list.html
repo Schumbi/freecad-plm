@@ -147,7 +147,7 @@
           </div>
           <div class="project-card-footer">
             <span>{{ project.part_count }} Teil{{ project.part_count|pluralize:"e" }}</span>
-            <span>{{ project.snapshot_count }} {% if project.snapshot_count == 1 %}Stand{% else %}Stände{% endif %}</span>
+            <span>{{ project.snapshot_count }} {% if project.snapshot_count == 1 %}Projektstand{% else %}Projektstände{% endif %}</span>
             <span>Projektdatum: {{ project.project_date|date:"d.m.Y" }}</span>
             {% if can_create_project and folder_options %}<button type="button" class="link-button" data-move-project="{{ project.id }}" data-move-project-name="{{ project.code }} · {{ project.name }}" data-move-current="{{ project.folder_id|default:"" }}">Verschieben</button>{% endif %}
           </div>
