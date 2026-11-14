@@ -23,20 +23,20 @@
         <p class="nav-section-label">Arbeitsbereiche</p>
         <ul class="nav-link-list">
           <li>
-            <a href="{% url 'plm:project_list' %}"{% if active_section == 'projects' or request.resolver_match.url_name == 'create_project' or request.resolver_match.url_name == 'edit_project' %} class="active"{% endif %}>
+            <a href="{% url 'plm:project_list' %}"{% if active_section == 'projects' %} class="active" aria-current="page"{% endif %}>
               <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
               Projekte
             </a>
           </li>
           {% if request.user.is_authenticated and request.user|can_manage_plm %}
             <li>
-              <a href="{% url 'plm:user_management' %}"{% if active_section == 'admin' or request.resolver_match.url_name == 'user_management' %} class="active"{% endif %}>
+              <a href="{% url 'plm:user_management' %}"{% if active_section == 'admin' %} class="active" aria-current="page"{% endif %}>
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 Verwaltung
               </a>
             </li>
             <li>
-              <a href="{% url 'plm:integration_settings' %}"{% if request.resolver_match.url_name == 'integration_settings' %} class="active"{% endif %}>
+              <a href="{% url 'plm:integration_settings' %}"{% if active_section == 'integrations' %} class="active" aria-current="page"{% endif %}>
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m5.66 5.66 4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66 4.24-4.24"/><circle cx="12" cy="12" r="4"/></svg>
                 Integrationen
               </a>
