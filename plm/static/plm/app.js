@@ -40,7 +40,7 @@
         window.setTimeout(function () {
           message.remove();
         }, 320);
-      }, 5200);
+      }, 8000);
     });
 
     document.querySelectorAll("[data-message-dismiss]").forEach(function (button) {
