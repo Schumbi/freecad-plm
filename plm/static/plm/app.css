@@ -522,7 +522,9 @@ input[type="radio"] {
   position: relative;
 }
 
-.global-search input {
+/* Spezifität muss über der generischen input-Regel (Zeile ~259) liegen,
+   sonst überschreibt deren Padding den Platz für das Lupen-Icon. */
+.topbar .global-search input {
   background: var(--surface-soft);
   padding-left: 2.35rem;
 }
