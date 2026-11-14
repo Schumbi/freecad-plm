@@ -378,13 +378,27 @@ function parseModel(buffer, format, cadCoordinates = false) {
   return object;
 }
 
+function webglUnavailableMessage() {
+  return "Die 3D-Ansicht kann auf diesem Gerät nicht angezeigt werden: "
+    + "Der Browser stellt keinen WebGL-Kontext bereit. "
+    + "Bitte den Browser neu starten, aktualisieren oder einen anderen Browser verwenden.";
+}
+
 async function openViewer(trigger) {
   const loadId = ++activeLoadId;
-  ensureScene();
-  dialog.showModal();
-  resizeRenderer();
+  // Open the dialog before touching WebGL. Otherwise a device that cannot
+  // create a WebGL context leaves the user with a button that does nothing.
+  if (!dialog.open) dialog.showModal();
   setStatus("3D-Modell wird geladen...");
   clearModel();
+  try {
+    ensureScene();
+  } catch (error) {
+    console.error("3D viewer: WebGL initialization failed.", error);
+    setStatus(webglUnavailableMessage());
+    return;
+  }
+  resizeRenderer();
 
   const sourceUrl = trigger.dataset.modelViewerSource;
   const format = trigger.dataset.modelViewerFormat || "stl";
