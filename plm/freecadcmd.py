@@ -511,7 +511,15 @@ def main():
     result_path = Path(sys.argv[2])
     spec = json.loads(spec_path.read_text())
     output_dir = Path(spec["output_dir"])
-    doc = FreeCAD.openDocument(spec["fcstd_path"])
+    source_path = Path(spec["fcstd_path"])
+    if source_path.suffix.lower() in (".step", ".stp"):
+        # STEP ist kein FreeCAD-Dokument; importieren statt openDocument.
+        import Import
+
+        doc = FreeCAD.newDocument("PLMStepPreview")
+        Import.insert(str(source_path), doc.Name)
+    else:
+        doc = FreeCAD.openDocument(str(source_path))
     doc.recompute()
 
     result = {"metadata": inspect_document(doc), "artifacts": []}
