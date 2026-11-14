@@ -1296,7 +1296,8 @@ class RevisionUploadViewTests(TestCase):
         response = self.client.get(reverse("plm:login"))
 
         self.assertContains(response, "FreeCAD-PLM")
-        self.assertContains(response, "Django-Admin")
+        # Der technische Admin-Link erscheint nur fuer Staff-Nutzer.
+        self.assertNotContains(response, "Technische Administration")
         self.assertContains(response, "plm/icons/favicon.ico")
         self.assertContains(response, "plm/icons/apple-touch-icon.png")
 

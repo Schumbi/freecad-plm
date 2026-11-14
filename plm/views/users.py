@@ -72,6 +72,9 @@ def user_management_list(request):
         {
             "user_rows": user_rows,
             "token_rows": token_rows,
+            "recent_events": list(
+                AuditEvent.objects.select_related("actor").order_by("-created_at")[:15]
+            ),
             "active_section": "admin",
         },
     )
