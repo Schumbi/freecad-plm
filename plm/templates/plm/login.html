@@ -20,7 +20,7 @@
       </div>
 
       {% if form.errors %}
-        <div class="errors">Benutzername oder Passwort stimmt nicht.</div>
+        <div class="errors" role="alert" aria-live="assertive">Benutzername oder Passwort stimmt nicht.</div>
       {% endif %}
 
       <form class="form-card" method="post" action="{% url 'plm:login' %}">
@@ -37,9 +37,12 @@
         <button type="submit">Anmelden</button>
       </form>
 
-      <p class="muted" style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);">
-        <a href="{% url 'admin:index' %}">Django-Admin</a>
-      </p>
+      {% if request.user.is_staff %}
+        <p class="muted" style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);">
+          <a href="{% url 'admin:index' %}">Technische Administration</a>
+          <span class="field-hint">Django-Admin für Serveraufgaben</span>
+        </p>
+      {% endif %}
     </section>
   </main>
 </body>
