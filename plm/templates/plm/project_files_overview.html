@@ -1,25 +1,132 @@
 {% extends "plm/base.html" %}
+
+{% block breadcrumbs %}
+  <nav class="breadcrumbs" aria-label="Brotkrumen">
+    <ol>
+      <li><a href="{% url 'plm:project_list' %}">Projekte</a></li>
+      <li><a href="{% url 'plm:project_detail' project.id %}">{{ project.code }}</a></li>
+      <li><span aria-current="page">CAD-Abhängigkeiten</span></li>
+    </ol>
+  </nav>
+{% endblock %}
+
 {% block content %}
-<h1>Dateien und Abhängigkeiten · {{ project.code }}</h1>
-<p><a href="{% url 'plm:project_documents' project.id %}">Projektdateien verwalten</a> · <a href="{% url 'plm:project_detail' project.id %}">Projekt öffnen</a></p>
-<form method="get">
-  <label>Projektstand <select name="snapshot"><option value="">Neuester Stand</option>{% for snapshot in snapshots %}<option value="{{ snapshot.id }}" {% if selected.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>{% endfor %}</select></label>
-  <label>Vergleichen mit <select name="compare"><option value="">Kein Vergleich</option>{% for snapshot in snapshots %}<option value="{{ snapshot.id }}" {% if compare.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>{% endfor %}</select></label>
-  <label>Suche <input name="q" type="search" value="{{ query }}"></label>
-  <label><input name="old" type="checkbox" value="1" {% if show_old %}checked{% endif %}> Ältere Versionen zeigen</label>
-  {% if sort_field %}<input type="hidden" name="sort" value="{{ sort_field }}"><input type="hidden" name="direction" value="{{ sort_direction }}">{% endif %}
-  <button type="submit">Anzeigen</button>
-</form>
-<section class="files-section dependency-section"><details open><summary class="files-section-title">Abhängigkeiten <span class="files-count">{{ dependencies|length }} Beziehungen</span></summary>
-  <p class="dependency-hint">Verbindungen zeigen, welche Dateien eine Datei benötigt. Zweige und Dateidetails lassen sich aufklappen.</p>
-  <div class="dependency-tree">
-  {% for node in dependency_tree %}{% include "plm/dependency_node.html" with node=node only %}
-  {% empty %}<p>Keine erkannten Abhängigkeiten.</p>{% endfor %}
-</div></details>
-{% if compare %}<h2>Unterschiede zwischen Projektständen</h2><ul>{% for item in changed %}<li>{{ item.path }}: {{ item.state }}</li>{% empty %}<li>Keine Dateiunterschiede.</li>{% endfor %}</ul>
-<h3>Abhängigkeiten</h3><ul>{% for item in changed_dependencies %}<li>{{ item.source }} → {{ item.target }}: {{ item.state }}</li>{% empty %}<li>Keine Unterschiede.</li>{% endfor %}</ul>{% endif %}</section>
-<section class="files-section file-list-section"><details open><summary class="files-section-title">Dateiübersicht <span class="files-count">{{ rows|length }} Dateien</span></summary>
-<div class="table-wrap"><table><thead><tr>{% for header in sort_headers %}<th scope="col"{% if header.active %} aria-sort="{{ header.direction }}"{% endif %}><a href="{{ header.url }}">{{ header.label }}{% if header.active %} {% if header.direction == 'descending' %}↓{% else %}↑{% endif %}{% endif %}</a></th>{% endfor %}<th scope="col">Öffnen</th></tr></thead><tbody>
-{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.type }}</td><td>{{ row.owner }}</td><td>{{ row.version }}</td><td>{% if row.in_snapshot %}Enthalten{% else %}Außerhalb{% endif %}</td><td><a href="{{ row.url }}">Herunterladen</a></td></tr>{% empty %}<tr><td colspan="6">Keine Dateien gefunden.</td></tr>{% endfor %}
-</tbody></table></div></details></section>
+  <div class="page-header">
+    <div class="page-header-main">
+      <span class="page-kicker">{{ project.code }}</span>
+      <h1>CAD-Abhängigkeiten</h1>
+      <p class="lead-text">Dateien, Projektdokumente und ihre Abhängigkeiten im gewählten Projektstand.</p>
+    </div>
+    <div class="page-header-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'plm:project_detail' project.id %}">Zum Projekt</a>
+      <a class="btn btn-outline-secondary" href="{% url 'plm:project_documents' project.id %}">Dokumente</a>
+    </div>
+  </div>
+
+  <form method="get" class="toolbar">
+    <div class="toolbar-group">
+      <div class="form-field">
+        <label for="snapshot">Projektstand</label>
+        <select id="snapshot" name="snapshot">
+          <option value="">Neuester Stand</option>
+          {% for snapshot in snapshots %}
+            <option value="{{ snapshot.id }}" {% if selected.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="compare">Vergleichen mit</label>
+        <select id="compare" name="compare">
+          <option value="">Kein Vergleich</option>
+          {% for snapshot in snapshots %}
+            <option value="{{ snapshot.id }}" {% if compare.id == snapshot.id %}selected{% endif %}>{{ snapshot.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="query">Suche</label>
+        <input id="query" name="q" type="search" value="{{ query }}" placeholder="Dateipfad filtern">
+      </div>
+      <div class="form-field">
+        <label><input name="old" type="checkbox" value="1" {% if show_old %}checked{% endif %}> Ältere Versionen zeigen</label>
+      </div>
+      {% if sort_field %}
+        <input type="hidden" name="sort" value="{{ sort_field }}">
+        <input type="hidden" name="direction" value="{{ sort_direction }}">
+      {% endif %}
+      <button type="submit">Anzeigen</button>
+    </div>
+  </form>
+
+  <section class="files-section dependency-section">
+    <details open>
+      <summary class="files-section-title">Abhängigkeiten <span class="files-count">{{ dependencies|length }} Beziehungen</span></summary>
+      <p class="dependency-hint">Verbindungen zeigen, welche Dateien eine Datei benötigt. Zweige und Dateidetails lassen sich aufklappen.</p>
+      <div class="dependency-tree">
+        {% for node in dependency_tree %}
+          {% include "plm/dependency_node.html" with node=node only %}
+        {% empty %}
+          <p>Keine erkannten Abhängigkeiten.</p>
+        {% endfor %}
+      </div>
+    </details>
+  </section>
+
+  {% if compare %}
+    <section class="data-card">
+      <div class="section-header">
+        <h2>Unterschiede zwischen Projektständen</h2>
+        <span class="muted">{{ changed|length }} Änderungen</span>
+      </div>
+      <ul>
+        {% for item in changed %}
+          <li>{{ item.path }}: {{ item.state }}</li>
+        {% empty %}
+          <li>Keine Dateiunterschiede.</li>
+        {% endfor %}
+      </ul>
+      <h3>Abhängigkeiten</h3>
+      <ul>
+        {% for item in changed_dependencies %}
+          <li>{{ item.source }} → {{ item.target }}: {{ item.state }}</li>
+        {% empty %}
+          <li>Keine Unterschiede.</li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <section class="files-section file-list-section">
+    <details open>
+      <summary class="files-section-title">Dateiübersicht <span class="files-count">{{ rows|length }} Dateien</span></summary>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {% for header in sort_headers %}
+                <th scope="col"{% if header.active %} aria-sort="{{ header.direction }}"{% endif %}>
+                  <a href="{{ header.url }}">{{ header.label }}{% if header.active %} {% if header.direction == 'descending' %}↓{% else %}↑{% endif %}{% endif %}</a>
+                </th>
+              {% endfor %}
+              <th scope="col">Öffnen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td>{{ row.type }}</td>
+                <td>{{ row.owner }}</td>
+                <td>{{ row.version }}</td>
+                <td>{% if row.in_snapshot %}Enthalten{% else %}Außerhalb{% endif %}</td>
+                <td><a href="{{ row.url }}">Herunterladen</a></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6">Keine Dateien gefunden.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
 {% endblock %}

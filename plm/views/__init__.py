@@ -71,6 +71,7 @@ from .parts import (
     remove_part,
     part_properties,
     process_export_jobs_once,
+    manufacturing_overview,
 )
 from .revisions import (
     artifact_viewer_source,

@@ -252,3 +252,33 @@ def remove_part(request, part_id):
     snapshot_entries = list(ProjectSnapshotEntry.objects.filter(revision__part=part).select_related("snapshot").order_by("snapshot__name", "path")) if not archive else []
     delete_plan = signing.dumps({"part_id": part.id, "revisions": list(part.revisions.order_by("id").values_list("id", flat=True)), "entries": [[entry.id, entry.snapshot_id, entry.path] for entry in sorted(snapshot_entries, key=lambda item: item.id)]}, salt="plm.remove_part") if not archive else ""
     return render(request, "plm/part_confirm_remove.html", {"part": part, "archive": archive, "snapshot_entries": snapshot_entries, "delete_plan": delete_plan}, status=400 if request.method == "POST" else 200)
+
+
+@login_required
+def manufacturing_overview(request, part_id):
+    part = get_object_or_404(
+        Part.objects.select_related("project", "family", "variant_source_revision__part"),
+        id=part_id,
+    )
+    if not (can_upload_revision(request.user) or is_plm_admin(request.user)):
+        return HttpResponseForbidden("Keine Berechtigung für Fertigungsdateien.")
+
+    revisions = part.revisions.select_related("created_by").prefetch_related(
+        "manufacturing_files"
+    )
+    manufacturing_files = []
+    for rev in revisions:
+        for mf in rev.manufacturing_files.select_related("machine"):
+            manufacturing_files.append((rev, mf))
+
+    return render(
+        request,
+        "plm/manufacturing_overview.html",
+        {
+            "part": part,
+            "revisions": revisions,
+            "manufacturing_files": manufacturing_files,
+            "can_upload": can_upload_revision(request.user),
+            "can_release": can_release_revision(request.user),
+        },
+    )

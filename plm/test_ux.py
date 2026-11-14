@@ -132,8 +132,14 @@ class UxFeatureTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertLess(html.index("<h2>Aktuelle Revision</h2>"), html.index("Baugruppenstruktur"))
-        self.assertLess(html.index("<h2>Aktuelle Revision</h2>"), html.index("Lebenszyklus"))
+        # AP-B4: H2 "Aktuelle Revision" entfernt, nur noch H3
+        self.assertNotIn("<h2>Aktuelle Revision</h2>", html)
+        # Prüfe, dass Baugruppenstruktur und Lebenszyklus nach dem H3 für neueste Revision kommen
+        h3_revision_idx = html.index('id="revision-')
+        baugruppen_idx = html.index("Baugruppenstruktur")
+        lebenszyklus_idx = html.index("Lebenszyklus")
+        self.assertLess(h3_revision_idx, baugruppen_idx)
+        self.assertLess(h3_revision_idx, lebenszyklus_idx)
         self.assertContains(response, '<details class="overview-section">', count=3)
         self.assertNotContains(response, '<details class="overview-section" open>')
 

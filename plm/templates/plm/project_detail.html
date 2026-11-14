@@ -20,7 +20,7 @@
         <div class="page-header-main">
           <span class="page-kicker">Projekt</span>
           <h1>{{ project.code }} · {{ project.name }}</h1>
-          <p><a href="{% url 'plm:project_documents' project.id %}">Projektdateien</a> · <a href="{% url 'plm:project_files_overview' project.id %}">Dateien und Abhängigkeiten</a></p>
+          <p><a href="{% url 'plm:project_documents' project.id %}">Dokumente</a> · <a href="{% url 'plm:project_files_overview' project.id %}">CAD-Abhängigkeiten</a></p>
           <p class="object-subtitle">{{ project.description|default:"Kein Beschreibungstext hinterlegt." }}</p>
         </div>
         <div class="page-header-actions">
@@ -51,33 +51,6 @@
           <span class="stat-label">Projektdatum</span>
         </div>
       </div>
-
-      <div class="section-header">
-        <div>
-          <h2>Druckprojekte</h2>
-          <p class="section-description">3MF-Dateien, Quellen und Druckplatten des Projekts.</p>
-        </div>
-        {% if print_projects %}
-          <button type="button" class="btn btn-outline-secondary" data-dialog-target="#print-projects">
-            {{ print_projects|length }} Druckprojekt{{ print_projects|length|pluralize:"e" }} anzeigen
-          </button>
-        {% endif %}
-      </div>
-      {% if print_projects %}
-        <div class="plm-dialog" id="print-projects" role="dialog" aria-modal="true" aria-labelledby="print-projects-title" hidden>
-          <div class="plm-dialog-panel wide">
-            <div class="plm-dialog-header">
-              <h5 class="plm-dialog-title" id="print-projects-title">Druckprojekte · {{ project.code }}</h5>
-              <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
-            </div>
-            <div class="plm-dialog-body">
-              {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_create_part can_delete_print_projects=can_delete_print_projects show_primary_revision=True %}
-            </div>
-          </div>
-        </div>
-      {% else %}
-        <p class="muted">Noch keine Druckprojekte. Sie werden über „Druckprojekt öffnen/erstellen“ in FreeCAD angelegt.</p>
-      {% endif %}
 
       <div class="section-header">
         <h2>Teile und Baugruppen</h2>
@@ -163,6 +136,31 @@
       {% endif %}
       {% if archived_parts %}
         <section class="panel"><h2>Archivierte Teile und Baugruppen</h2><ul>{% for archived_part in archived_parts %}<li><a href="{% url 'plm:part_detail' archived_part.id %}">{{ archived_part.number }} · {{ archived_part.name }}</a> <a href="{% url 'plm:remove_part' archived_part.id %}">Wiederherstellen</a></li>{% endfor %}</ul></section>
+      {% endif %}
+
+      <div class="section-header">
+        <h2>3D-Druck</h2>
+        <p class="section-description">3MF-Dateien, Quellen und Druckplatten des Projekts.</p>
+        {% if print_projects %}
+          <button type="button" class="btn btn-outline-secondary" data-dialog-target="#print-projects">
+            {{ print_projects|length }} Druckprojekt{{ print_projects|length|pluralize:"e" }} anzeigen
+          </button>
+        {% endif %}
+      </div>
+      {% if print_projects %}
+        <div class="plm-dialog" id="print-projects" role="dialog" aria-modal="true" aria-labelledby="print-projects-title" hidden>
+          <div class="plm-dialog-panel wide">
+            <div class="plm-dialog-header">
+              <h5 class="plm-dialog-title" id="print-projects-title">Druckprojekte · {{ project.code }}</h5>
+              <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
+            </div>
+            <div class="plm-dialog-body">
+              {% include "plm/includes/print_projects_table.html" with print_projects=print_projects can_manage_print_projects=can_create_part can_delete_print_projects=can_delete_print_projects show_primary_revision=True %}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <p class="muted">Noch keine Druckprojekte. Sie werden über „Druckprojekt öffnen/erstellen“ in FreeCAD angelegt.</p>
       {% endif %}
     </div>
 

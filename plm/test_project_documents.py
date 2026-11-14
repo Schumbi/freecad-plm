@@ -87,7 +87,7 @@ class ProjectDocumentTests(TestCase):
     def test_web_file_overview_and_documents_render(self):
         upload_document(self.project, "manual.pdf", SimpleUploadedFile("manual.pdf", b"%PDF-1.4"), self.admin)
         self.client.force_login(self.reader)
-        self.assertContains(self.client.get(reverse("plm:project_detail", args=[self.project.pk])), "Dateien und Abhängigkeiten")
+        self.assertContains(self.client.get(reverse("plm:project_detail", args=[self.project.pk])), "CAD-Abhängigkeiten")
         self.assertContains(self.client.get(reverse("plm:project_files_overview", args=[self.project.pk])), "manual.pdf")
         self.assertContains(self.client.get(reverse("plm:project_documents", args=[self.project.pk])), "PDF ansehen")
 

@@ -374,6 +374,31 @@ Neue View, URL, Template: Liste aller Fertigungsdateien aller Revisionen des Tei
 direkte Upload-Möglichkeit ohne modalen Kontext, Sortierung/Filter nach Revision
 und Dateityp.
 
+Dateien: `plm/views/parts.py` (neue View), `plm/urls.py` (neuer URL),
+neues Template `plm/manufacturing_overview.html`.
+
+Test: Zugriff mit Reader (nur Ansicht), Editor (Upload), Admin (Löschen).
+Upload ohne aktive Revision schlägt mit Fehlermeldung fehl.  
+Risiko: mittel. Neue Seite, kein bestehendes Verhalten berührt.
+
+---
+
+**AP-D2: Link zur Fertigungsseite in Projektdetail und Suche** (≈ 1 h)  
+Auf Teilseite: neuer Button in `page-header-actions`; in Suchergebnissen:
+Spalte „Fertigung" mit Link, wenn Fertigungsdateien vorhanden.
+
+Test: Navigationsfluss Suche → Fertigungsseite.  
+Risiko: keines.
+
+---
+
+### Gruppe D – Fertigungs-UX (eigenständige Seite)
+
+**AP-D1: Fertigungsseite `/parts/<id>/manufacturing/`** (≈ 1 Tag)  
+Neue View, URL, Template: Liste aller Fertigungsdateien aller Revisionen des Teils,
+direkte Upload-Möglichkeit ohne modalen Kontext, Sortierung/Filter nach Revision
+und Dateityp.
+
 Dateien: `plm/views/manufacturing.py` (neue View), `plm/urls.py` (neuer URL),
 neues Template `plm/manufacturing_overview.html`.
 
@@ -424,7 +449,7 @@ Vertragstests `run_contract_tests.py` müssen grün bleiben.
 | AP | Status | Risiko | Grund | Absicherung |
 |---|---|---|---|---|
 | A1–A4 | ✅ Abgeschlossen | 🟢 keines | Nur CSS/Template | Visuelle Prüfung, 405 Tests grün |
-| B1–B4 | ⏳ Nicht begonnen | 🟢 keines | Nur Template-Reihenfolge | Sichtprüfung |
+| B1–B4 | ✅ Abgeschlossen | 🟢 keines | Nur Template-Reihenfolge | Sichtprüfung |
 | C1 | ⏳ Nicht begonnen | 🟡 mittel | JS-Verhalten `<dialog>` vs. custom | Firefox Desktop + Android testen |
 | C2 | ⏳ Nicht begonnen | 🟢 gering | Nach C1 sequenziell | Alle Dialog-Trigger durchklicken |
 | D1 | ⏳ Nicht begonnen | 🟡 mittel | Neue View + Berechtigungen | Reader/Editor/Admin-Tests |

@@ -1355,7 +1355,8 @@ class RevisionUploadViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertIn("Aktuelle Revision", html)
+        # AP-B4: H2 "Aktuelle Revision" entfernt, nur noch H3 in der Liste
+        self.assertNotIn("Aktuelle Revision", html)
         self.assertIn("Revisionen (1)", html)
         self.assertLess(html.index(f'id="revision-{current.id}"'), html.index('id="older-revisions"'))
         self.assertGreater(html.index(f'id="revision-{older.id}"'), html.index('id="older-revisions"'))
