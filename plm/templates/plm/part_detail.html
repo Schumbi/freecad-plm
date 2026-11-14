@@ -132,9 +132,19 @@
                   {% for print_project in revision.primary_print_projects.all %}
                     <span class="artifact-pill">Druckprojekt {{ print_project.code }}</span>
                   {% endfor %}
-                  {% for job in revision.export_jobs.all %}
-                    <span class="job-status-pill job-{{ job.status }}">{{ job.get_job_type_display }}: {{ job.get_status_display }}</span>
-                  {% endfor %}
+                  {% with png=revision.png_status %}
+                    {% if png.state == "failed" %}
+                      <button type="button" class="job-status-pill job-failed png-status-button" data-dialog-target="#png-log-{{ revision.id }}" title="Fehlerdetails und Log anzeigen">
+                        PNG-Ansichten fehlgeschlagen
+                      </button>
+                    {% elif png.state == "success" %}
+                      <span class="job-status-pill job-succeeded" title="PNG-Ansichten wurden erzeugt">PNG-Ansichten ✓</span>
+                    {% elif png.state == "pending" %}
+                      <span class="job-status-pill job-running">PNG-Ansichten werden erzeugt</span>
+                    {% else %}
+                      <span class="job-status-pill job-missing">PNG-Ansichten fehlen</span>
+                    {% endif %}
+                  {% endwith %}
                 </div>
               </div>
 
@@ -193,6 +203,27 @@
                 </div>
               </div>
             </article>
+
+            {% with png=revision.png_status %}
+              {% if png.state == "failed" %}
+                <dialog class="plm-dialog" id="png-log-{{ revision.id }}" aria-labelledby="png-log-title-{{ revision.id }}">
+                  <div class="plm-dialog-panel wide">
+                    <div class="plm-dialog-header">
+                      <h5 class="plm-dialog-title" id="png-log-title-{{ revision.id }}">PNG-Ansichten · {{ revision.revision_code }}</h5>
+                      <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
+                    </div>
+                    <div class="plm-dialog-body">
+                      <p class="meta-line">
+                        {{ png.job.get_status_display }}
+                        {% if png.job.finished_at %}· {{ png.job.finished_at|date:"d.m.Y H:i" }}{% endif %}
+                      </p>
+                      {% if png.job.error %}<div class="form-errors" role="alert">{{ png.job.error }}</div>{% endif %}
+                      <pre class="job-log">{{ png.job.log|default:"Kein Log vorhanden." }}</pre>
+                    </div>
+                  </div>
+                </dialog>
+              {% endif %}
+            {% endwith %}
 
             <dialog class="plm-dialog" id="notes-{{ revision.id }}" aria-labelledby="notes-title-{{ revision.id }}">
               <div class="plm-dialog-panel">

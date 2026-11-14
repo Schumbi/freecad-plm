@@ -302,6 +302,30 @@ class Revision(TimeStampedModel):
         return f"{self.part.number} {self.revision_code}"
 
     @property
+    def png_status(self):
+        """Ein zusammengefasster Status fuer die PNG-Ansichten.
+
+        Die Einzelansichten sind technische Artefakte; in der Revisionskarte
+        zaehlt nur, ob der letzte Lauf erfolgreich war.
+        """
+        artifacts = [a for a in self.artifacts.all() if a.artifact_type == "png"]
+        jobs = [
+            job for job in self.export_jobs.all()
+            if job.job_type == ExportJob.JobType.PNG_VIEWS
+        ]
+        latest = jobs[0] if jobs else None
+        if latest is not None:
+            if latest.status == ExportJob.Status.FAILED:
+                return {"state": "failed", "job": latest}
+            if latest.status in (ExportJob.Status.QUEUED, ExportJob.Status.RUNNING):
+                return {"state": "pending", "job": latest}
+            if latest.status == ExportJob.Status.SUCCEEDED and artifacts:
+                return {"state": "success", "job": latest}
+        if artifacts:
+            return {"state": "success", "job": latest}
+        return {"state": "missing", "job": latest}
+
+    @property
     def preview_summary(self):
         """Kurze, nutzerlesbare Zusammenfassung der erzeugten Vorschauen."""
         counts = {}
@@ -310,8 +334,6 @@ class Revision(TimeStampedModel):
         labels = []
         if counts.get("3mf"):
             labels.append("3D")
-        if counts.get("png"):
-            labels.append(f"{counts['png']} Ansichten")
         for artifact_type in ("step", "stl"):
             if counts.get(artifact_type):
                 labels.append(artifact_type.upper())

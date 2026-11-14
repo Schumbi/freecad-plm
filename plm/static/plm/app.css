@@ -2901,3 +2901,33 @@ kbd {
     text-decoration: none;
   }
 }
+
+
+.png-status-button {
+  border: 0;
+  cursor: pointer;
+}
+
+.png-status-button:focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.job-missing {
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.job-log {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: var(--space-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

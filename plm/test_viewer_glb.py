@@ -82,7 +82,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from .freecadcmd import PREVIEW_GENERATOR_VERSION
-from .models import ExportJob, Part, Project, Revision
+from .models import ExportJob, Part, Project, Revision, RevisionArtifact
 from .views.common import ensure_revision_viewer_preview, revision_viewer_glb_artifact
 
 
@@ -122,3 +122,62 @@ class PreviewUnavailableTests(TestCase):
                 status=ExportJob.Status.QUEUED,
             ).exists()
         )
+
+
+class PngStatusTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("png-user", password="pw")
+        project = Project.objects.create(code="PNG", name="PNG")
+        part = Part.objects.create(project=project, number="P-1", name="Teil")
+        self.revision = Revision.objects.create(
+            part=part,
+            revision_code="R0001",
+            status=Revision.Status.DRAFT,
+            file=SimpleUploadedFile("part.FCStd", b"x"),
+            file_format=Revision.FileFormat.FCSTD,
+            original_filename="part.FCStd",
+            sha256="b" * 64,
+            size_bytes=1,
+            created_by=self.user,
+        )
+
+    def _job(self, status, log=""):
+        return ExportJob.objects.create(
+            revision=self.revision,
+            job_type=ExportJob.JobType.PNG_VIEWS,
+            status=status,
+            log=log,
+            created_by=self.user,
+        )
+
+    def _png(self):
+        RevisionArtifact.objects.create(
+            revision=self.revision,
+            artifact_type=RevisionArtifact.ArtifactType.PNG,
+            view_name="front",
+            file="front.png",
+            original_filename="front.png",
+            sha256="c" * 64,
+            size_bytes=1,
+        )
+
+    def test_missing_without_job_or_artifacts(self):
+        self.assertEqual(self.revision.png_status["state"], "missing")
+
+    def test_success_with_artifact_and_successful_job(self):
+        self._png()
+        self._job(ExportJob.Status.SUCCEEDED)
+        self.assertEqual(self.revision.png_status["state"], "success")
+
+    def test_latest_failed_job_wins_over_old_artifacts(self):
+        self._png()
+        self._job(ExportJob.Status.SUCCEEDED)
+        failed = self._job(ExportJob.Status.FAILED, log="Keine sichtbaren Volumenkoerper")
+        status = self.revision.png_status
+        self.assertEqual(status["state"], "failed")
+        self.assertEqual(status["job"].id, failed.id)
+        self.assertIn("Volumenkoerper", status["job"].log)
+
+    def test_pending_job_is_reported(self):
+        self._job(ExportJob.Status.RUNNING)
+        self.assertEqual(self.revision.png_status["state"], "pending")
