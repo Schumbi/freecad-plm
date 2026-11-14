@@ -2819,3 +2819,30 @@ figure {
 .sidebar-nav :where(a, button, summary):focus-visible {
   outline-color: #ffffff;
 }
+
+
+.shortcut-list {
+  display: grid;
+  gap: 0.5rem 1rem;
+  grid-template-columns: auto 1fr;
+  margin: 0;
+}
+
+.shortcut-list dt {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.shortcut-list dd {
+  color: var(--muted);
+  margin: 0;
+}
+
+kbd {
+  background: var(--surface-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.35rem;
+}

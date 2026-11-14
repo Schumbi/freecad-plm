@@ -87,6 +87,7 @@
               </summary>
               <div class="user-menu-panel">
                 <p class="user-menu-name">Angemeldet als <strong>{{ request.user.get_username }}</strong></p>
+                <button type="button" class="link-button" data-dialog-target="#shortcuts-dialog">Tastaturkürzel</button>
                 <form class="logout-form" action="{% url 'plm:logout' %}" method="post">
                   {% csrf_token %}
                   <button class="logout-button" type="submit">Abmelden</button>
@@ -146,6 +147,23 @@
             </div>
           </form>
         </div>
+      </div>
+    </div>
+  </dialog>
+  <dialog class="plm-dialog" id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+    <div class="plm-dialog-panel">
+      <div class="plm-dialog-header">
+        <h5 class="plm-dialog-title" id="shortcuts-title">Tastaturkürzel</h5>
+        <button type="button" class="plm-dialog-close" data-dialog-close aria-label="Schließen">&times;</button>
+      </div>
+      <div class="plm-dialog-body">
+        <dl class="shortcut-list">
+          <dt><kbd>/</kbd></dt><dd>Suche fokussieren</dd>
+          <dt><kbd>g</kbd> <kbd>p</kbd></dt><dd>Zu den Projekten</dd>
+          <dt><kbd>g</kbd> <kbd>v</kbd></dt><dd>Zur Verwaltung</dd>
+          <dt><kbd>?</kbd></dt><dd>Diese Übersicht öffnen</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Dialog oder Suche schließen</dd>
+        </dl>
       </div>
     </div>
   </dialog>

@@ -367,6 +367,75 @@
     });
   }
 
+  function setupKeyboardShortcuts() {
+    var pendingG = false;
+    var timer = null;
+
+    function isTyping(target) {
+      if (!target) return false;
+      var tag = target.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target.isContentEditable
+      );
+    }
+
+    function goTo(name) {
+      var link = document.querySelector('.nav-link-list a[href="' + name + '"]');
+      if (link) window.location = link.getAttribute("href");
+    }
+
+    function openShortcuts() {
+      var dialog = document.getElementById("shortcuts-dialog");
+      if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isTyping(event.target)) return;
+      if (document.querySelector("dialog[open]")) return;
+
+      if (event.key === "/") {
+        var search = document.querySelector(".global-search input");
+        if (!search) return;
+        event.preventDefault();
+        var topbar = document.querySelector(".topbar");
+        if (topbar && getComputedStyle(search.closest(".global-search")).display === "none") {
+          topbar.classList.add("search-open");
+          var toggle = document.querySelector("[data-search-toggle]");
+          if (toggle) toggle.setAttribute("aria-expanded", "true");
+        }
+        search.focus();
+        return;
+      }
+
+      if (event.key === "?") {
+        event.preventDefault();
+        openShortcuts();
+        return;
+      }
+
+      if (event.key === "g") {
+        pendingG = true;
+        window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+          pendingG = false;
+        }, 1200);
+        return;
+      }
+
+      if (!pendingG) return;
+      pendingG = false;
+      if (event.key === "p") {
+        goTo("/");
+      } else if (event.key === "v") {
+        goTo("/verwaltung/");
+      }
+    });
+  }
+
   function setupSearchToggle() {
     var toggle = document.querySelector("[data-search-toggle]");
     var topbar = document.querySelector(".topbar");
@@ -760,6 +829,7 @@
   setupSidebarToggle();
   setupProjectMove();
   setupConfirmForms();
+  setupKeyboardShortcuts();
   setupSearchToggle();
   setupUserMenu();
   setupManufacturingSelectors();
