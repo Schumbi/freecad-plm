@@ -312,6 +312,19 @@ input[type="radio"] {
   min-height: 100vh;
 }
 
+/* Die Sidebar ist sticky und nur 100vh hoch; die Spalte darunter bleibt
+   sonst hell. Der Verlauf malt die komplette Navigationsspalte. */
+@media (min-width: 1101px) {
+  .app-shell {
+    background-image: linear-gradient(
+      90deg,
+      #111827 0,
+      #111827 var(--sidebar-width),
+      transparent var(--sidebar-width)
+    );
+  }
+}
+
 .sidebar-nav {
   background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
   color: var(--sidebar-text);
