@@ -383,7 +383,8 @@ Risiko: mittel. Neue Seite, kein bestehendes Verhalten berührt.
 
 ---
 
-**AP-D2: Link zur Fertigungsseite in Projektdetail und Suche** (≈ 1 h)  
+**AP-D2: Link zur Fertigungsseite in Projektdetail und Suche (ABGESCHLOSSEN am 2026-11-14)** (≈ 1 h)
+
 Auf Teilseite: neuer Button in `page-header-actions`; in Suchergebnissen:
 Spalte „Fertigung" mit Link, wenn Fertigungsdateien vorhanden.
 
@@ -408,7 +409,8 @@ Risiko: mittel. Neue Seite, kein bestehendes Verhalten berührt.
 
 ---
 
-**AP-D2: Link zur Fertigungsseite in Projektdetail und Suche** (≈ 1 h)  
+**AP-D2: Link zur Fertigungsseite in Projektdetail und Suche (ABGESCHLOSSEN am 2026-11-14)** (≈ 1 h)
+
 Auf Teilseite: neuer Button in `page-header-actions`; in Suchergebnissen:
 Spalte „Fertigung" mit Link, wenn Fertigungsdateien vorhanden.
 
@@ -453,6 +455,7 @@ Vertragstests `run_contract_tests.py` müssen grün bleiben.
 | C1 | ⏳ Nicht begonnen | 🟡 mittel | JS-Verhalten `<dialog>` vs. custom | Firefox Desktop + Android testen |
 | C2 | ⏳ Nicht begonnen | 🟢 gering | Nach C1 sequenziell | Alle Dialog-Trigger durchklicken |
 | D1 | ⏳ Nicht begonnen | 🟡 mittel | Neue View + Berechtigungen | Reader/Editor/Admin-Tests |
+| D2 | ✅ Abgeschlossen | 🟢 keines | Teil- und Suchnavigation | Browserpfade, Rollen- und Query-Tests |
 | E1 | ⏳ Nicht begonnen | 🔴 hoch | DB-Migration + Datenmigration | Separater Branch, `run_tests.py` + `run_contract_tests.py` |
 | E2 | ⏳ Nicht begonnen | 🟡 mittel | API-Rückgabe ändert sich | Addon-Vertragstests |
 

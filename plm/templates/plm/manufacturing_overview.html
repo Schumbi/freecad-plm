@@ -1,10 +1,5 @@
 {% extends "plm/base.html" %}
 
-{% block extra_head %}
-  {# Die bestehende globale .plm-dialog-Regel setzt display:flex auch für geschlossene Dialoge. #}
-  <style>dialog.plm-dialog:not([open]) { display: none; }</style>
-{% endblock %}
-
 {% block breadcrumbs %}
   <nav class="breadcrumbs" aria-label="Brotkrumen">
     <ol>

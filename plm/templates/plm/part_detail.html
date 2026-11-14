@@ -34,6 +34,7 @@
         </div>
         <div class="page-header-actions">
           <span class="type-pill">{{ part.get_category_display }}</span>
+          <a class="btn btn-outline-secondary" href="{% url 'plm:manufacturing_overview' part.id %}">Fertigung</a>
           {% if can_manage_part %}<a class="btn btn-outline-danger" href="{% url 'plm:remove_part' part.id %}">{% if part.is_archived %}Wiederherstellen{% else %}Aus Projekt entfernen{% endif %}</a>{% endif %}
           {% if can_upload %}
             <button type="button" class="btn btn-primary" data-dialog-target="#revision-upload">Neue Revision</button>

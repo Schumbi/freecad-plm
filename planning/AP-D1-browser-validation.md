@@ -44,6 +44,10 @@ Für die erste D1-Prüfung wurde ausschließlich in der Test-Browsersitzung
 Anschließend wurde der geschlossene Dialog **nur im neuen D1-Template**
 ausgeblendet; der frische Browseraufruf bestätigt `display: none` ohne Injektion.
 Die globale CSS-Regel und die bisherigen Seiten wurden nicht verändert.
+
+**Nachtrag (14.11.2026):** Der seither beauftragte globale Dialog-CSS-Fix
+ersetzt den oben beschriebenen lokalen Workaround. Geschlossene Dialoge sind
+nun auf allen Seiten verborgen; die bisherigen Klickblockaden entfallen.
 Der unveränderte Ist-Zustand ist im Screenshot `../.playwright-mcp/d1-desktop.png`
 dokumentiert; der Screenshot mit Browser-Workaround unter
 `../.playwright-mcp/d1-desktop-workaround.png`.

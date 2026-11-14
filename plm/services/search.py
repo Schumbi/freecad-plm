@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 
-from ..models import Part, Project, ProjectSnapshotEntry, Revision
+from ..models import ManufacturingFile, Part, Project, ProjectSnapshotEntry, Revision
 
 
 PLM_SEARCH_RESULT_LIMIT = 50
@@ -33,8 +33,16 @@ def search_plm(
         return PlmSearchResults(projects=[], parts=[], revisions=[], snapshot_paths=[])
 
     project_query = Project.objects.filter(is_archived=False)
-    part_query = Part.objects.filter(is_archived=False)
-    revision_query = Revision.objects.all()
+    part_query = Part.objects.filter(is_archived=False).annotate(
+        has_manufacturing_files=Exists(
+            ManufacturingFile.objects.filter(revision__part_id=OuterRef("pk"))
+        )
+    )
+    revision_query = Revision.objects.annotate(
+        has_manufacturing_files=Exists(
+            ManufacturingFile.objects.filter(revision__part_id=OuterRef("part_id"))
+        )
+    )
     snapshot_query = ProjectSnapshotEntry.objects.all()
 
     if project_id:
