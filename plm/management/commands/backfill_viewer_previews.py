@@ -3,7 +3,10 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
-from plm.derivatives import revision_has_pending_png_job
+from plm.derivatives import (
+    revision_has_pending_png_job,
+    revision_preview_permanently_unavailable,
+)
 from plm.freecadcmd import PREVIEW_GENERATOR_VERSION
 from plm.models import Revision
 from plm.views.common import ensure_revision_viewer_preview, revision_viewer_glb_artifact
@@ -40,8 +43,12 @@ class Command(BaseCommand):
             .order_by("id")
         )
         candidates = []
+        unavailable = 0
         for revision in queryset.iterator():
             if revision_viewer_glb_artifact(revision):
+                continue
+            if revision_preview_permanently_unavailable(revision):
+                unavailable += 1
                 continue
             if revision_has_pending_png_job(revision):
                 continue
@@ -55,6 +62,11 @@ class Command(BaseCommand):
             f"{len(candidates)} Revision(en) ohne Vorschau der Generation "
             f"{PREVIEW_GENERATOR_VERSION}."
         )
+        if unavailable:
+            self.stdout.write(
+                f"{unavailable} Revision(en) ohne sichtbare Volumenkoerper "
+                "werden uebersprungen."
+            )
         for revision in candidates[:20]:
             self.stdout.write(
                 f"  {revision.part.project.code} · {revision.part.number} "

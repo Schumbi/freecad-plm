@@ -75,3 +75,50 @@ class ViewerGlbTests(SimpleTestCase):
         bin_length, bin_type = struct.unpack_from("<I4s", data, 20 + json_length)
         self.assertEqual(bin_type, b"BIN\x00")
         self.assertGreater(bin_length, 0)
+
+
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
+
+from .freecadcmd import PREVIEW_GENERATOR_VERSION
+from .models import ExportJob, Part, Project, Revision
+from .views.common import ensure_revision_viewer_preview, revision_viewer_glb_artifact
+
+
+class PreviewUnavailableTests(TestCase):
+    def test_revision_without_solids_is_not_retried(self):
+        user = get_user_model().objects.create_user("preview-user", password="pw")
+        project = Project.objects.create(code="NOVIS", name="Ohne Solids")
+        part = Part.objects.create(project=project, number="P-1", name="Parameter")
+        revision = Revision.objects.create(
+            part=part,
+            revision_code="R0001",
+            status=Revision.Status.DRAFT,
+            file=SimpleUploadedFile("parameter.FCStd", b"x"),
+            file_format=Revision.FileFormat.FCSTD,
+            original_filename="parameter.FCStd",
+            sha256="a" * 64,
+            size_bytes=1,
+            created_by=user,
+        )
+        ExportJob.objects.create(
+            revision=revision,
+            job_type=ExportJob.JobType.VIEWER,
+            status=ExportJob.Status.FAILED,
+            error="FreeCADCmd endete mit Code 1.",
+            log="RuntimeError: Keine sichtbaren Volumenkoerper fuer Vorschau-Ansichten gefunden.",
+            created_by=user,
+        )
+
+        self.assertIsNone(revision_viewer_glb_artifact(revision))
+        self.assertEqual(
+            ensure_revision_viewer_preview(revision, user, process_inline=False),
+            "failed",
+        )
+        self.assertFalse(
+            ExportJob.objects.filter(
+                revision=revision,
+                status=ExportJob.Status.QUEUED,
+            ).exists()
+        )

@@ -29,6 +29,22 @@ def revision_has_complete_png_views(revision):
     return revision_png_view_names(revision) >= set(PNG_VIEW_NAMES)
 
 
+PREVIEW_NO_SOLIDS_MARKER = "Keine sichtbaren Volumenkoerper"
+
+
+def revision_preview_permanently_unavailable(revision):
+    """Revisionen ohne sichtbare Solids erzeugen nie eine Vorschau.
+
+    Ein erneuter Job wuerde bei unveraenderlicher Revision immer wieder
+    scheitern; die Meldung bleibt als Fehlerstatus sichtbar.
+    """
+    return revision.export_jobs.filter(
+        job_type__in=(ExportJob.JobType.PNG_VIEWS, ExportJob.JobType.VIEWER),
+        status=ExportJob.Status.FAILED,
+        log__contains=PREVIEW_NO_SOLIDS_MARKER,
+    ).exists()
+
+
 def revision_has_pending_viewer_job(revision):
     return revision.export_jobs.filter(
         job_type=ExportJob.JobType.VIEWER,

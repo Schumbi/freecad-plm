@@ -12,6 +12,7 @@ from ..derivatives import (
     revision_has_complete_png_views,
     revision_has_pending_png_job,
     revision_has_pending_viewer_job,
+    revision_preview_permanently_unavailable,
     revision_png_view_names,
 )
 from ..forms import user_role
@@ -387,6 +388,8 @@ def ensure_revision_viewer_preview(revision, user, *, process_inline=True):
         return "ready"
     if revision_viewer_glb_artifact(revision):
         return "ready"
+    if revision_preview_permanently_unavailable(revision):
+        return "failed"
     if revision_has_pending_viewer_job(revision) or revision_has_pending_png_job(revision):
         return "pending"
 
