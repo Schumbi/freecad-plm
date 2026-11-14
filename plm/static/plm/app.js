@@ -183,6 +183,22 @@
     });
   }
 
+  function setupAutoSubmitForms() {
+    document.querySelectorAll("form[data-auto-submit]").forEach(function (form) {
+      form.querySelectorAll("select").forEach(function (select) {
+        select.addEventListener("change", function () {
+          form.requestSubmit();
+        });
+      });
+      // Leere Filter nicht als ?project=&status= in die URL schreiben.
+      form.addEventListener("submit", function () {
+        form.querySelectorAll("select").forEach(function (select) {
+          if (!select.value) select.disabled = true;
+        });
+      });
+    });
+  }
+
   function setupFormAccessibility() {
     document.querySelectorAll(".form-field").forEach(function (container) {
       var input = container.querySelector("input, select, textarea");
@@ -738,6 +754,7 @@
   revealLinkedRevision();
   window.addEventListener("hashchange", revealLinkedRevision);
   setupCadFileGuides();
+  setupAutoSubmitForms();
   setupFormAccessibility();
   setupClickableRows();
   setupSidebarToggle();

@@ -36,12 +36,9 @@
     </div>
   </div>
 
-  <form class="search-facets" method="get" action="{% url 'plm:global_search' %}">
+  <form class="search-facets" method="get" action="{% url 'plm:global_search' %}" data-auto-submit>
+    <input type="hidden" name="q" value="{{ query }}">
     <div class="search-facets-main">
-      <label>
-        <span>Suchbegriff</span>
-        <input type="search" name="q" value="{{ query }}" placeholder="Code, Name, Revision oder Datei">
-      </label>
       <label>
         <span>Projekt</span>
         <select name="project">
@@ -80,7 +77,7 @@
       </label>
     </div>
     <div class="form-actions">
-      <button type="submit">Suchen und filtern</button>
+      <button type="submit">Filter anwenden</button>
       {% if query or filters_active %}<a class="btn btn-outline-secondary" href="{% url 'plm:global_search' %}">Zurücksetzen</a>{% endif %}
     </div>
   </form>
