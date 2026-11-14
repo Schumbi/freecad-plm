@@ -49,7 +49,7 @@
           {% if can_upload %}
             <button type="button" class="btn btn-primary" data-dialog-target="#revision-upload">Neue Revision</button>
           {% endif %}
-          {% if revisions %}
+          {% if revisions|length > 1 %}
             <a class="btn btn-outline-secondary" href="{% url 'plm:revision_compare' part.id %}">Visuell vergleichen</a>
           {% endif %}
         </div>
