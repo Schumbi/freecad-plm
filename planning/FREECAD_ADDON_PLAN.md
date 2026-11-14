@@ -261,6 +261,7 @@ Antwort:
       "material": "",
       "supplier": "",
       "tags": "",
+      "tag_items": [{"id": 1, "name": "Montage"}],
       "is_archived": false
     }
   ]
@@ -279,9 +280,15 @@ Request:
   "description": "",
   "material": "",
   "supplier": "",
-  "tags": ""
+  "tags": ["Halterung", "Montage"]
 }
 ```
+
+`tags` akzeptiert beim Schreiben weiterhin einen kommagetrennten String oder
+eine Liste von Namen. Ein fehlendes `tags`-Feld laesst die Zuordnungen
+unveraendert; `""` oder `[]` entfernt alle Tags. Die Antwort liefert `tags`
+abwaertskompatibel als String und zusaetzlich `tag_items` als Liste aus
+`{"id", "name"}`. `tag_items` ist nur lesend.
 
 `category` ist `part` oder `assembly`. Wenn `number` leer ist, vergibt der Server automatisch die naechste Nummer.
 
@@ -319,6 +326,7 @@ Antwort:
     "material": "",
     "supplier": "",
     "tags": "",
+    "tag_items": [{"id": 1, "name": "Montage"}],
     "is_archived": false
   },
   "revisions": [

@@ -15,7 +15,7 @@ Gruende:
 - ORM und Migrationen sind Standardbestandteile.
 - Datei-Uploads und Storage-Abstraktion passen zum PLM-Kern.
 - Python bleibt nah an FreeCAD und spaeteren FreeCADCmd-Workern.
-- Docker Compose ist spaeter gut moeglich.
+- Docker Compose ist umgesetzt und fuer den Betrieb vorgesehen.
 
 Nicht favorisiert fuer v1:
 
@@ -26,7 +26,10 @@ Nicht favorisiert fuer v1:
 ## UI-Ansatz
 
 - Serverseitige Django-Templates als Basis.
-- Bootstrap oder ein vergleichbar schlichter CSS-Ansatz fuer eine robuste Arbeitsoberflaeche.
+- Eigenes schlichtes CSS ohne Bootstrap; die Vendor-Assets wurden entfernt.
+- Dialoge nutzen das native `<dialog>`-Element mit `showModal()`/`close()`
+  und werden ueber `data-dialog-target`/`data-dialog-close` in
+  `plm/static/plm/app.js` gesteuert.
 - Optional HTMX fuer dynamische Bereiche ohne grosse Frontend-SPA.
 - Keine React/Vue/Svelte-SPA fuer v1, solange kein klarer Bedarf entsteht.
 
@@ -34,10 +37,13 @@ Nicht favorisiert fuer v1:
 
 - Entwicklung zuerst mit SQLite moeglich.
 - Datenmodell PostgreSQL-kompatibel halten.
-- Spaeteres Docker-Compose-Ziel mit PostgreSQL vorsehen.
+- Docker Compose mit PostgreSQL ist umgesetzt.
 - CAD-Dateien nicht in der Datenbank speichern.
 - Dateien in einem Storage-Verzeichnis oder Docker-Volume ablegen.
 - Datenbank speichert Metadaten, Pfade, Hashes, Status und Beziehungen.
+- Projekt-Tags und Teile-Tags sind getrennte relationale Modelle
+  (`ProjectTag`, `PartTag`); Teile-Tags werden ueber eine M2M-Zuordnung mit
+  casefold-basiertem `identity_hash` eindeutig gehalten.
 
 ## Dateispeicher
 
@@ -58,12 +64,12 @@ Details koennen sich aendern. Wichtig bleibt: Dateinamen duerfen nicht allein au
 
 ## FreeCAD-Integration
 
-V1:
+V1 (umgesetzt):
 
 - `FCStd` als Datei validieren.
 - `FCStd` als ZIP lesen.
 - Basis-Metadaten extrahieren, soweit ohne FreeCAD moeglich.
-- Optionaler FreeCADCmd-Joblauf fuer abgeleitete Artefakte:
+- FreeCADCmd-Joblauf fuer abgeleitete Artefakte:
   - Analyse von exportierbaren Objekten und VarSet-Parametern.
   - Export nach STEP, STL und 3MF.
   - PNG-Ansichten fuer visuelle Vergleiche.
@@ -74,19 +80,20 @@ V1:
 
 Spaeter:
 
-- Separater dauerhafter Worker fuer FreeCADCmd.
 - Exporte nach PDF, DXF und weiteren Formaten.
 - Bearbeitung von VarSet-Parametern und Neurendern mit Varianten.
-- Status und Logs fuer Exportjobs.
-- Worker als eigener Docker-Compose-Service denkbar.
+- Weitere Verfeinerung von Status- und Logdarstellung fuer Exportjobs.
 
-## Spaeteres Docker-Compose-Zielbild
+## Docker-Compose-Betrieb
+
+Der Docker-Compose-Betrieb ist umgesetzt. Das Zielbild:
 
 ```text
-web       Django-App
+web       Django-App (Build-Target web, ohne FreeCAD)
 db        PostgreSQL
 media     Volume fuer FCStd- und Exportdateien
-worker    optionaler FreeCADCmd-Worker mit konfigurierbarem FREECADCMD_COMMAND
+worker    FreeCADCmd-Worker (Build-Target worker)
 ```
 
-Docker Compose ist kein v1-Muss, aber Architektur und Pfade sollen so gewaehlt werden, dass ein spaeterer Umzug nicht weh tut.
+Zusaetzlich gibt es `.forgejo/workflows/build-image.yml` fuer den automatischen
+Image-Build und `docker-compose.image.yml` fuer den Betrieb mit fertigen Images.

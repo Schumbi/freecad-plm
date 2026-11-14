@@ -5,6 +5,14 @@ dokumentiert.
 
 ## [Unreleased] - 2026-10-09
 
+- Teile-Tags sind strukturiert: zentrales `PartTag`-Modell, Migration der
+  bisherigen kommagetrennten Freitextwerte (0036–0038), Bearbeitung in den
+  Teileigenschaften, Tag-Chips auf der Teilseite und Suche über Tag-Namen.
+- Die Teile-API bleibt abwärtskompatibel: `tags` wird weiterhin als String
+  geliefert, zusätzlich gibt es `tag_items` mit ID und Name. Schreibzugriffe
+  akzeptieren String oder Namensliste; ein fehlendes Feld erhält vorhandene
+  Tags, `""` oder `[]` entfernt sie.
+
 - 3D- und PNG-Vorschauen bevorzugen eine eindeutig sichtbare, exportierbare
   FreeCAD-Baugruppe. Sichtbare Quellkörper außerhalb der Baugruppe werden dann
   nicht doppelt dargestellt; vorhandene Vorschauen werden beim nächsten Aufruf

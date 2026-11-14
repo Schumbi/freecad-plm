@@ -126,11 +126,20 @@ Nach Upload:
 
 Das Addon muss Manufacturing-Dateien nicht erzeugen. Es sollte sie aber sehen und herunterladen koennen, damit ein Konstrukteur erkennt, ob eine Revision schon produktionsnah vorbereitet wurde.
 
-API spaeter:
+API (umgesetzt):
 
-- `GET /api/revisions/<id>/manufacturing-files/`
-- `POST /api/revisions/<id>/manufacturing-files/`
-- `GET /api/manufacturing-files/<id>/download/`
+- `GET /api/manufacturing-files/<id>/file/` laedt die Datei herunter.
+- Ein separater API-Upload-Endpunkt fuer Fertigungsdateien existiert derzeit
+  nicht; Uploads laufen ueber die Web-UI.
+
+### Fertigungsuebersicht pro Teil (umgesetzt)
+
+Zusaetzlich zum Revisionsdialog gibt es die Seite
+`/parts/<id>/manufacturing/`. Sie listet Fertigungsdateien aller Revisionen
+eines Teils und unterstuetzt die Filter `revision`, `type` und `sort`
+(`newest`, `revision`, `type`). Berechtigte Benutzer und Admins koennen dort
+direkt eine Datei fuer eine aktive Revision hochladen. Der revisionsbezogene
+Dialog bleibt fuer den Arbeitsfluss an einer einzelnen Revision erhalten.
 
 ## 3MF-Spezialfall
 
@@ -245,7 +254,7 @@ Im Audit-Metadata speichern:
 
 ## Umsetzungsschritte
 
-### Schritt 1: Datenmodell Und Upload
+### Schritt 1: Datenmodell Und Upload (umgesetzt)
 
 - `ManufacturingFile`-Modell anlegen.
 - Migration erstellen.
@@ -253,29 +262,32 @@ Im Audit-Metadata speichern:
 - Upload-Service mit Hash, Groesse, Basismetadaten.
 - Tests fuer Upload, Dublette, Download, Projektloeschung.
 
-### Schritt 2: Web-UI
+### Schritt 2: Web-UI (umgesetzt)
 
 - Revisionsdetail um Bereich `Fertigung` erweitern.
 - Upload-Dialog einbauen.
 - Detaildialog fuer Metadaten.
 - Download und Statuswechsel.
+- Zusaetzliche Fertigungsuebersicht pro Teil.
 
-### Schritt 3: API
+### Schritt 3: API (teilweise umgesetzt)
 
-- Manufacturing-Dateien in Revisions-API anzeigen.
-- Upload- und Download-Endpunkte fuer Addon/Automatisierung.
+- Download-Endpunkt fuer Addon/Automatisierung.
+- Fertigungsdateien werden derzeit nicht in der Revisions-API aufgelistet und
+  koennen nicht ueber die API hochgeladen werden.
 
-### Schritt 4: 3MF-Metadaten
+### Schritt 4: 3MF-Metadaten (umgesetzt)
 
 - 3MF als ZIP inventarisieren.
 - bekannte Slicer-Metadaten auslesen, erst konservativ.
 - Thumbnail extrahieren, falls vorhanden.
 
-### Schritt 5: PrintRun
+### Schritt 5: PrintRun (umgesetzt fuer Grundmodell)
 
 - Eigenes Modell fuer echte Drucklaeufe.
 - Ergebnis, Materialcharge, Drucker, Menge, Fotos und Messprotokolle.
 - Aus Manufacturing-Datei heraus `Druck dokumentieren`.
+- Verfeinerung von Ergebnis- und Nachweisfeldern bleibt moeglich.
 
 ## Offene Entscheidungen
 

@@ -37,7 +37,7 @@ Grund:
 - Python bleibt nah an FreeCAD.
 - Spaeteres Docker Compose ist gut moeglich.
 
-Status: vorlaeufig entschieden; nach der Anforderungsrunde final pruefen.
+Status: entschieden. Docker Compose mit PostgreSQL und Worker ist inzwischen umgesetzt.
 
 ## 2026-06-26: Filesystem Plus Datenbank
 
@@ -72,7 +72,8 @@ Grund:
 - Der Dienst soll spaeter sauber deploybar sein.
 - Ein spaeterer Wechsel auf PostgreSQL und Volumes soll nicht zum Umbau werden.
 
-Status: entschieden.
+Status: entschieden. Der Compose-Betrieb ist inzwischen umgesetzt; die
+Formulierung "kein v1-Muss" beschreibt nur den urspruenglichen Planungsstand.
 
 ## 2026-06-26: Gleicher Datei-Hash Pro Teil Wird Nicht Erneut Hochgeladen
 
@@ -294,5 +295,75 @@ Grund:
   erscheinen.
 - Die vom PLM geführte Revision und der Workspace bleiben dadurch von Anfang an
   eindeutig.
+
+Status: entschieden.
+
+## 2026-11-14: Web-Dialoge nutzen das native `<dialog>`-Element
+
+Entscheidung: Die Web-Oberfläche verwendet für modale Dialoge das native
+`<dialog>`-Element mit `showModal()`/`close()` statt eines CSS-/JS-Frameworks.
+
+Regeln:
+
+- Bootstrap-Vendor-Assets werden nicht mehr ausgeliefert; es gibt keine
+  Bootstrap-Referenzen mehr in Templates, CSS oder JavaScript.
+- Auslöser tragen `data-dialog-target`, Schließen-Buttons `data-dialog-close`;
+  die Steuerung liegt in `plm/static/plm/app.js`.
+- Das Styling erfolgt über die eigenen `plm-dialog`-Klassen in `app.css`.
+
+Grund:
+
+- Weniger externe Abhängigkeiten und kein zusätzliches Framework für wenige
+  Dialoge.
+- Fokus-Falle, Escape-Schließen und Barrierefreiheit kommen vom Browser.
+- Die vorhandenen Bootstrap-Modal-Dialoge ließen sich ohne API-Bruch ersetzen.
+
+Status: entschieden.
+
+## 2026-11-14: Fertigungsübersicht als eigene Seite pro Teil
+
+Entscheidung: Zusätzlich zum Revisionsdialog gibt es eine eigene
+Fertigungsübersicht unter `/parts/<id>/manufacturing/`.
+
+Regeln:
+
+- Die Seite listet Fertigungsdateien aller Revisionen eines Teils.
+- Filter nach Revision, Dateityp und Sortierung sind verfügbar.
+- Berechtigte Benutzer und Admins können dort direkt hochladen; der
+  Revisionsdialog bleibt für den revisionsbezogenen Arbeitsfluss erhalten.
+
+Grund:
+
+- Fertigungsdateien sind oft über mehrere Revisionen verteilt und waren im
+  einzelnen Revisionsdialog schlecht auffindbar.
+- Eine eigene Seite macht Suche, Vergleich und Upload unabhängig von einer
+  bestimmten Revision.
+
+Status: entschieden.
+
+## 2026-11-14: Teile-Tags als eigenes relationales Modell
+
+Entscheidung: Teile- und Baugruppen-Tags werden als eigenständiges Modell
+`PartTag` mit M2M-Zuordnung gespeichert, getrennt von `ProjectTag`.
+
+Regeln:
+
+- Ein `PartTag` ist projektübergreifend global und besitzt einen eindeutigen
+  `identity_hash` (SHA-256 der casefold-normalisierten Bezeichnung).
+- Beim Anlegen/Bearbeiten werden Kommas als Trenner verwendet, Unicode-Leerraum
+  wird normalisiert, die erste Schreibweise bleibt Anzeigename.
+- Grenzen: maximal 255 Zeichen pro Tag, maximal 100 Tags pro Teil.
+- Die API liefert `tags` weiterhin als kommagetrennten String und zusätzlich
+  `tag_items`; fehlendes `tags` lässt Zuordnungen unverändert, `""`/`[]` löscht sie.
+- Die Migrationen `0036`–`0038` legen das Modell an, übertragen Altdaten und
+  entfernen das bisherige CharField `Part.tags`.
+
+Grund:
+
+- Freitext-Tags erzeugten Dubletten durch Schreibweisen und Leerraum.
+- Ein relationales Modell erlaubt zentrale Anzeige, Suche und spätere Pflege,
+  ohne die bestehende Addon-API zu brechen.
+- Projekt-Tags und Teile-Tags haben unterschiedliche Lebenszyklen und bleiben
+  daher getrennte Systeme.
 
 Status: entschieden.

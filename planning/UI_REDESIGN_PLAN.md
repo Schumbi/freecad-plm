@@ -26,20 +26,24 @@ Die vorhandene Funktionalitaet bleibt erhalten. Der Umbau betrifft zuerst Strukt
 
 ## Framework-Entscheidung
 
-Empfehlung: Django-Templates behalten, dazu Bootstrap 5 lokal ausliefern und kleine eigene Komponenten ergaenzen.
+Umgesetzt: Django-Templates mit eigenem schlankem CSS. Bootstrap wurde nicht
+übernommen; die Bootstrap-4-Vendor-Assets wurden entfernt. Dialoge nutzen das
+native `<dialog>`-Element.
 
 Begruendung:
 
 - Passt zum bestehenden serverseitigen Django-Ansatz.
 - Keine SPA-Komplexitaet fuer ein internes PLM.
-- Gute, moderne Basiskomponenten fuer Buttons, Formulare, Modals, Offcanvas, Badges und Layout.
+- Keine zusaetzliche Framework-Abhaengigkeit fuer wenige Dialoge; das native
+  `<dialog>` liefert Fokus-Falle und Escape-Schliessen.
 - Lokale Auslieferung bleibt moeglich.
 - Spaeter kann HTMX punktuell fuer Dialoge, Inline-Updates und Filter nachgezogen werden.
 
 Nicht empfohlen fuer diesen Schritt:
 
 - React/Vue/Svelte als kompletter Rewrite. Das wuerde die eigentliche PLM-Arbeit blockieren.
-- Reines Bootstrap ohne eigenes Designsystem. Dann wird es zwar technischer moderner, aber nicht automatisch einfacher.
+- Zusaetzliches CSS-Framework ohne eigenes Designsystem. Es macht die Oberflaeche
+  nicht automatisch einfacher.
 
 ## Ziel-Layout
 
@@ -205,7 +209,7 @@ Neue UI-Komponenten:
 - `revision-card`
 - `context-panel`
 - `action-menu`
-- `modal-dialog`
+- `plm-dialog` (natives `<dialog>`)
 - `empty-state`
 - `job-status-pill`
 - `artifact-pill`
@@ -246,8 +250,10 @@ Abstaende:
 
 ### Schritt 1: Designsystem und Shell
 
-- Bootstrap 5 lokal einbinden.
-- Altes Bootstrap 4 entfernen.
+- Keine Bootstrap-5-Einbindung. Die Umsetzung nutzt das native
+  `<dialog>`-Element mit eigenen `plm-dialog`-Klassen (siehe
+  `plm/static/plm/app.js` und `app.css`).
+- Alte Bootstrap-4-Assets entfernen. (Umgesetzt.)
 - Neue Basisstruktur in `base.html`.
 - CSS-Variablen und Komponentenklassen anlegen.
 - Linke Navigation und Topbar bauen.
@@ -331,9 +337,9 @@ Akzeptanz:
 - Soll es eine globale Suche schon im ersten Redesign geben?
   - Empfehlung: visuell vorsehen, funktional spaeter ausbauen.
 - Sollen Dialoge mit Bootstrap 5 oder eigenem Dialogsystem laufen?
-  - Empfehlung: Bootstrap 5 Modals, wenn lokal und sauber eingebunden; sonst eigenes kleines Dialogsystem behalten.
+  - Entschieden: natives `<dialog>`-Element mit eigenem CSS (AP-C1/C2, umgesetzt).
 - Sollen Icons eingesetzt werden?
-  - Empfehlung: Ja, lokal eingebundene Bootstrap Icons oder einfache Inline-Symbole. Nicht ueberladen.
+  - Empfehlung: einfache Inline-Symbole oder eigene SVGs. Nicht ueberladen.
 
 ## Nicht Bestandteil dieses Plans
 
@@ -350,3 +356,15 @@ Akzeptanz:
 - Die neueste Revision ist als `Aktuell` markiert; Format, Download-Aktion und Bearbeitbarkeit sind direkt an der Revision sichtbar.
 - Die optionale Übernahme einer neuen FCStd-Revision in einen Projektstand ist eine bewusst zu aktivierende Zusatzoption. Der bestehende Projektstand bleibt unverändert.
 - Der ZIP-Import erklärt vor dem Start, welche CAD-Dateien zu Revisionen werden und dass identische Dateien wiederverwendet werden.
+
+## Umgesetzt: Native Dialoge 2026-11-14 (AP-C1/C2)
+
+- Alle modalen Dialoge nutzen das native `<dialog>`-Element.
+- `plm/static/plm/app.js` öffnet per `showModal()` und schließt per `close()`;
+  Auslöser und Schließen-Buttons verwenden `data-dialog-target` und
+  `data-dialog-close`.
+- Die Bootstrap-4-Vendor-Assets wurden entfernt; Templates, CSS und JavaScript
+  enthalten keine Bootstrap-Referenzen mehr.
+- Das Styling liegt in den eigenen `plm-dialog`-Klassen in `app.css`.
+- Der Fertigungsdialog, der Modell-Viewer und die Revisionsdialoge wurden
+  migriert; ein geschlossener Dialog bleibt unsichtbar.

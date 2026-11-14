@@ -49,7 +49,7 @@ Eigenes PLM/PDM fuer FreeCAD-`FCStd`-Dateien fuer ein **kleines LAN-Team**. Nich
 
 ### Technologie
 
-- **Django 5.2**, serverseitige Templates, Bootstrap 4 (UI-Redesign auf Bootstrap 5 geplant)
+- **Django 5.2**, serverseitige Templates, eigenes CSS und native `<dialog>`-Dialoge (zum Analysezeitpunkt noch Bootstrap 4; Bootstrap wurde inzwischen entfernt)
 - SQLite lokal, PostgreSQL in Docker Compose
 - Dateien im Filesystem unter `storage/`, Metadaten in DB
 - Docker Compose: `web`, `db` (PostgreSQL 16), `worker` (FreeCADCmd-Job-Schleife)

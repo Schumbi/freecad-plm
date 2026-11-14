@@ -371,6 +371,17 @@ Fertigungsdateien nach einer Bestätigung dauerhaft löschen; mit einem
 Fertigungslauf verknüpfte Dateien bleiben geschützt. Im 3D-Viewer lassen sich
 PLM-Anmerkungen an einem Modellpunkt verankern.
 
+Über **Fertigung** auf der Teilseite öffnet sich die Fertigungsübersicht unter
+`/parts/<id>/manufacturing/`. Sie listet die Fertigungsdateien aller
+Revisionen des Teils, filterbar nach Revision, Dateityp und Sortierung. Berechtigte
+Benutzer und Admins können dort direkt Dateien hochladen, ohne den Umweg über
+den Revisionsdialog.
+
+Dialoge wie Eigenschaften, Fertigung, Anmerkungen und der 3D-Viewer nutzen das
+native `<dialog>`-Element des Browsers. Sie schließen per Schaltfläche oder
+`Esc`; ein geschlossener Dialog bleibt unsichtbar. Die Oberfläche benötigt dafür
+keine Bootstrap- oder sonstige Frontend-Bibliothek.
+
 ## Projektstaende
 
 Projekte mit `.FCStd`-, `.step`-, `.stp`- und `.stl`-Dateien können als ZIP importiert werden. Das PLM legt einen Projektstand an und speichert, welche Revisionen unter welchen relativen Pfaden zusammengehören. Der Projektstand kann wieder als ZIP heruntergeladen werden.
@@ -408,6 +419,11 @@ Token-Scopes:
 - `POST /api/projects/import/`
 - `GET/POST /api/projects/<id>/`
 - `POST /api/projects/<id>/snapshots/import/`
+- `GET/POST /api/folders/` (Schreiben mit Scope `admin`)
+- `POST/DELETE /api/folders/<id>/` (Scope `admin`)
+- `GET/POST /api/projects/<id>/documents/`
+- `GET/POST /api/documents/<id>/`
+- `GET /api/document-versions/<id>/file/`
 - `GET/POST /api/projects/<id>/parts/`
 - `POST /api/projects/<id>/parts/create-fcstd/`
 - `GET/POST /api/parts/<id>/`
@@ -462,11 +478,14 @@ bleiben davon getrennt und unveränderlich.
 
 `GET/POST /api/revisions/<id>/slicer-project/` bleibt für ältere Addon-Stände
 verfügbar. Dieser ältere Endpunkt verwaltet einen Arbeitsstand unmittelbar an
-der CAD-Revision und prüft beim Update `base_sha256`. Der aktuelle
-PrintProject-Endpunkt nimmt beim Upload noch keinen Basis-Hash entgegen. Ein
-Client muss deshalb vor dem Upload den Serverstand abgleichen; zwei gleichzeitig
-geöffnete Druckprojekte sind noch nicht durch eine serverseitige
-Versionssperre geschützt.
+der CAD-Revision.
+
+Auch der aktuelle PrintProject-Endpunkt schützt Uploads mit einem Basis-Hash:
+Der Client sendet beim Update die zuletzt gelesene `slicer_project.sha256` als
+Feld `base_sha256`. Stimmt dieser Wert nicht mit dem aktuellen Serverstand
+überein, antwortet der Server mit HTTP `409` und dem Feld `current_sha256`; der
+Client muss den Stand neu laden und den Upload wiederholen. Ein leerer
+`base_sha256` ist nur für das erstmalige Hochladen ohne vorhandene Datei gültig.
 
 Checkout ist exklusiv pro Teil/Baugruppe. Das Checkout-Manifest enthaelt Root-Datei, referenzierte Revisionen, relative Pfade, Hashes und Download-URLs. Der Check-in erzeugt nur fuer modellrelevante FCStd-Aenderungen neue unveraenderliche Revisionen; reine FreeCAD-Speicherartefakte wie `GuiDocument.xml`, `ShapeAppearance*`, `LastModified*`, `PLMRevision`, lokale Checkout-Pfade in BOM-/XML-Attributen und winziges Placement-Floating-Point-Rauschen werden durch die technische Signatur ignoriert.
 
@@ -510,7 +529,8 @@ werden nicht automatisch als Original eines älteren Drucks hochgeladen.
 Projekte können mehrere zentral verwaltete Tags tragen. Unter **Eigenschaften bearbeiten**
 vorhandene Tags auswählen oder neue Namen durch Kommas getrennt eingeben.
 Groß-/Kleinschreibung und überzählige Leerzeichen erzeugen keine doppelten Tags.
-Die bisherigen Freitext-Tags an Teilen bleiben unabhängig davon.
+Projekt-Tags und Teile-Tags sind getrennte Systeme; Teile-Tags werden unter
+[Teile-Tags](#teile-tags) beschrieben.
 
 Die Projektübersicht bietet Textsuche, Tag-Auswahl mit Projektanzahlen und die
 Kombination **Alle ausgewählten** (UND) oder **Mindestens eines** (ODER).
@@ -532,6 +552,40 @@ Bestehende Authentifizierung und Administratorrechte für Änderungen gelten wei
 
 Die Datenbankmigration `0026` ergänzt Tags und Zuordnungen; bestehende Projekte
 starten ohne Tags. Das Addon unterstützt Anzeige, Filter und Bearbeitung ab 0.1.9.
+
+## Teile-Tags
+
+Teile und Baugruppen tragen eigene, projektübergreifende Tags. Sie sind zentral
+als `PartTag` gespeichert und unabhängig von den Projekt-Tags.
+
+- In der Web-UI: Teilseite öffnen, **Eigenschaften** wählen und dort unter
+  **Tags bearbeiten** die Namen durch Kommas getrennt eintragen oder entfernen.
+  Das Feld ist mit den vorhandenen Tags vorbefüllt; leer speichern entfernt alle.
+- Tags erscheinen als Chips auf der Teilseite; die Eigenschaften zeigen sie im
+  vorbefüllten Bearbeitungsfeld.
+- Die globale Suche findet Teile auch über ihre Tag-Namen.
+
+Normalisierung: Tags werden an Kommas getrennt. Unicode-Leerraum an den Rändern
+wird entfernt und innerhalb eines Tags zu einem Leerzeichen zusammengefasst.
+Leere Einträge werden verworfen; für die Eindeutigkeit vergleicht der Server
+Namen per Unicode-Casefolding. Die zuerst verwendete Schreibweise bleibt als
+Anzeigename erhalten. Ein Tag darf höchstens 255 Zeichen enthalten, pro Teil
+sind höchstens 100 Tags erlaubt. Ein Komma kann nicht Teil eines Tag-Namens sein.
+
+`GET /api/parts/<id>/` und `GET /api/projects/<id>/parts/` liefern weiterhin
+`tags` als kommagetrennten String (abwärtskompatibel für ältere Add-ons) und
+zusätzlich `tag_items` als Liste aus `{"id": 1, "name": "Montage"}`. Beim
+Anlegen/Bearbeiten akzeptiert `tags` entweder den bisherigen String oder eine
+Liste von Namen. Ein fehlendes Feld lässt die Tags unverändert, `""` oder `[]`
+entfernt alle Zuordnungen. `tag_items` ist nur lesend gedacht.
+
+Die Migrationen `0036` bis `0038` führen das relationale Tag-System ein:
+`0036` legt `PartTag` samt Zuordnungstabelle an, `0037` überträgt die bisherigen
+kommagetrennten `Part.tags`-Werte, `0038` entfernt das alte CharField. Vor dem
+Update muss `python manage.py migrate` (beziehungsweise der Migrationsschritt im
+Container) abgeschlossen sein. Vorher ein Backup von Datenbank und `storage/`
+anlegen. Die Rückmigration stellt die Tag-Menge semantisch wieder her, jedoch
+nicht die ursprüngliche Formatierung der alten Freitextwerte.
 
 ## Projektimport und abhängige Dateien
 

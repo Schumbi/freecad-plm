@@ -6,7 +6,7 @@ Diese Datei sammelt fachliche Anforderungen, Annahmen und offene Fragen fuer das
 
 ## Zielgruppe
 
-Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verwalten will. Die Anwendung soll lokal oder im lokalen Netzwerk laufen und spaeter per Docker Compose deploybar sein.
+Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verwalten will. Die Anwendung soll lokal oder im lokalen Netzwerk laufen und per Docker Compose deploybar sein.
 
 ## Kernobjekte
 
@@ -70,11 +70,15 @@ Primaere Zielgruppe ist ein kleines LAN-Team, das FreeCAD-Dateien gemeinsam verw
 - Das FreeCAD-Addon kann ein neues Teil oder eine Baugruppe mit Name, optionaler Teilenummer und Typ direkt anlegen. Es erzeugt intern eine leere FCStd-Datei, legt atomar Revision `R0001` an und öffnet sie ohne manuelles lokales Speichern.
 - Wenn ein lokal geöffneter Projekt-Checkout aktiv ist, wird die neue `R0001` direkt als zusätzliche Datei in diesen Checkout aufgenommen. Ohne aktiven Checkout entsteht ein eigener Checkout für das neue Teil.
 
+- Teile und Baugruppen koennen mehrere projektuebergreifende Tags tragen; die Zuordnung ist relational gespeichert und wird beim Anlegen/Bearbeiten ueber die Web-UI und die API gepflegt.
+- Die Teilseite bietet eine Fertigungsuebersicht, die Fertigungsdateien aller Revisionen filterbar nach Revision, Dateityp und Sortierung anzeigt und Uploads erlaubt.
+- Dialoge in der Web-UI basieren auf dem nativen `<dialog>`-Element.
+
 ## Nicht Ziel Fuer V1
 
 - Kein Umbau des alten nanoPLM.
 - Kein verpflichtender FreeCADCmd- oder FreeCAD-GUI-Betrieb.
-- Keine automatische STEP/STL/PDF/DXF-Erzeugung.
+- Keine automatische PDF- oder DXF-Erzeugung. Automatische Analyse- und PNG-Vorschau-Jobs sind umgesetzt; STEP- und STL-Exporte werden als Exportjobs manuell gestartet.
 - Keine vollstaendige Stuecklistenverwaltung.
 - Kein komplexer mehrstufiger Freigabeprozess.
 - Keine Bearbeitung von VarSet-Parametern in der ersten FreeCADCmd-Ausbaustufe.

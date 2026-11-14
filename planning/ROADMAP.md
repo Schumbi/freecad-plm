@@ -74,3 +74,12 @@ Weiterhin offen fuer V1.0: dokumentierte Browser-Abnahme und Betriebsabnahme auf
 - Eine spätere FCStd-Revision kann optional in einen neuen, von einem STEP/STL-Projektstand abgeleiteten Stand übernommen werden.
 - Das Addon legt neue FreeCAD-Teile samt `R0001` ohne vorheriges lokales Speichern an und öffnet sie im aktiven Projekt-Checkout oder in einem eigenen Checkout.
 - Aktueller Prüfstand: 219 Servertests und 138 Addon-Tests.
+
+## Implementierungsstand 2026-11-14
+
+- Native `<dialog>`-Dialoge ersetzen die Bootstrap-Modals; Bootstrap-Assets wurden entfernt (AP-C1/C2).
+- Die Teilseite bietet eine eigene Fertigungsübersicht unter `/parts/<id>/manufacturing/` mit Filtern nach Revision, Dateityp und Sortierung (AP-D1/D2).
+- Teile-Tags sind relational als `PartTag` mit eindeutigem `identity_hash` umgesetzt; die Migrationen `0036`–`0038` übertragen Altdaten und entfernen das alte CharField (AP-E1/E2).
+- Der bisherige JSON-String `tags` bleibt abwärtskompatibel; zusätzlich liefert die API `tag_items`.
+- Aktueller Prüfstand: 441 Servertests (1 übersprungen), 297 Addon-Tests (11 übersprungen) und 13 separate HTTP-Vertragstests.
+- Weiterhin offen für V1.0: Browser-Abnahme, Betriebsabnahme und der Zwei-Rechner-Test der PrintProject-Versionssperre.

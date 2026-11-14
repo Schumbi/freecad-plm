@@ -77,7 +77,7 @@ kein Kontext-Verlust.
 **Befund:** `Part.tags = models.CharField(max_length=255, blank=True)` war ein unkontrollierter
 Freitext. Migrationen 0036/0037/0038 führen `PartTag` ein und migrieren Bestandsdaten.
 API liefert rückwärtskompatibel `"tags"` (Legacy-String) und `"tag_items"` (strukturiert).
-Tags sind als Chips in Teildetail und Eigenschaften dargestellt; Suche und Formulare integriert.
+Tags sind als Chips im Teildetail und als Bearbeitungsfeld in den Eigenschaften dargestellt; Suche und Formulare integriert.
 
 ---
 
@@ -367,33 +367,7 @@ Risiko: gering nach AP-C1; sequenziell durchführen.
 
 ### Gruppe D – Fertigungs-UX (eigenständige Seite)
 
-**AP-D1: Fertigungsseite `/parts/<id>/manufacturing/`** (≈ 1 Tag)  
-Neue View, URL, Template: Liste aller Fertigungsdateien aller Revisionen des Teils,
-direkte Upload-Möglichkeit ohne modalen Kontext, Sortierung/Filter nach Revision
-und Dateityp.
-
-Dateien: `plm/views/parts.py` (neue View), `plm/urls.py` (neuer URL),
-neues Template `plm/manufacturing_overview.html`.
-
-Test: Zugriff mit Reader (nur Ansicht), Editor (Upload), Admin (Löschen).
-Upload ohne aktive Revision schlägt mit Fehlermeldung fehl.  
-Risiko: mittel. Neue Seite, kein bestehendes Verhalten berührt.
-
----
-
-**AP-D2: Link zur Fertigungsseite in Projektdetail und Suche (ABGESCHLOSSEN am 2026-11-14)** (≈ 1 h)
-
-Auf Teilseite: neuer Button in `page-header-actions`; in Suchergebnissen:
-Spalte „Fertigung" mit Link, wenn Fertigungsdateien vorhanden.
-
-Test: Navigationsfluss Suche → Fertigungsseite.  
-Risiko: keines.
-
----
-
-### Gruppe D – Fertigungs-UX (eigenständige Seite)
-
-**AP-D1: Fertigungsseite `/parts/<id>/manufacturing/`** (≈ 1 Tag)  
+**AP-D1: Fertigungsseite `/parts/<id>/manufacturing/` (ABGESCHLOSSEN am 2026-11-14)** (≈ 1 Tag)  
 Neue View, URL, Template: Liste aller Fertigungsdateien aller Revisionen des Teils,
 direkte Upload-Möglichkeit ohne modalen Kontext, Sortierung/Filter nach Revision
 und Dateityp.
@@ -417,30 +391,69 @@ Risiko: keines.
 
 ---
 
-### Gruppe E – Part-Tags Migration
+### Gruppe E – Part-Tags Migration ✅ (2026-11-14)
 
-**AP-E1: Datenmodell und Migration** (≈ 1 h)  
-Neues Model `PartTag` (analog `ProjectTag`, aber ohne `project`-Bindung, da
-Teile-Tags projektübergreifend sinnvoll sein können) **oder** Erweiterung von
-`ProjectTag` um optionalen Part-M2M. Entscheidung vor Implementierung treffen.  
-Migration 0036: `Part.tags` CharField entfernen, M2M hinzufügen.  
-Datenmigration: Bestehende komma-separierte Strings splitten und als Tags anlegen.
+**Entscheidung:** Eigenständiges globales Modell `PartTag` statt Erweiterung von
+`ProjectTag`. Damit bleiben Projekt-Tag-Verträge, Admin-Verwaltung und API
+unverändert. `PartTag.name` ist auf 255 Zeichen begrenzt; `identity_hash` ist
+der SHA-256-Hash des Unicode-casefolded und leerraum-normalisierten Namens und
+unique. `Part.tags` ist eine M2M-Beziehung zu `PartTag` mit
+`related_name="parts"` und Sortierung `["name", "pk"]`.
 
-Test: `python manage.py migrate` auf Testdatenbank; bestehende Testfälle in
-`plm/tests.py` die `Part.tags` setzen/lesen.  
-Risiko: hoch. Datenmigration, API-Rückgabe (`extracted_metadata` in JSONField
-kann `tags` als String enthalten), Addon-Vertragstests.
-→ Zuletzt implementieren, eigener Feature-Branch.
+**AP-E1: Datenmodell und Migration** (abgeschlossen)
+- `0036_add_structured_part_tags`: legt `PartTag` und das transitional benannte
+  M2M-Feld `Part.structured_tags` an. Das Legacy-CharField bleibt zunächst
+  erhalten, damit Leser während der Umstellung nicht brechen.
+- `0037_migrate_part_tags`: überträgt bestehende `Part.tags`-Strings über
+  historische Modelle (`apps.get_model`) in `PartTag`-Zeilen und Zuordnungen.
+  Idempotent über `identity_hash`. Rückwärts werden nur die in 0037 erzeugten
+  Tags und Zuordnungen entfernt; das Legacy-Feld bleibt unverändert.
+- `0038_remove_legacy_part_tags`: entfernt das CharField und benennt
+  `structured_tags` in `tags` um. Die Rückmigration legt das CharField wieder an
+  und serialisiert die M2M kanonisch (alphabetisch, `", "`-getrennt). Die
+  Tag-Menge bleibt erhalten, die ursprüngliche Formatierung nicht byte-genau.
+- `Revision.extracted_metadata` wird bewusst nicht migriert: dortige `tags`
+  sind CAD-Metadaten und keine Teile-Tags.
 
----
+**Normalisierung:** Split an `,`; Unicode-Leerraum an den Rändern entfernen,
+innerhalb zu einem Leerzeichen zusammenfassen; leere Segmente verwerfen;
+Vergleich per `casefold`; die erste Schreibweise bleibt Anzeigename; keine
+NFC/NFKC-Konvertierung; Kommas sind in Tag-Namen nicht erlaubt; maximal 255
+Zeichen pro Tag und 100 Tags pro Teil. Case-Varianten werden bewusst
+zusammengeführt. Dokumentiert in `plm/services/part_tags.py`.
 
-**AP-E2: Form, View, Template anpassen** (≈ 2 h)  
-`PartForm`: Freitext-Eingabe mit Komma-Trenner wie `ProjectForm`.  
-`part_detail.html`: Tag-Chips statt plain Text.  
-API: `GET /api/parts/<id>/` → `tags` als Liste zurückgeben.
+**AP-E2: Anwendungsintegration** (abgeschlossen)
+- `plm/services/part_tags.py`: zentrale Normalisierung, `set_part_tags`,
+  `tags_as_legacy_string`.
+- `PartForm` und `PartTagsForm`: kommagetrennte Eingabe mit serverseitiger
+  Validierung; `create_part` setzt die Tags innerhalb der bestehenden Transaktion.
+- Neue View `parts/<id>/tags/` (`update_part_tags`) mit derselben
+  Berechtigungsprüfung wie Uploads (`can_upload_revision`). Reader sehen Chips,
+  aber kein Bearbeitungsformular; die Prüfung erfolgt serverseitig.
+- Tag-Chips auf Teilseite und vorbefülltes Bearbeitungsfeld in den
+  Eigenschaften; `prefetch_related("tags")` und
+  Nutzung des Prefetch-Caches in `part_payload` vermeiden N+1.
+- Globale Suche und Admin-Suche berücksichtigen `tags__name`.
+- API abwärtskompatibel: `tags` bleibt String, neu `tag_items`
+  (`[{"id", "name"}]`). Schreiben akzeptiert String oder Namensliste; fehlendes
+  Feld erhält die Tags, `""`/`[]` löscht sie.
 
-Test: Part anlegen mit Tags, Tags in Web-UI sichtbar, API-Antwort korrekt.  
-Vertragstests `run_contract_tests.py` müssen grün bleiben.
+**Tests:** 441 Django-Tests inklusive Service-, View-, API-, Such- und
+Migrations-Tests (vorwärts und rückwärts); 13 Addon-Vertragstests grün.
+Playwright (Chromium, isolierte Testdaten): Anlegen, Bearbeiten, Leeren,
+Duplikate, Sonderzeichen/Unicode, Chips auf Teilseite und Bearbeitungsfeld in
+den Eigenschaften, Reader
+ohne Bearbeitungsformular, Suche über Tag-Namen, Persistenz nach Reload,
+390×844 ohne horizontalen Überlauf, 0 Konsolenfehler. Screenshots liegen unter
+`.playwright-mcp/` und werden nicht versioniert.
+
+**Betrieb:** Vor dem Update Datenbank, `storage/` und `.env` sichern. Die
+Migrationen 0036–0038 und die Anwendungsumstellung gemeinsam in einem
+Wartungsfenster ausrollen: 0036 → 0037 → neue Anwendung → 0038. Während des
+Zwischenstands schreibt die alte Anwendung noch in das CharField; deshalb keine
+längere gemischte Phase. Rollback nur mit dem vorherigen Image und der
+Rückmigration von 0038/0037. Die semantische Tag-Menge bleibt erhalten, die
+ursprüngliche Freitext-Formatierung nicht.
 
 ---
 
@@ -448,11 +461,11 @@ Vertragstests `run_contract_tests.py` müssen grün bleiben.
 
 | AP | Status | Risiko | Grund | Absicherung |
 |---|---|---|---|---|
-| A1–A4 | ✅ Abgeschlossen | 🟢 keines | Nur CSS/Template | Visuelle Prüfung, 405 Tests grün |
+| A1–A4 | ✅ Abgeschlossen | 🟢 keines | Nur CSS/Template | Visuelle Prüfung, 441 Tests grün |
 | B1–B4 | ✅ Abgeschlossen | 🟢 keines | Nur Template-Reihenfolge | Sichtprüfung |
-| C1 | ⏳ Nicht begonnen | 🟡 mittel | JS-Verhalten `<dialog>` vs. custom | Firefox Desktop + Android testen |
-| C2 | ⏳ Nicht begonnen | 🟢 gering | Nach C1 sequenziell | Alle Dialog-Trigger durchklicken |
-| D1 | ⏳ Nicht begonnen | 🟡 mittel | Neue View + Berechtigungen | Reader/Editor/Admin-Tests |
+| C1 | ✅ Umgesetzt | 🟡 mittel | Native `<dialog>`-Migration gemergt | Chrome/Playwright geprüft; Firefox/Android-Prüfung offen |
+| C2 | ✅ Umgesetzt | 🟢 gering | Dialog-Trigger migriert und im Browser durchlaufen | Sichtprüfung, 441 Tests grün |
+| D1 | ✅ Abgeschlossen | 🟢 keines | Eigene Fertigungsseite + Berechtigungen | Reader/Editor/Admin-Tests, Browserprüfung, 441 Tests grün |
 | D2 | ✅ Abgeschlossen | 🟢 keines | Teil- und Suchnavigation | Browserpfade, Rollen- und Query-Tests |
 | E1 | ✅ Abgeschlossen | 🟢 keines | PartTag-Modell + Datenmigration 0036/0037 | 441 Tests grün, Migrationstest vor/zurück |
 | E2 | ✅ Abgeschlossen | 🟢 keines | Rückwärtskompatible API (`tags` + `tag_items`) | 441 Tests + 13 Addon-Vertragstests grün, Playwright-Prüfung |
