@@ -93,6 +93,15 @@
         <noscript><button type="submit">Filtern</button></noscript>
       </div>
     </form>
+  {% if active_filter_chips %}
+    <div class="active-filters" aria-label="Aktive Filter">
+      <span class="active-filters-label">Aktive Filter:</span>
+      {% for chip in active_filter_chips %}
+        <span class="filter-chip">{{ chip.label }}<a href="{{ chip.url }}" aria-label="Filter {{ chip.label }} entfernen">×</a></span>
+      {% endfor %}
+      <a class="active-filters-reset" href="{% url 'plm:project_list' %}">Alle zurücksetzen</a>
+    </div>
+  {% endif %}
   {% if projects %}
     {% if project_view == 'details' %}
       <div class="table-wrap project-details">
@@ -147,7 +156,16 @@
   {% else %}
     <div class="empty-state">
       <strong>Keine Projekte gefunden</strong>
-      Ändere die Filter oder lege ein Projekt an.
+      {% if active_filter_chips %}
+        <p>Für die aktiven Filter gibt es keine Treffer.</p>
+        <div class="empty-state-actions">
+          <a class="btn btn-outline-secondary" href="{% url 'plm:project_list' %}">Filter zurücksetzen</a>
+          {% if can_create_project %}<a class="btn btn-primary" href="{% url 'plm:create_project' %}">Projekt anlegen</a>{% endif %}
+        </div>
+      {% else %}
+        <p>Lege das erste Projekt an, um Teile und Revisionen zu verwalten.</p>
+        {% if can_create_project %}<a class="btn btn-primary" href="{% url 'plm:create_project' %}">Projekt anlegen</a>{% endif %}
+      {% endif %}
     </div>
   {% endif %}
   </section>

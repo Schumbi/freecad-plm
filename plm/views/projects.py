@@ -143,6 +143,45 @@ def project_list(request):
     def children(parent_id, ancestors=frozenset()):
         return [{"folder": folder, "children": children(folder.pk, ancestors | {folder.pk})}
                 for folder in folders if folder.parent_id == parent_id and folder.pk not in ancestors]
+
+    def url_without(param, value=None):
+        params = request.GET.copy()
+        if value is None:
+            params.pop(param, None)
+        else:
+            remaining = [item for item in params.getlist(param) if item != str(value)]
+            if remaining:
+                params.setlist(param, remaining)
+            else:
+                params.pop(param, None)
+        query = params.urlencode()
+        base = reverse("plm:project_list")
+        return f"{base}?{query}" if query else base
+
+    untagged = request.GET.get("untagged") == "1"
+    active_filter_chips = []
+    if selected_folder == "none":
+        active_filter_chips.append({"label": "Ohne Ordner", "url": url_without("folder")})
+    elif selected_folder not in {"all", ""}:
+        label = (
+            f"Ordner: {selected_folder_label}"
+            if folder_path
+            else f"Unbekannter Ordner ({selected_folder})"
+        )
+        active_filter_chips.append({"label": label, "url": url_without("folder")})
+
+    tag_names_by_id = {str(tag.pk): tag.name for tag in tags}
+    for tag_id in selected_tags:
+        label = (
+            f"Tag: {tag_names_by_id[tag_id]}"
+            if tag_id in tag_names_by_id
+            else f"Unbekannter Tag ({tag_id})"
+        )
+        active_filter_chips.append({"label": label, "url": url_without("tag", tag_id)})
+
+    if untagged:
+        active_filter_chips.append({"label": "Nur ohne Tags", "url": url_without("untagged")})
+
     return render(
         request,
         "plm/project_list.html",
@@ -162,10 +201,11 @@ def project_list(request):
             "tags": tags,
             "selected_tags": selected_tags,
             "selected_tag_names": [tag.name for tag in tags if str(tag.pk) in selected_tags],
+            "active_filter_chips": active_filter_chips,
             "tags_open": request.GET.get("tag_picker") == "1",
             "query": request.GET.get("q", ""),
             "tag_mode": request.GET.get("mode", "all"),
-            "untagged": request.GET.get("untagged") == "1",
+            "untagged": untagged,
 
         },
     )
