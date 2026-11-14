@@ -1858,8 +1858,25 @@ class RevisionUploadViewTests(TestCase):
         self.assertEqual(queued.json()["status"], "queued")
         artifact.metadata["preview_generator_version"] = PREVIEW_GENERATOR_VERSION
         artifact.save(update_fields=["metadata"])
+        # Ein aktuelles 3MF reicht noch nicht: Solange kein GLB existiert,
+        # bleibt die Aktualisierung angefordert.
+        response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
+        self.assertEqual(response["X-PLM-Viewer-Refresh-Required"], "1")
+        response.close()
+        glb = RevisionArtifact.objects.create(
+            revision=revision,
+            artifact_type=RevisionArtifact.ArtifactType.GLB,
+            view_name="viewer-preview",
+            file=ContentFile(b"glTF", name="preview.glb"),
+            original_filename="preview.glb",
+            sha256="e" * 64,
+            size_bytes=4,
+            metadata={"preview_generator_version": PREVIEW_GENERATOR_VERSION},
+        )
         response = self.client.get(reverse("plm:revision_viewer_source", args=[revision.id]))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "model/gltf-binary")
+        self.assertEqual(response["ETag"], '"' + glb.sha256 + '"')
         self.assertNotIn("X-PLM-Viewer-Refresh-Required", response)
         response.close()
 

@@ -376,6 +376,7 @@ class RevisionArtifact(TimeStampedModel):
         STEP = "step", "STEP"
         STL = "stl", "STL"
         THREEMF = "3mf", "3MF"
+        GLB = "glb", "GLB"
         PNG = "png", "PNG"
 
     revision = models.ForeignKey(

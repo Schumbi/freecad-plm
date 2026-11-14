@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shlex
+import struct
 import shutil
 import subprocess
 import sys
@@ -33,7 +34,7 @@ PNG_VIEW_NAMES = (
 )
 
 
-PREVIEW_GENERATOR_VERSION = 8
+PREVIEW_GENERATOR_VERSION = 9
 
 
 def preview_source_context(revision):
@@ -62,6 +63,7 @@ def filter_preview_context(queryset, revision, *, artifacts=False):
 
 FREECADCMD_SCRIPT = r'''
 import json
+import struct
 import sys
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -218,6 +220,142 @@ def write_viewer_3mf(meshes, colors, path):
         archive.writestr("_rels/.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')
 
 
+def _glb_color(value):
+    text = str(value or "").strip()
+    if text.startswith("#"):
+        text = text[1:]
+    elif text.lower().startswith("0x"):
+        text = text[2:]
+    if len(text) != 6:
+        text = "8193A1"
+    try:
+        return [int(text[0:2], 16) / 255.0, int(text[2:4], 16) / 255.0, int(text[4:6], 16) / 255.0, 1.0]
+    except ValueError:
+        return [0.506, 0.576, 0.631, 1.0]
+
+
+def write_viewer_glb(meshes, colors, path):
+    """Schreibt ein GLB mit Positionen/Indizes und einer Farbe je Solid.
+
+    Normals werden bewusst nicht mitgeschrieben; der Viewer berechnet sie
+    nach dem Laden. Das haelt die Datei klein und die Erzeugung simpel.
+    """
+    from array import array
+
+    binary = bytearray()
+    buffer_views = []
+    accessors = []
+    gltf_meshes = []
+    nodes = []
+    materials = []
+    material_index = {}
+    scene_nodes = []
+
+    def append_view(payload, target=None):
+        while len(binary) % 4:
+            binary.append(0)
+        offset = len(binary)
+        binary.extend(payload)
+        view = {
+            "buffer": 0,
+            "byteOffset": offset,
+            "byteLength": len(payload),
+        }
+        if target is not None:
+            view["target"] = target
+        buffer_views.append(view)
+        return len(buffer_views) - 1
+
+    for mesh, color in zip(meshes, colors):
+        points, facets = mesh.Mesh.Topology
+        if not points or not facets:
+            continue
+        positions = array("f")
+        for point in points:
+            positions.extend((float(point.x), float(point.y), float(point.z)))
+        if sys.byteorder != "little":
+            positions.byteswap()
+        indices = array("I")
+        for facet in facets:
+            indices.extend((int(facet[0]), int(facet[1]), int(facet[2])))
+        if sys.byteorder != "little":
+            indices.byteswap()
+
+        position_view = append_view(positions.tobytes(), 34962)
+        index_view = append_view(indices.tobytes(), 34963)
+        xs = [float(point.x) for point in points]
+        ys = [float(point.y) for point in points]
+        zs = [float(point.z) for point in points]
+        position_accessor = len(accessors)
+        accessors.append({
+            "bufferView": position_view,
+            "componentType": 5126,
+            "count": len(points),
+            "type": "VEC3",
+            "min": [min(xs), min(ys), min(zs)],
+            "max": [max(xs), max(ys), max(zs)],
+        })
+        index_accessor = len(accessors)
+        accessors.append({
+            "bufferView": index_view,
+            "componentType": 5125,
+            "count": len(indices),
+            "type": "SCALAR",
+        })
+        rgba = _glb_color(color)
+        key = tuple(round(channel, 4) for channel in rgba)
+        if key not in material_index:
+            material_index[key] = len(materials)
+            materials.append({
+                "name": str(color or "PLM"),
+                "pbrMetallicRoughness": {
+                    "baseColorFactor": list(rgba),
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.62,
+                },
+                "doubleSided": False,
+            })
+        mesh_index = len(gltf_meshes)
+        gltf_meshes.append({
+            "name": getattr(mesh, "Label", "Solid"),
+            "primitives": [{
+                "attributes": {"POSITION": position_accessor},
+                "indices": index_accessor,
+                "material": material_index[key],
+                "mode": 4,
+            }],
+        })
+        nodes.append({"name": getattr(mesh, "Label", "Solid"), "mesh": mesh_index})
+        scene_nodes.append(len(nodes) - 1)
+
+    if not gltf_meshes:
+        raise RuntimeError("Keine Volumenkoerper fuer die 3D-Vorschau gefunden.")
+
+    document = {
+        "asset": {"version": "2.0", "generator": "FreeCAD-PLM"},
+        "scene": 0,
+        "scenes": [{"nodes": scene_nodes}],
+        "nodes": nodes,
+        "meshes": gltf_meshes,
+        "materials": materials,
+        "buffers": [{"byteLength": len(binary)}],
+        "bufferViews": buffer_views,
+        "accessors": accessors,
+    }
+    json_bytes = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    while len(json_bytes) % 4:
+        json_bytes += b" "
+    while len(binary) % 4:
+        binary.append(0)
+    total = 12 + 8 + len(json_bytes) + 8 + len(binary)
+    with open(path, "wb") as handle:
+        handle.write(struct.pack("<4sII", b"glTF", 2, total))
+        handle.write(struct.pack("<I4s", len(json_bytes), b"JSON"))
+        handle.write(json_bytes)
+        handle.write(struct.pack("<I4s", len(binary), b"BIN\x00"))
+        handle.write(binary)
+
+
 def same_viewer_solid(solid, candidate):
     if solid.isSame(candidate):
         return True
@@ -294,7 +432,7 @@ def solid_viewer_color(obj, solid, colors, fallback="#8193A1", document_colors=N
     return color
 
 
-def export_viewer_preview(objects, path, colors=None, document_colors=None):
+def export_viewer_preview(objects, path, colors=None, document_colors=None, glb_path=None):
     # Keep solids separate, including flush inlays inside assembly compounds.
     # A temporary document avoids modifying the source or its feature history.
     import MeshPart
@@ -316,6 +454,8 @@ def export_viewer_preview(objects, path, colors=None, document_colors=None):
         if not meshes:
             raise RuntimeError("Keine Volumenkoerper fuer die 3D-Vorschau gefunden.")
         write_viewer_3mf(meshes, mesh_colors, path)
+        if glb_path is not None:
+            write_viewer_glb(meshes, mesh_colors, glb_path)
     finally:
         FreeCAD.closeDocument(preview_doc.Name)
 
@@ -331,11 +471,16 @@ def create_preview_sources(doc, spec, output_dir):
     Import.export(objects, str(step_path))
     Mesh.export(objects, str(stl_path))
     viewer_path = output_dir / f"{spec['revision_code']}-viewer.3mf"
-    export_viewer_preview(objects, viewer_path, spec.get("viewer_colors", {}), spec.get("viewer_document_colors", {}))
+    glb_path = output_dir / f"{spec['revision_code']}-viewer.glb"
+    export_viewer_preview(
+        objects, viewer_path, spec.get("viewer_colors", {}),
+        spec.get("viewer_document_colors", {}), glb_path=glb_path,
+    )
     return {
         "artifacts": [
             {"path": str(step_path), "artifact_type": "step", "view_name": "preview"},
             {"path": str(viewer_path), "artifact_type": "3mf", "view_name": "viewer-preview"},
+            {"path": str(glb_path), "artifact_type": "glb", "view_name": "viewer-preview"},
         ],
         "preview_mesh_path": str(stl_path),
     }
@@ -345,15 +490,18 @@ def create_viewer_source(doc, spec, output_dir):
     """Erzeugt nur das 3MF fuer den Web-Viewer, ohne PNG-/STEP-Export."""
     objects = preview_objects(doc)
     viewer_path = output_dir / f"{spec['revision_code']}-viewer.3mf"
+    glb_path = output_dir / f"{spec['revision_code']}-viewer.glb"
     export_viewer_preview(
         objects,
         viewer_path,
         spec.get("viewer_colors", {}),
         spec.get("viewer_document_colors", {}),
+        glb_path=glb_path,
     )
     return {
         "artifacts": [
             {"path": str(viewer_path), "artifact_type": "3mf", "view_name": "viewer-preview"},
+            {"path": str(glb_path), "artifact_type": "glb", "view_name": "viewer-preview"},
         ],
     }
 

@@ -33,6 +33,7 @@ VIEWER_FALLBACK_VIEW_NAME = "preview"
 VIEWER_SUPPORTED_ARTIFACT_TYPES = {
     RevisionArtifact.ArtifactType.STL,
     RevisionArtifact.ArtifactType.THREEMF,
+    RevisionArtifact.ArtifactType.GLB,
     RevisionArtifact.ArtifactType.STEP,
 }
 
@@ -48,6 +49,7 @@ VIEWER_SUPPORTED_MANUFACTURING_TYPES = {
 VIEWER_CONTENT_TYPES = {
     "stl": "model/stl",
     "3mf": "model/3mf",
+    "glb": "model/gltf-binary",
 }
 
 
@@ -164,12 +166,27 @@ def viewer_file_format(filename, fallback=""):
         return "stl"
     if suffix == ".3mf":
         return "3mf"
-    if fallback in {"stl", "3mf"}:
+    if suffix == ".glb":
+        return "glb"
+    if fallback in {"stl", "3mf", "glb"}:
         return fallback
     return ""
 
 
+def revision_viewer_glb_artifact(revision):
+    artifacts = revision.artifacts.filter(
+        artifact_type=RevisionArtifact.ArtifactType.GLB,
+        view_name=VIEWER_PREVIEW_VIEW_NAME,
+    )
+    return filter_preview_context(artifacts.filter(
+        metadata__preview_generator_version=PREVIEW_GENERATOR_VERSION,
+    ), revision, artifacts=True).order_by("-created_at", "-id").first()
+
+
 def revision_viewer_artifact(revision, *, allow_previous=False):
+    glb = revision_viewer_glb_artifact(revision)
+    if glb is not None:
+        return glb
     artifacts = revision.artifacts.filter(
         artifact_type=RevisionArtifact.ArtifactType.THREEMF,
         view_name=VIEWER_PREVIEW_VIEW_NAME,
@@ -224,10 +241,15 @@ def missing_viewer_preview_response():
 def viewer_preview_response(artifact):
     context = preview_source_context(artifact.revision)
     stale_sources = bool(context) and artifact.metadata.get("parameters", {}).get("preview_sources_sha256") != context["preview_sources_sha256"]
+    needs_glb = revision_viewer_glb_artifact(artifact.revision) is None
     return viewer_file_response(
         artifact.file, artifact.original_filename, artifact.artifact_type,
         cad_coordinates=True,
-        refresh_required=stale_sources or artifact.metadata.get("preview_generator_version") != PREVIEW_GENERATOR_VERSION,
+        refresh_required=(
+            stale_sources
+            or artifact.metadata.get("preview_generator_version") != PREVIEW_GENERATOR_VERSION
+            or needs_glb
+        ),
         etag=artifact.sha256,
     )
 
@@ -363,7 +385,7 @@ def revision_png_status_needs_poll(status_payload):
 def ensure_revision_viewer_preview(revision, user, *, process_inline=True):
     if revision.file_format == Revision.FileFormat.STL:
         return "ready"
-    if revision_viewer_artifact(revision):
+    if revision_viewer_glb_artifact(revision):
         return "ready"
     if revision_has_pending_viewer_job(revision) or revision_has_pending_png_job(revision):
         return "pending"

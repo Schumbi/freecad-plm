@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from plm.derivatives import revision_has_pending_png_job
 from plm.freecadcmd import PREVIEW_GENERATOR_VERSION
 from plm.models import Revision
-from plm.views.common import ensure_revision_viewer_preview, revision_viewer_artifact
+from plm.views.common import ensure_revision_viewer_preview, revision_viewer_glb_artifact
 
 
 class Command(BaseCommand):
@@ -41,7 +41,7 @@ class Command(BaseCommand):
         )
         candidates = []
         for revision in queryset.iterator():
-            if revision_viewer_artifact(revision):
+            if revision_viewer_glb_artifact(revision):
                 continue
             if revision_has_pending_png_job(revision):
                 continue
