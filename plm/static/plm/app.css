@@ -2846,3 +2846,58 @@ kbd {
   font-size: 0.8rem;
   padding: 0.1rem 0.35rem;
 }
+
+/* OP-7: Bewegung reduzieren, wenn das Betriebssystem es verlangt. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* OP-8: Druckansicht fuer Revisionskarten und Projektuebersichten. */
+@media print {
+  .sidebar-nav,
+  .topbar,
+  .breadcrumbs,
+  .page-header-actions,
+  .revision-actions,
+  .message,
+  .sidebar-backdrop,
+  dialog {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .app-shell {
+    background: none !important;
+    display: block;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .revision-card,
+  .data-card,
+  .panel,
+  .snapshot-card {
+    border: 1px solid #999;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}
