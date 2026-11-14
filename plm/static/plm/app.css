@@ -2807,3 +2807,15 @@ figure {
   font-weight: 700;
   margin-bottom: var(--space-3);
 }
+
+
+/* OP-1: Einheitlicher, gut sichtbarer Fokusring fuer alle interaktiven Elemente. */
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.model-viewer-dialog :where(button, a, summary):focus-visible,
+.sidebar-nav :where(a, button, summary):focus-visible {
+  outline-color: #ffffff;
+}
