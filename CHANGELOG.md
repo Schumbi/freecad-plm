@@ -5,6 +5,19 @@ dokumentiert.
 
 ## [Unreleased] - 2026-11-14
 
+### 3D-Anzeige beschleunigt
+
+- 3D-Artefakte werden mit `ETag` und `Cache-Control` ausgeliefert; erneutes
+  Öffnen lädt nur noch 304-Header statt mehrerer Megabyte.
+- Der Viewer zeigt das erste Bild vor der teuren Kantengeometrie und lädt
+  Anmerkungen asynchron nach. Die Vorschau-Warteschlange fragt im
+  Sekundentakt statt alle drei Sekunden.
+- Ein neuer, schlanker `viewer`-Job erzeugt beim ersten Öffnen nur das
+  3MF statt zusätzlich sieben PNG-Ansichten (Messung: 3,3 s statt
+  durchschnittlich 35,6 s bei bestehenden `png_views`-Jobs).
+- `manage.py backfill_viewer_previews` listet veraltete Vorschauen und legt
+  mit `--apply` Hintergrundjobs an.
+
 ### UX-, Usability- und Accessibility-Überarbeitung
 
 Grundlage: `planning/UX_AUDIT_2026-11-14.md`. Alle Änderungen sind mit
