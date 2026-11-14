@@ -2,6 +2,7 @@ import * as THREE from "./vendor/three/build/three.module.js";
 import { OrbitControls } from "./vendor/three/examples/jsm/controls/OrbitControls.js";
 import { STLLoader } from "./vendor/three/examples/jsm/loaders/STLLoader.js";
 import { ThreeMFLoader } from "./vendor/three/examples/jsm/loaders/3MFLoader.js";
+import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 
 const dialog = document.getElementById("model-viewer-dialog");
 const titleElement = document.getElementById("model-viewer-title");
@@ -295,7 +296,13 @@ async function fetchModel(sourceUrl) {
     buffer: await response.arrayBuffer(),
     cadCoordinates: response.headers.get("X-PLM-Viewer-Coordinates") === "cad",
     refreshRequired: response.headers.get("X-PLM-Viewer-Refresh-Required") === "1",
-    format: contentType === "model/3mf" ? "3mf" : contentType === "model/stl" ? "stl" : "",
+    format: contentType === "model/3mf"
+      ? "3mf"
+      : contentType === "model/stl"
+        ? "stl"
+        : contentType === "model/gltf-binary"
+          ? "glb"
+          : "",
   };
 }
 
@@ -375,7 +382,19 @@ function highlightCoplanarDetails(object) {
   return highlighted;
 }
 
-function parseModel(buffer, format, cadCoordinates = false) {
+async function parseModel(buffer, format, cadCoordinates = false) {
+  if (format === "glb") {
+    const gltf = await new GLTFLoader().parseAsync(buffer, "");
+    const object = gltf.scene;
+    object.userData.viewerZUp = true;
+    object.traverse((item) => {
+      if (!item.isMesh || !item.geometry) return;
+      if (!item.geometry.attributes.normal) item.geometry.computeVertexNormals();
+    });
+    object.userData.viewerCoplanarDetailCount = highlightCoplanarDetails(object);
+    return object;
+  }
+
   if (format === "3mf") {
     const object = new ThreeMFLoader().parse(buffer);
     if (!cadCoordinates) object.rotation.set(-Math.PI / 2, 0, 0);
@@ -428,7 +447,7 @@ async function openViewer(trigger) {
     if (loadId !== activeLoadId || !dialog.open) return;
     const actualFormat = loaded.format || format;
     formatElement.textContent = actualFormat.toUpperCase();
-    currentObject = parseModel(loaded.buffer, actualFormat, loaded.cadCoordinates);
+    currentObject = await parseModel(loaded.buffer, actualFormat, loaded.cadCoordinates);
     if (currentObject.userData.viewerCoplanarDetailCount) {
       formatElement.textContent = `${actualFormat.toUpperCase()} · bündige Details hervorgehoben`;
     }
@@ -636,7 +655,7 @@ async function refreshDisplayedModel(trigger, sourceUrl, loadId, format) {
     // Geometry is from the same immutable revision; keep the user's camera.
     const position = camera.position.clone();
     const target = controls.target.clone();
-    const replacement = parseModel(loaded.buffer, loaded.format || format, loaded.cadCoordinates);
+    const replacement = await parseModel(loaded.buffer, loaded.format || format, loaded.cadCoordinates);
     clearModel();
     currentObject = replacement;
     scene.add(currentObject);
